@@ -59,13 +59,16 @@ export default function Login() {
     }, 450);
   };
 
+  // Dynamic clinic logo
+  const savedLogo = localStorage.getItem('dental_clinic_logo');
+
   return (
     <div className="w-full min-h-screen bg-surface flex flex-col lg:flex-row relative overflow-hidden font-sans">
       {/* Top Advisory Banner */}
       <div className="fixed top-0 inset-x-0 h-8 z-50 bg-[#d3e4ff] text-[#004881] flex items-center justify-center px-4 text-center shadow-xs">
         <span className="text-xs font-semibold flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[16px] text-primary">shield_with_heart</span>
-          Smile Clinic RxGuard — Restricted Clinical Decision Support Portal
+          <span className="material-symbols-outlined text-[16px] text-primary">dentistry</span>
+          Smile Clinic — Prescription Safety & Decision Support Portal
         </span>
       </div>
 
@@ -80,12 +83,16 @@ export default function Login() {
           {/* Logo & Header */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-md">
-                <span className="material-symbols-outlined text-[28px] text-primary">shield_with_heart</span>
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-md overflow-hidden">
+                {savedLogo ? (
+                  <img src={savedLogo} alt="Clinic Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <span className="material-symbols-outlined text-[28px] text-primary">dentistry</span>
+                )}
               </div>
               <div>
                 <span className="text-xl font-bold tracking-tight text-primary block leading-tight">Smile Clinic</span>
-                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">RxGuard Safety Checker</span>
+                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Prescription Safety Portal</span>
               </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">Clinician Sign-In</h1>

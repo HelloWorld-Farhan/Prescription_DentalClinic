@@ -142,16 +142,16 @@ export default function Layout() {
         <div className="flex flex-col">
           {/* Brand Header */}
           <div className="px-6 pt-6 pb-4 flex items-center gap-3 border-b border-surface-container-low">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-sm overflow-hidden shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-md overflow-hidden shrink-0">
               {clinicLogo ? (
                 <img src={clinicLogo} alt="Clinic Logo" className="w-full h-full object-contain p-1" />
               ) : (
-                <span className="material-symbols-outlined text-[24px] text-primary">shield_with_heart</span>
+                <span className="material-symbols-outlined text-[24px] text-primary">dentistry</span>
               )}
             </div>
             <div>
               <span className="text-lg font-bold tracking-tight text-primary block leading-tight">Smile Clinic</span>
-              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">RxGuard • Safety</span>
+              <span className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider">Prescription Safety Portal</span>
             </div>
           </div>
 

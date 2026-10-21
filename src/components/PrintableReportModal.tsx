@@ -56,11 +56,11 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
               <div className="flex items-start justify-between border-b-2 border-primary/20 pb-6">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="material-symbols-outlined text-primary text-[28px]">shield_with_heart</span>
+                    <span className="material-symbols-outlined text-primary text-[28px]">dentistry</span>
                     <h1 className="text-2xl font-black tracking-tight text-primary">Smile Clinic</h1>
                   </div>
                   <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                    RxGuard Clinical Decision Support & Interaction Screening Service
+                    Prescription Safety & Interaction Screening Service
                   </p>
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     100 Dental Plaza Blvd, Suite 400 • Medical Records Hotline: (555) 019-8234
