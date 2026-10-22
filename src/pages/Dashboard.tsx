@@ -397,6 +397,14 @@ export default function Dashboard() {
                 <span>Scan Rx Barcode</span>
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/report')}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-surface-container-low text-secondary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px] text-primary">description</span>
+              <span>Open Printable CDS Verification Report</span>
+            </button>
           </div>
 
           {/* High Priority Queue Card */}

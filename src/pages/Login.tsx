@@ -3,8 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 export const OFFICIAL_PRESCRIBER_CREDENTIALS = {
-  email: 'rxguard@smileclinic.com',
-  password: 'RxGuard@Smile2026#',
+  email: 'prescription@smileclinic.com',
+  password: 'Prescription@Smile2026#',
   name: 'Dr. Sarah Lin, PharmD',
   role: 'Lead Clinical Pharmacist - Inpatient',
   npi: 'NPI# 1092837482'
@@ -12,7 +12,7 @@ export const OFFICIAL_PRESCRIBER_CREDENTIALS = {
 
 export default function Login() {
   const navigate = useNavigate();
-  const [selectedRole, setSelectedRole] = useState<'Clinician' | 'Pharmacist' | 'Reviewer' | 'Admin'>('Clinician');
+  const [selectedRole, setSelectedRole] = useState<'Clinician' | 'Pharmacist' | 'Reviewer' | 'Admin'>('Pharmacist');
   const [clinicalId, setClinicalId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,6 +21,14 @@ export default function Login() {
   const [attest2, setAttest2] = useState(false);
   const [attest3, setAttest3] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successFlash, setSuccessFlash] = useState<string | null>(() => {
+    const flash = sessionStorage.getItem('smileclinic_prescriber_registered_flash');
+    if (flash) {
+      sessionStorage.removeItem('smileclinic_prescriber_registered_flash');
+      return flash;
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   // Dynamic clinic logo
@@ -46,33 +54,67 @@ export default function Login() {
       return;
     }
 
-    const inputId = clinicalId.trim().toLowerCase();
-    const isOfficial =
-      (inputId === OFFICIAL_PRESCRIBER_CREDENTIALS.email.toLowerCase() ||
-       inputId === 'doctor@smileclinic.com' ||
-       inputId.includes('1092837482') ||
-       inputId.includes('smileclinic')) &&
-      (password === OFFICIAL_PRESCRIBER_CREDENTIALS.password ||
-       password === 'Doctor@Smile2026#' ||
-       password.length >= 6);
+    const inputEmail = clinicalId.trim().toLowerCase();
+    const inputPass = password;
 
-    if (isOfficial) {
+    // Check Official Prescriber Credentials
+    const isOfficialPrescription =
+      inputEmail === OFFICIAL_PRESCRIBER_CREDENTIALS.email.toLowerCase() &&
+      inputPass === OFFICIAL_PRESCRIBER_CREDENTIALS.password;
+
+    // Check legacy rxguard & doctor credentials
+    const isOfficialRxGuard =
+      (inputEmail === 'rxguard@smileclinic.com' && inputPass === 'RxGuard@Smile2026#') ||
+      (inputEmail === 'doctor@smileclinic.com' && inputPass === 'Doctor@Smile2026#');
+
+    // Check Registered Prescribers
+    const registeredPrescribers = JSON.parse(
+      localStorage.getItem('smileclinic_registered_prescribers') || '[]'
+    );
+    const registered = registeredPrescribers.find(
+      (p: any) => p.email.toLowerCase() === inputEmail && p.password === inputPass
+    );
+
+    // Also check registered doctors from Doctor portal if shared
+    const registeredDoctors = JSON.parse(
+      localStorage.getItem('smileclinic_registered_doctors') || '[]'
+    );
+    const registeredDoc = registeredDoctors.find(
+      (d: any) => d.email.toLowerCase() === inputEmail && d.password === inputPass
+    );
+
+    if (isOfficialPrescription || isOfficialRxGuard || registered || registeredDoc) {
       setIsLoading(true);
       setTimeout(() => {
         sessionStorage.setItem('rxguard_authenticated', 'true');
-        sessionStorage.setItem('rxguard_prescriber_name', OFFICIAL_PRESCRIBER_CREDENTIALS.name);
-        sessionStorage.setItem('rxguard_prescriber_role', selectedRole);
-        sessionStorage.setItem('rxguard_prescriber_npi', clinicalId || OFFICIAL_PRESCRIBER_CREDENTIALS.npi);
+        sessionStorage.setItem(
+          'rxguard_prescriber_name',
+          registered ? registered.fullName : registeredDoc ? registeredDoc.name : OFFICIAL_PRESCRIBER_CREDENTIALS.name
+        );
+        sessionStorage.setItem(
+          'rxguard_prescriber_role',
+          registered ? registered.role : selectedRole
+        );
+        sessionStorage.setItem(
+          'rxguard_prescriber_npi',
+          registered ? registered.npiLicense : OFFICIAL_PRESCRIBER_CREDENTIALS.npi
+        );
+        sessionStorage.setItem(
+          'rxguard_prescriber_email',
+          inputEmail
+        );
         navigate('/dashboard');
-      }, 350);
+      }, 400);
     } else {
-      setErrorMessage('Invalid credentials. Use rxguard@smileclinic.com / RxGuard@Smile2026# or click 1-Click Demo Fill.');
+      setErrorMessage(
+        'Invalid credentials. Please enter authorized prescriber email and password, or enroll below.'
+      );
     }
   };
 
   const handleSsoClick = () => {
-    setClinicalId('sso.clinician@smileclinic.com');
-    setPassword('SSO-TOKEN-AUTH');
+    setClinicalId(OFFICIAL_PRESCRIBER_CREDENTIALS.email);
+    setPassword(OFFICIAL_PRESCRIBER_CREDENTIALS.password);
     setAttest1(true);
     setAttest2(true);
     setAttest3(true);
@@ -82,6 +124,7 @@ export default function Login() {
       sessionStorage.setItem('rxguard_prescriber_name', 'Dr. Sarah Lin, PharmD');
       sessionStorage.setItem('rxguard_prescriber_role', 'Pharmacist');
       sessionStorage.setItem('rxguard_prescriber_npi', 'EHR-SSO-CERNER-8891');
+      sessionStorage.setItem('rxguard_prescriber_email', OFFICIAL_PRESCRIBER_CREDENTIALS.email);
       navigate('/dashboard');
     }, 400);
   };
@@ -207,6 +250,14 @@ export default function Login() {
                 </div>
               </div>
 
+              {/* Success Flash Notification */}
+              {successFlash && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2">
+                  <span className="material-symbols-outlined text-sm shrink-0 mt-0.5 text-emerald-600">check_circle</span>
+                  <span>{successFlash}</span>
+                </div>
+              )}
+
               {/* Error Message */}
               {errorMessage && (
                 <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2">
@@ -231,7 +282,7 @@ export default function Login() {
                       type="text"
                       value={clinicalId}
                       onChange={(e) => setClinicalId(e.target.value)}
-                      placeholder="e.g. rxguard@smileclinic.com or NPI# 1092837482"
+                      placeholder="prescription@smileclinic.com or NPI# 1092837482"
                       required
                       className="w-full h-10 pl-10 pr-3 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-on-surface text-sm placeholder-outline/60 focus:bg-surface-container-low focus:border-primary focus:outline-none transition-colors"
                     />
@@ -383,6 +434,14 @@ export default function Login() {
                       ? 'Institutional certifications active. Ready for clinical screening.'
                       : 'Confirm all 3 institutional certifications to unlock verification workflow.'}
                   </span>
+
+                  {/* Link to Signup */}
+                  <div className="pt-2 text-center text-xs">
+                    <span className="text-outline">Need new authorized prescriber credentials? </span>
+                    <Link to="/signup" className="text-primary font-bold hover:underline">
+                      Enroll as Prescriber / Pharmacist
+                    </Link>
+                  </div>
                 </div>
               </form>
 

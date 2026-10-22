@@ -88,6 +88,13 @@ export default function Layout() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const isAuth = sessionStorage.getItem('rxguard_authenticated') === 'true';
+    if (!isAuth) {
+      navigate('/login', { replace: true });
+    }
+  }, [navigate]);
+
   const unreadCount = notifications.filter(n => n.unread).length;
 
   const markAllAsRead = () => {
@@ -98,6 +105,7 @@ export default function Layout() {
     { name: 'Dashboard', path: '/dashboard', icon: 'grid_view' },
     { name: 'New Safety Check', path: '/check', icon: 'add_circle' },
     { name: 'Alerts Queue', path: '/alerts', icon: 'warning' },
+    { name: 'Reports Preview', path: '/report', icon: 'analytics' },
     { name: 'Audit Log', path: '/audit-log', icon: 'verified' },
     { name: 'Rules & Data', path: '/rules', icon: 'database' },
     { name: 'Settings', path: '/settings', icon: 'settings' },
@@ -351,9 +359,15 @@ export default function Layout() {
                     className="absolute right-0 top-12 w-64 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-2 z-50 space-y-1"
                   >
                     <div className="p-3 border-b border-surface-container-low">
-                      <div className="font-bold text-xs text-on-surface">Dr. Sarah Lin, PharmD</div>
-                      <div className="text-[10px] text-outline">Lead Clinical Prescriber</div>
-                      <div className="text-[10px] text-primary font-mono mt-0.5">NPI-9834210</div>
+                      <div className="font-bold text-xs text-on-surface">
+                        {sessionStorage.getItem('rxguard_prescriber_name') || 'Dr. Sarah Lin, PharmD'}
+                      </div>
+                      <div className="text-[10px] text-outline">
+                        {sessionStorage.getItem('rxguard_prescriber_role') || 'Lead Clinical Pharmacist'}
+                      </div>
+                      <div className="text-[10px] text-primary font-mono mt-0.5">
+                        {sessionStorage.getItem('rxguard_prescriber_npi') || 'NPI-1092837482'}
+                      </div>
                     </div>
 
                     <a

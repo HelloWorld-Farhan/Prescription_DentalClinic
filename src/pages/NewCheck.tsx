@@ -1194,10 +1194,18 @@ export default function NewCheck() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setReportModalOpen(true)}
-                  className="px-5 py-2.5 rounded-xl border border-primary text-primary hover:bg-primary/5 text-xs font-bold transition-all cursor-pointer"
+                  onClick={() => navigate('/report')}
+                  className="px-4 py-2.5 rounded-xl bg-surface-container text-secondary hover:bg-surface-container-high text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  View Printable Audit
+                  <span className="material-symbols-outlined text-[16px]">print</span>
+                  <span>Full A4 Report</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl border border-primary text-primary hover:bg-primary/5 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Quick Modal Audit
                 </button>
                 <button
                   type="button"
