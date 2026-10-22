@@ -76,6 +76,7 @@ export default function Dashboard() {
           <div className="inline-flex p-1 bg-surface-container-high rounded-xl text-on-surface">
             {units.map((unit) => (
               <button
+                type="button"
                 key={unit}
                 onClick={() => setSelectedUnit(unit)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${

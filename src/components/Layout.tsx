@@ -89,7 +89,9 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
-    const isAuth = sessionStorage.getItem('rxguard_authenticated') === 'true';
+    const isAuth =
+      sessionStorage.getItem('rxguard_authenticated') === 'true' ||
+      localStorage.getItem('rxguard_authenticated') === 'true';
     if (!isAuth) {
       navigate('/login', { replace: true });
     }
@@ -120,6 +122,7 @@ export default function Layout() {
 
   const handleLogout = () => {
     sessionStorage.removeItem('rxguard_authenticated');
+    localStorage.removeItem('rxguard_authenticated');
     navigate('/login');
   };
 

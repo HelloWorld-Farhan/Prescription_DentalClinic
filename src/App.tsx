@@ -39,14 +39,22 @@ export default function App() {
         <Route path="/dashboard/patient-rights" element={<Navigate to="/patient-rights" replace />} />
 
         {/* Authenticated Layout Routes */}
-        <Route path="/dashboard" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="check" element={<NewCheck />} />
-          <Route path="alerts" element={<Alerts />} />
-          <Route path="audit-log" element={<AuditLog />} />
-          <Route path="rules" element={<RulesAdmin />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="report" element={<Report />} />
+        <Route element={<Layout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/check" element={<NewCheck />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/audit-log" element={<AuditLog />} />
+          <Route path="/rules" element={<RulesAdmin />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/report" element={<Report />} />
+
+          {/* Subroutes under /dashboard/ */}
+          <Route path="/dashboard/check" element={<NewCheck />} />
+          <Route path="/dashboard/alerts" element={<Alerts />} />
+          <Route path="/dashboard/audit-log" element={<AuditLog />} />
+          <Route path="/dashboard/rules" element={<RulesAdmin />} />
+          <Route path="/dashboard/settings" element={<Settings />} />
+          <Route path="/dashboard/report" element={<Report />} />
         </Route>
 
         {/* Fallback - Redirect to Login */}

@@ -17,9 +17,9 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
-  const [attest1, setAttest1] = useState(false);
-  const [attest2, setAttest2] = useState(false);
-  const [attest3, setAttest3] = useState(false);
+  const [attest1, setAttest1] = useState(true);
+  const [attest2, setAttest2] = useState(true);
+  const [attest3, setAttest3] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successFlash, setSuccessFlash] = useState<string | null>(() => {
     const flash = sessionStorage.getItem('smileclinic_prescriber_registered_flash');
@@ -87,6 +87,9 @@ export default function Login() {
       setIsLoading(true);
       setTimeout(() => {
         sessionStorage.setItem('rxguard_authenticated', 'true');
+        if (rememberDevice) {
+          localStorage.setItem('rxguard_authenticated', 'true');
+        }
         sessionStorage.setItem(
           'rxguard_prescriber_name',
           registered ? registered.fullName : registeredDoc ? registeredDoc.name : OFFICIAL_PRESCRIBER_CREDENTIALS.name
