@@ -151,7 +151,7 @@ export default function Layout() {
             </div>
             <div>
               <span className="text-lg font-bold tracking-tight text-primary block leading-tight">Smile Clinic</span>
-              <span className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider">Prescription Safety Portal</span>
+              <span className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider">Prescription Portal</span>
             </div>
           </div>
 
