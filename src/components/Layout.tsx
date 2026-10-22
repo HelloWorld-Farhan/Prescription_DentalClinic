@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface NotificationItem {
@@ -384,6 +384,24 @@ export default function Layout() {
                       Portal Settings
                     </button>
 
+                    <Link
+                      to="/support"
+                      onClick={() => setProfileOpen(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-primary">support_agent</span>
+                      Support & Helpdesk
+                    </Link>
+
+                    <Link
+                      to="/patient-rights"
+                      onClick={() => setProfileOpen(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-primary">assignment_turned_in</span>
+                      Patient Rights
+                    </Link>
+
                     <div className="border-t border-surface-container-low pt-1">
                       <button
                         onClick={handleLogout}
@@ -404,6 +422,22 @@ export default function Layout() {
         <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto">
           <Outlet />
         </main>
+
+        {/* 6. Standard Legal Footer */}
+        <footer className="w-full bg-surface-container-low py-4 border-t border-surface-container-high px-4 sm:px-6 lg:px-8 mt-auto z-20">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-on-surface-variant text-xs text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-tertiary">shield_with_heart</span>
+              <span>© 2026 Smile Clinic Health System. All health records encrypted.</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6 text-[11px] font-medium">
+              <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
+              <Link to="/patient-rights" className="hover:text-primary transition-colors">Patient Rights</Link>
+              <Link to="/support" className="hover:text-primary transition-colors">Support Desk</Link>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );

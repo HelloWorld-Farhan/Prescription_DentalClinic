@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 export const OFFICIAL_PRESCRIBER_CREDENTIALS = {
@@ -116,19 +116,27 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={handleFillDemo}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors border border-primary/20"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors border border-primary/20 cursor-pointer"
               title="Auto-fill verified clinical credentials"
             >
               <span className="material-symbols-outlined text-sm">bolt</span>
               1-Click Demo Fill
             </button>
-            <div className="flex items-center gap-1.5 bg-surface-container-low px-3 py-1 rounded text-on-surface-variant">
-              <span className="material-symbols-outlined text-sm text-primary">local_hospital</span>
-              <span className="text-xs font-medium">Smile Clinic Health System</span>
+            <div className="hidden md:flex items-center gap-1.5 text-on-surface-variant text-xs font-medium bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-container-high">
+              <span className="material-symbols-outlined text-[16px] text-primary">verified_user</span>
+              <span>HIPAA Compliant 256-Bit SSL</span>
             </div>
+            <Link
+              to="/support"
+              className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors text-xs font-semibold"
+            >
+              <span className="material-symbols-outlined text-[18px]">help_outline</span>
+              <span>Support</span>
+            </Link>
           </div>
         </header>
       </div>
@@ -433,6 +441,22 @@ export default function Login() {
           </motion.div>
         </div>
       </main>
+
+      {/* Standard Legal Footer */}
+      <footer className="w-full bg-surface-container-low py-4 border-t border-surface-container-high shadow-[0_-1px_8px_rgba(0,119,130,0.03)] z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-on-surface-variant text-xs text-center sm:text-left">
+          <div className="flex items-center justify-center sm:justify-start gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-tertiary">shield_with_heart</span>
+            <span>© 2026 Smile Clinic Health System. All health records encrypted.</span>
+          </div>
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6 text-[11px] font-medium">
+            <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
+            <Link to="/patient-rights" className="hover:text-primary transition-colors">Patient Rights</Link>
+            <Link to="/support" className="hover:text-primary transition-colors">Support Desk</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
