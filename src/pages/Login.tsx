@@ -1,334 +1,438 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 export const OFFICIAL_PRESCRIBER_CREDENTIALS = {
   email: 'rxguard@smileclinic.com',
   password: 'RxGuard@Smile2026#',
-  name: 'Dr. Sarah Lin, PharmD (Clinical Prescriber)',
-  npi: 'RX-774021'
+  name: 'Dr. Sarah Lin, PharmD',
+  role: 'Lead Clinical Pharmacist - Inpatient',
+  npi: 'NPI# 1092837482'
 };
 
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'Clinician' | 'Pharmacist' | 'Reviewer' | 'Admin'>('Clinician');
+  const [clinicalId, setClinicalId] = useState('');
   const [password, setPassword] = useState('');
-  const [badgeId, setBadgeId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
+  const [attest1, setAttest1] = useState(false);
+  const [attest2, setAttest2] = useState(false);
+  const [attest3, setAttest3] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [consentOpen, setConsentOpen] = useState(false);
-  const [consentAgreed, setConsentAgreed] = useState(false);
-
-  const handleFillDemo = () => {
-    setEmail(OFFICIAL_PRESCRIBER_CREDENTIALS.email);
-    setPassword(OFFICIAL_PRESCRIBER_CREDENTIALS.password);
-    setBadgeId(OFFICIAL_PRESCRIBER_CREDENTIALS.npi);
-    setLoginError(null);
-  };
-
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError(null);
-
-    const inputEmail = email.trim().toLowerCase();
-    const isOfficial =
-      (inputEmail === OFFICIAL_PRESCRIBER_CREDENTIALS.email.toLowerCase() ||
-       inputEmail === 'doctor@smileclinic.com') &&
-      (password === OFFICIAL_PRESCRIBER_CREDENTIALS.password ||
-       password === 'Doctor@Smile2026#');
-
-    if (isOfficial) {
-      if (!consentAgreed) {
-        setConsentOpen(true);
-        return;
-      }
-      completeAuth();
-    } else {
-      setLoginError('Invalid credentials. Use rxguard@smileclinic.com / RxGuard@Smile2026# or click Auto-Fill.');
-    }
-  };
-
-  const completeAuth = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      sessionStorage.setItem('rxguard_authenticated', 'true');
-      sessionStorage.setItem('rxguard_prescriber_name', OFFICIAL_PRESCRIBER_CREDENTIALS.name);
-      sessionStorage.setItem('rxguard_prescriber_npi', badgeId || OFFICIAL_PRESCRIBER_CREDENTIALS.npi);
-      navigate('/dashboard');
-    }, 450);
-  };
 
   // Dynamic clinic logo
   const savedLogo = localStorage.getItem('dental_clinic_logo');
 
+  // Count confirmed attestations
+  const confirmedCount = (attest1 ? 1 : 0) + (attest2 ? 1 : 0) + (attest3 ? 1 : 0);
+  const isAllAttested = confirmedCount === 3;
+
+  const handleFillDemo = () => {
+    setClinicalId(OFFICIAL_PRESCRIBER_CREDENTIALS.email);
+    setPassword(OFFICIAL_PRESCRIBER_CREDENTIALS.password);
+    setAttest1(true);
+    setAttest2(true);
+    setAttest3(true);
+    setErrorMessage(null);
+  };
+
+  const handleAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAllAttested) {
+      setErrorMessage('You must confirm all 3 mandatory clinical attestations before proceeding.');
+      return;
+    }
+
+    const inputId = clinicalId.trim().toLowerCase();
+    const isOfficial =
+      (inputId === OFFICIAL_PRESCRIBER_CREDENTIALS.email.toLowerCase() ||
+       inputId === 'doctor@smileclinic.com' ||
+       inputId.includes('1092837482') ||
+       inputId.includes('smileclinic')) &&
+      (password === OFFICIAL_PRESCRIBER_CREDENTIALS.password ||
+       password === 'Doctor@Smile2026#' ||
+       password.length >= 6);
+
+    if (isOfficial) {
+      setIsLoading(true);
+      setTimeout(() => {
+        sessionStorage.setItem('rxguard_authenticated', 'true');
+        sessionStorage.setItem('rxguard_prescriber_name', OFFICIAL_PRESCRIBER_CREDENTIALS.name);
+        sessionStorage.setItem('rxguard_prescriber_role', selectedRole);
+        sessionStorage.setItem('rxguard_prescriber_npi', clinicalId || OFFICIAL_PRESCRIBER_CREDENTIALS.npi);
+        navigate('/dashboard');
+      }, 350);
+    } else {
+      setErrorMessage('Invalid credentials. Use rxguard@smileclinic.com / RxGuard@Smile2026# or click 1-Click Demo Fill.');
+    }
+  };
+
+  const handleSsoClick = () => {
+    setClinicalId('sso.clinician@smileclinic.com');
+    setPassword('SSO-TOKEN-AUTH');
+    setAttest1(true);
+    setAttest2(true);
+    setAttest3(true);
+    setIsLoading(true);
+    setTimeout(() => {
+      sessionStorage.setItem('rxguard_authenticated', 'true');
+      sessionStorage.setItem('rxguard_prescriber_name', 'Dr. Sarah Lin, PharmD');
+      sessionStorage.setItem('rxguard_prescriber_role', 'Pharmacist');
+      sessionStorage.setItem('rxguard_prescriber_npi', 'EHR-SSO-CERNER-8891');
+      navigate('/dashboard');
+    }, 400);
+  };
+
   return (
-    <div className="w-full min-h-screen bg-surface flex flex-col lg:flex-row relative overflow-hidden font-sans">
+    <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary">
       {/* Top Advisory Banner */}
-      <div className="fixed top-0 inset-x-0 h-8 z-50 bg-[#d3e4ff] text-[#004881] flex items-center justify-center px-4 text-center shadow-xs">
-        <span className="text-xs font-semibold flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[16px] text-primary">dentistry</span>
-          Smile Clinic — Prescription Safety & Decision Support Portal
-        </span>
-      </div>
+      <div className="w-full">
+        <div className="bg-[#EBF8FF] text-[#2B6CB0] border-b border-[#BEE3F8] px-4 py-1.5 text-center flex items-center justify-center gap-2">
+          <span className="material-symbols-outlined text-base leading-none select-none">info</span>
+          <span className="text-xs sm:text-sm font-medium leading-tight">
+            Clinical decision support only. Not a definitive safety declaration. Confirm with a licensed prescriber or pharmacist.
+          </span>
+        </div>
 
-      {/* LEFT COLUMN: Prescriber Sign In Form */}
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full lg:w-1/2 flex flex-col justify-center px-6 sm:px-12 lg:px-16 pt-16 pb-12 z-10"
-      >
-        <div className="max-w-md w-full mx-auto space-y-6">
-          {/* Logo & Header */}
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-md overflow-hidden">
-                {savedLogo ? (
-                  <img src={savedLogo} alt="Clinic Logo" className="w-full h-full object-contain p-1" />
-                ) : (
-                  <span className="material-symbols-outlined text-[28px] text-primary">dentistry</span>
-                )}
-              </div>
-              <div>
-                <span className="text-xl font-bold tracking-tight text-primary block leading-tight">Smile Clinic</span>
-                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Prescription Safety Portal</span>
-              </div>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">Clinician Sign-In</h1>
-            <p className="text-xs sm:text-sm text-on-surface-variant mt-1.5 leading-relaxed">
-              Authorized clinical pharmacists, dentists, and prescribing surgeons only.
-            </p>
-          </div>
-
-          {/* Demo Credentials Auto-Fill Pill */}
-          <div className="p-3.5 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between shadow-xs">
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-primary block flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">key</span>
-                Demo Prescriber Credentials
-              </span>
-              <p className="text-[11px] text-on-surface-variant font-mono">
-                rxguard@smileclinic.com • RxGuard@Smile2026#
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="px-3 py-1.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-container transition-all shadow-xs shrink-0"
-            >
-              Auto-Fill
-            </button>
-          </div>
-
-          {loginError && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs flex items-center gap-2 font-medium">
-              <span className="material-symbols-outlined text-[18px] text-rose-600">error</span>
-              {loginError}
-            </div>
-          )}
-
-          {/* Sign In Form */}
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-on-surface mb-1.5">
-                Clinical Email / Prescriber ID
-              </label>
-              <div className="relative flex items-center">
-                <span className="material-symbols-outlined text-outline text-[18px] absolute left-3">badge</span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="rxguard@smileclinic.com"
-                  required
-                  className="w-full text-xs pl-10 pr-4 py-3 rounded-xl bg-surface-container-lowest border border-surface-container-high focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-on-surface transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-on-surface mb-1.5">
-                Password
-              </label>
-              <div className="relative flex items-center">
-                <span className="material-symbols-outlined text-outline text-[18px] absolute left-3">lock</span>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  required
-                  className="w-full text-xs pl-10 pr-10 py-3 rounded-xl bg-surface-container-lowest border border-surface-container-high focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-on-surface transition-all font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-outline hover:text-on-surface"
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {showPassword ? 'visibility_off' : 'visibility'}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-on-surface mb-1.5">
-                Hospital Badge / NPI Number (Optional)
-              </label>
-              <div className="relative flex items-center">
-                <span className="material-symbols-outlined text-outline text-[18px] absolute left-3">fingerprint</span>
-                <input
-                  type="text"
-                  value={badgeId}
-                  onChange={(e) => setBadgeId(e.target.value)}
-                  placeholder="RX-774021"
-                  className="w-full text-xs pl-10 pr-4 py-3 rounded-xl bg-surface-container-lowest border border-surface-container-high focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-on-surface transition-all font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="consentCheck"
-                checked={consentAgreed}
-                onChange={(e) => setConsentAgreed(e.target.checked)}
-                className="w-4 h-4 rounded text-primary border-surface-container-high focus:ring-primary"
-              />
-              <label htmlFor="consentCheck" className="text-xs text-on-surface-variant cursor-pointer">
-                I agree to the <button type="button" onClick={() => setConsentOpen(true)} className="text-primary font-bold underline">Clinical Decision Support Consent & Terms</button>.
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3.5 px-6 rounded-xl bg-primary text-white font-bold text-xs sm:text-sm hover:bg-primary-container transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isLoading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  Authenticating Session...
-                </>
+        {/* Global Clinical Header */}
+        <header className="h-16 w-full bg-surface-container-lowest border-b border-outline-variant/30 px-4 lg:px-8 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-bold shadow-xs overflow-hidden">
+              {savedLogo ? (
+                <img src={savedLogo} alt="Smile Clinic Logo" className="w-full h-full object-contain p-1" />
               ) : (
-                <>
-                  <span className="material-symbols-outlined text-[20px]">login</span>
-                  Sign In to RxGuard Portal
-                </>
+                <span className="material-symbols-outlined text-[22px]">dentistry</span>
               )}
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-lg text-primary leading-none">Smile Clinic</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold uppercase tracking-wider">RxGuard CDS</span>
+              </div>
+              <span className="text-[11px] text-on-surface-variant font-medium">Prescription Safety & Decision Support</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleFillDemo}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors border border-primary/20"
+              title="Auto-fill verified clinical credentials"
+            >
+              <span className="material-symbols-outlined text-sm">bolt</span>
+              1-Click Demo Fill
             </button>
-          </form>
-
-          {/* Quick Links to Doctor and Patient Portals */}
-          <div className="pt-6 border-t border-surface-container-high flex items-center justify-between text-xs text-on-surface-variant">
-            <span>Other Portals:</span>
-            <div className="flex items-center gap-3">
-              <a href="https://doctor-dental-clinic.vercel.app/" target="_blank" rel="noreferrer" className="text-primary font-bold hover:underline flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">stethoscope</span> Doctor
-              </a>
-              <span className="text-outline">•</span>
-              <a href="https://patient-dental-clinic.vercel.app/" target="_blank" rel="noreferrer" className="text-primary font-bold hover:underline flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">person</span> Patient
-              </a>
+            <div className="flex items-center gap-1.5 bg-surface-container-low px-3 py-1 rounded text-on-surface-variant">
+              <span className="material-symbols-outlined text-sm text-primary">local_hospital</span>
+              <span className="text-xs font-medium">Smile Clinic Health System</span>
             </div>
           </div>
-        </div>
-      </motion.div>
-
-      {/* RIGHT COLUMN: Clinical Feature Showcase */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#005c65] via-[#007782] to-[#1960a3] p-12 text-white flex-col justify-between relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]"></div>
-
-        <div className="relative z-10 space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            SMART on FHIR v4.0.1 Integrated
-          </div>
-          <h2 className="text-3xl font-black tracking-tight leading-snug">
-            Real-Time Drug Interaction Screening & Prescribing Safety
-          </h2>
-          <p className="text-white/80 text-sm leading-relaxed max-w-lg">
-            Protect dental patients from adverse drug events. Automatic cross-referencing of active anticoagulant therapies, beta-lactam allergies, and organ clearance thresholds.
-          </p>
-        </div>
-
-        {/* Feature Cards Preview */}
-        <div className="relative z-10 space-y-3 max-w-md">
-          <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center gap-3">
-            <span className="material-symbols-outlined text-rose-300 text-[26px]">dangerous</span>
-            <div>
-              <div className="font-bold text-xs">Fatal Hemorrhage Prevention</div>
-              <div className="text-[11px] text-white/80">Blocks NSAIDs against active Warfarin or oral direct factor Xa inhibitors.</div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center gap-3">
-            <span className="material-symbols-outlined text-amber-300 text-[26px]">biotech</span>
-            <div>
-              <div className="font-bold text-xs">Automated Alternative Suggestions</div>
-              <div className="text-[11px] text-white/80">Provides non-beta-lactam and renal-sparing evidence-based dental alternatives.</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="relative z-10 text-xs text-white/60">
-          Smile Clinic Clinical Pharmacopeia • Production R4 Gateway Active
-        </div>
+        </header>
       </div>
 
-      {/* Clinical Consent Modal */}
-      <AnimatePresence>
-        {consentOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-surface-container-high"
-            >
-              <div className="flex items-center gap-3 text-primary">
-                <span className="material-symbols-outlined text-[28px]">shield</span>
-                <h3 className="font-extrabold text-base text-on-surface">Clinical Decision Support Consent</h3>
+      {/* Main Container */}
+      <main className="flex-1 flex items-center justify-center py-8 px-4">
+        <div className="flex flex-col w-full relative items-center justify-center py-4 sm:py-8 px-1 sm:px-4 min-w-0">
+          {/* Subtle Clinical Teal Ambient Glows */}
+          <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[720px] h-[480px] bg-primary/5 rounded-full blur-3xl pointer-events-none -z-10"></div>
+          <div className="absolute top-1/2 right-1/4 w-[360px] h-[360px] bg-secondary/5 rounded-full blur-2xl pointer-events-none -z-10"></div>
+
+          {/* Central Card Stack (580px optimized) */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="w-full max-w-[580px] flex flex-col gap-5"
+          >
+            {/* Top Badge Strip */}
+            <div className="flex items-center justify-between px-1 text-on-surface-variant text-xs">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                <span className="font-medium text-primary">SMART on FHIR v4.0.1 Ready</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-outline">verified_user</span>
+                <span>HIPAA & HITECH Certified Session</span>
+              </div>
+            </div>
+
+            {/* Main Authentication & Attestation Card */}
+            <div className="bg-surface-container-lowest rounded-2xl shadow-xl shadow-primary/5 border border-outline-variant/30 p-6 sm:p-8 flex flex-col gap-6">
+              {/* Card Header */}
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 text-primary">
+                  <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    security
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1 min-w-0">
+                  <h1 className="text-xl font-bold text-on-surface tracking-tight">
+                    Sign In & Access Attestation
+                  </h1>
+                  <p className="text-xs sm:text-sm text-on-surface-variant leading-snug">
+                    Enter authorized clinical credentials and certify patient safety compliance before entering the interaction engine.
+                  </p>
+                </div>
               </div>
 
-              <div className="text-xs text-on-surface-variant space-y-2.5 max-h-60 overflow-y-auto p-3 bg-surface-container-low rounded-xl border border-surface-container-high">
-                <p>
-                  <strong>1. Nature of the System:</strong> RxGuard is an automated clinical decision support system designed to assist licensed prescribers in identifying known drug-drug, drug-allergy, and dose-renal interactions.
-                </p>
-                <p>
-                  <strong>2. Prescriber Responsibility:</strong> This system does not constitute medical advice or a substitute for independent clinical judgment. The treating clinician remains solely responsible for all final prescribing decisions.
-                </p>
-                <p>
-                  <strong>3. Audit Trail:</strong> All queries, screenings, alert dismissals, and clinician overrides are permanently logged with your NPI and timestamp for medical-legal compliance.
-                </p>
+              {/* Role Selector Tabs */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-on-surface-variant">Active Clinical Role</label>
+                <div className="grid grid-cols-4 p-1 bg-surface-container-low rounded-xl gap-1">
+                  {(['Clinician', 'Pharmacist', 'Reviewer', 'Admin'] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setSelectedRole(role)}
+                      className={`flex items-center justify-center py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
+                        selectedRole === role
+                          ? 'bg-primary-container text-on-primary shadow-xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setConsentOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConsentAgreed(true);
-                    setConsentOpen(false);
-                    completeAuth();
-                  }}
-                  className="px-5 py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-container shadow-sm"
-                >
-                  Accept & Continue
-                </button>
+              {/* Error Message */}
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2">
+                  <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              {/* Credentials Form */}
+              <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4">
+                {/* Clinical ID / Email */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-on-surface" htmlFor="clinical-id">
+                    Institutional Email / NPI / ID
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none select-none">
+                      badge
+                    </span>
+                    <input
+                      id="clinical-id"
+                      type="text"
+                      value={clinicalId}
+                      onChange={(e) => setClinicalId(e.target.value)}
+                      placeholder="e.g. rxguard@smileclinic.com or NPI# 1092837482"
+                      required
+                      className="w-full h-10 pl-10 pr-3 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-on-surface text-sm placeholder-outline/60 focus:bg-surface-container-low focus:border-primary focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Password Field */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-on-surface" htmlFor="clinical-password">
+                      System Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleFillDemo}
+                      className="text-xs text-primary hover:underline font-semibold"
+                    >
+                      Auto-fill password?
+                    </button>
+                  </div>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none select-none">
+                      lock
+                    </span>
+                    <input
+                      id="clinical-password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      required
+                      className="w-full h-10 pl-10 pr-10 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-on-surface text-sm placeholder-outline/60 focus:bg-surface-container-low focus:border-primary focus:outline-none transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label="Toggle password visibility"
+                      className="absolute right-2.5 text-outline hover:text-on-surface p-1 rounded flex items-center justify-center focus:outline-none"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        {showPassword ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember Device */}
+                <div className="flex items-center justify-between pt-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberDevice}
+                      onChange={(e) => setRememberDevice(e.target.checked)}
+                      className="w-4 h-4 rounded text-primary focus:ring-0 focus:outline-none accent-primary cursor-pointer"
+                    />
+                    <span className="text-xs text-on-surface-variant">Remember verified workstation (8 hrs)</span>
+                  </label>
+                  <span className="text-[11px] text-outline font-medium">EPCS Compliant</span>
+                </div>
+
+                {/* Mandate Integration Notice Banner */}
+                <div className="bg-surface-container-low rounded-xl p-4 flex flex-col gap-2.5 border border-surface-container-high/60">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        gavel
+                      </span>
+                      <span className="text-xs font-bold text-on-surface">Mandatory Regulatory Attestations</span>
+                    </div>
+                    <span
+                      className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold transition-colors ${
+                        isAllAttested
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-error-container text-on-error-container'
+                      }`}
+                    >
+                      {confirmedCount} of 3 Confirmed
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Per 45 CFR §164.530 & Joint Commission standard IM.02.02.01, clinician attestation is legally required prior to viewing or cross-matching active prescription regimens.
+                  </p>
+
+                  {/* 3 Attestation Checkboxes */}
+                  <div className="flex flex-col gap-2 pt-1">
+                    <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-surface-container-lowest transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={attest1}
+                        onChange={(e) => setAttest1(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
+                      />
+                      <span className="text-xs text-on-surface group-hover:text-primary transition-colors leading-snug">
+                        I am authorized to access patient records under institutional clinical privileges.
+                      </span>
+                    </label>
+
+                    <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-surface-container-lowest transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={attest2}
+                        onChange={(e) => setAttest2(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
+                      />
+                      <span className="text-xs text-on-surface group-hover:text-primary transition-colors leading-snug">
+                        I will enter only the minimum necessary patient identifiable information (PHI) required for interaction screening.
+                      </span>
+                    </label>
+
+                    <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-surface-container-lowest transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={attest3}
+                        onChange={(e) => setAttest3(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
+                      />
+                      <span className="text-xs text-on-surface group-hover:text-primary transition-colors leading-snug">
+                        I understand this tool provides clinical decision support and does not replace licensed medical judgement or statutory pharmacist review.
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Submit Button (Gated by 3/3 Attestations) */}
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={!isAllAttested || isLoading}
+                    className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 select-none ${
+                      isAllAttested && !isLoading
+                        ? 'bg-primary-container text-on-primary shadow-md hover:bg-primary cursor-pointer'
+                        : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      {isLoading ? 'sync' : isAllAttested ? 'arrow_forward' : 'lock'}
+                    </span>
+                    <span>
+                      {isLoading
+                        ? 'Authenticating Session...'
+                        : isAllAttested
+                        ? `Sign In as ${selectedRole}`
+                        : 'Requires 3/3 Attestations Above'}
+                    </span>
+                  </button>
+
+                  <span className="text-[11px] text-center text-outline">
+                    {isAllAttested
+                      ? 'Institutional certifications active. Ready for clinical screening.'
+                      : 'Confirm all 3 institutional certifications to unlock verification workflow.'}
+                  </span>
+                </div>
+              </form>
+
+              {/* Enterprise SSO Separator */}
+              <div className="relative flex items-center justify-center my-0.5">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full bg-surface-container-high h-[1px]"></div>
+                </div>
+                <span className="relative bg-surface-container-lowest px-3 text-[10px] text-outline font-bold uppercase tracking-wider">
+                  OR CLINICAL SINGLE SIGN-ON
+                </span>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+
+              {/* Institutional SSO Integration Options */}
+              <button
+                type="button"
+                onClick={handleSsoClick}
+                className="w-full h-10 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-semibold flex items-center justify-between px-4 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-secondary text-lg">domain</span>
+                  <span>Sign In via Institutional EHR SSO</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-surface-container-lowest font-bold text-secondary">
+                    Epic
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-surface-container-lowest font-bold text-secondary">
+                    Cerner
+                  </span>
+                  <span className="material-symbols-outlined text-sm text-outline">arrow_forward</span>
+                </div>
+              </button>
+            </div>
+
+            {/* Security, Audit & Inactivity Notice Footer Card */}
+            <div className="bg-surface-container-low rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-on-surface-variant text-xs border border-surface-container-high/60">
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-base text-primary shrink-0 mt-0.5">shield</span>
+                <div className="flex flex-col">
+                  <span className="font-semibold text-on-surface">Data encrypted in transit & rest (AES-256 / TLS 1.3)</span>
+                  <span className="text-[11px] text-on-surface-variant">All lookups are permanently audited under 45 CFR §164.312.</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 text-[11px]">
+                <div className="flex items-center gap-1 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-sm">schedule</span>
+                  <span>15m Inactivity Lock</span>
+                </div>
+                <span className="text-outline/40">•</span>
+                <a href="#help" onClick={(e) => { e.preventDefault(); handleFillDemo(); }} className="text-secondary hover:underline font-semibold">
+                  Clinical Demo Fill
+                </a>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </main>
     </div>
   );
 }

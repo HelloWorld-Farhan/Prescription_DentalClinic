@@ -33,9 +33,11 @@ export interface DrugInteractionAlert {
   interactingDrugs: string[];
   mechanism: string;
   clinicalImpact: string;
-  evidenceGrade: 'Class I (Definitive)' | 'Class II (Probable)' | 'Class III (Theoretical)';
+  description?: string;
+  evidenceGrade: 'Class I (Definitive)' | 'Class II (Probable)' | 'Class III (Theoretical)' | string;
   recommendation: string;
   alternatives: string[];
+  alternativeSuggestion?: string;
   overridden?: boolean;
   overrideReason?: string;
   overrideAuthor?: string;
@@ -48,13 +50,16 @@ export interface SafetyCheckRecord {
   timestamp: string;
   patientId: string;
   patientName: string;
+  patientKey?: string;
   mrn: string;
   unit: string;
   prescriptions: PrescriptionItem[];
+  prescribedDrugs?: string[];
   alerts: DrugInteractionAlert[];
   overallStatus: 'Safe to Dispense' | 'Requires Review' | 'Contraindicated' | 'Overridden';
   prescriberName: string;
   prescriberNpi: string;
+  reviewerName?: string;
   fhirSynced: boolean;
   notes?: string;
 }
@@ -74,7 +79,7 @@ export interface InteractionRule {
   drugA: string;
   drugB: string;
   severity: AlertSeverity;
-  category: 'Drug-Drug' | 'Drug-Allergy' | 'Drug-Condition' | 'Renal Dose Adjustment';
+  category: 'Drug-Drug' | 'Drug-Allergy' | 'Drug-Condition' | 'Renal Dose Adjustment' | string;
   description: string;
   active: boolean;
 }
