@@ -100,10 +100,12 @@ export default function Alerts() {
           { key: 'major', label: 'Major Interactions', count: allAlerts.filter(a => a.alert.severity === 'major').length },
           { key: 'overridden', label: 'Overridden History', count: allAlerts.filter(a => a.alert.overridden).length }
         ].map((tab) => (
-          <button
+          <motion.button
+            type="button"
             key={tab.key}
+            whileTap={{ scale: 0.97 }}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeTab === tab.key
                 ? 'bg-primary text-white shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface border border-surface-container-high'
@@ -115,7 +117,7 @@ export default function Alerts() {
             }`}>
               {tab.count}
             </span>
-          </button>
+          </motion.button>
         ))}
       </div>
 

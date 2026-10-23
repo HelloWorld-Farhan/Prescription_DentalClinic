@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../data/virtualDb';
 import { InteractionRule } from '../types';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
+import CustomDropdown from '../components/CustomDropdown';
 
 export default function RulesAdmin() {
   const [activeTab, setActiveTab] = useState<'rules' | 'knowledge' | 'regression'>('rules');
@@ -224,40 +225,50 @@ export default function RulesAdmin() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <CustomDropdown
                 value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="h-10 px-3 rounded-xl bg-surface-container-low text-on-surface text-xs font-semibold outline-none border border-surface-container-high cursor-pointer"
-              >
-                <option value="ALL">Check Type: All Categories</option>
-                <option value="Interaction">Drug-Drug Interaction</option>
-                <option value="Allergy">Allergy Conflict</option>
-                <option value="Dose">Dose &amp; Frequency</option>
-                <option value="Duplicate">Duplicate Therapy</option>
-              </select>
+                onChange={setCategoryFilter}
+                prefixIcon="category"
+                menuWidth="w-60"
+                options={[
+                  { value: 'ALL', label: 'Check Type: All Categories', icon: 'category' },
+                  { value: 'Interaction', label: 'Drug-Drug Interaction', icon: 'sync_alt' },
+                  { value: 'Allergy', label: 'Allergy Conflict', icon: 'crisis_alert' },
+                  { value: 'Dose', label: 'Dose & Frequency', icon: 'medication' },
+                  { value: 'Duplicate', label: 'Duplicate Therapy', icon: 'content_copy' },
+                ]}
+              />
 
-              <select
+              <CustomDropdown
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 px-3 rounded-xl bg-surface-container-low text-on-surface text-xs font-semibold outline-none border border-surface-container-high cursor-pointer"
-              >
-                <option value="ALL">State: All Rules</option>
-                <option value="ACTIVE">Active Only</option>
-                <option value="INACTIVE">Inactive / Staged</option>
-              </select>
+                onChange={setStatusFilter}
+                prefixIcon="toggle_on"
+                menuWidth="w-52"
+                options={[
+                  { value: 'ALL', label: 'State: All Rules', icon: 'tune' },
+                  { value: 'ACTIVE', label: 'Active Only', icon: 'check_circle', badge: 'Active', badgeColor: 'bg-emerald-100 text-emerald-800' },
+                  { value: 'INACTIVE', label: 'Inactive / Staged', icon: 'pause_circle', badge: 'Staged', badgeColor: 'bg-slate-200 text-slate-700' },
+                ]}
+              />
 
-              <button
+              <motion.button
                 type="button"
+                whileTap={{ scale: 0.95 }}
                 onClick={() => {
                   setSearchQuery('');
                   setCategoryFilter('ALL');
                   setStatusFilter('ALL');
                 }}
-                className="p-2 h-10 rounded-xl hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-all flex items-center justify-center cursor-pointer"
-                title="Reset Filters"
+                className={`p-2.5 h-10 rounded-xl transition-all flex items-center justify-center cursor-pointer border ${
+                  searchQuery !== '' || categoryFilter !== 'ALL' || statusFilter !== 'ALL'
+                    ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20 shadow-xs'
+                    : 'bg-surface-container-low hover:bg-surface-container border-surface-container-high text-on-surface-variant hover:text-on-surface'
+                }`}
+                title={searchQuery !== '' || categoryFilter !== 'ALL' || statusFilter !== 'ALL' ? 'Reset active filters' : 'Clear filters'}
+                aria-label="Reset filters"
               >
-                <span className="material-symbols-outlined text-[20px]">filter_alt_off</span>
-              </button>
+                <span className="material-symbols-outlined text-[19px]">filter_alt_off</span>
+              </motion.button>
             </div>
           </div>
 

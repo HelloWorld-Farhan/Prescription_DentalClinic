@@ -5,6 +5,7 @@ import { VirtualDb } from '../data/virtualDb';
 import { SafetyCheckRecord, DrugInteractionAlert } from '../types';
 import PrintableReportModal from '../components/PrintableReportModal';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
+import CustomDropdown from '../components/CustomDropdown';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -100,15 +101,17 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="h-6 w-px bg-surface-container-highest mx-1 hidden sm:block"></div>
-          <select
+          <CustomDropdown
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="bg-surface-container-lowest border border-surface-container-high text-on-surface text-xs font-medium px-3 py-2 rounded-xl shadow-xs outline-none cursor-pointer"
-          >
-            <option>Today</option>
-            <option>Last 24 Hours</option>
-            <option>Last 7 Days</option>
-          </select>
+            onChange={setTimeRange}
+            prefixIcon="schedule"
+            menuWidth="w-44"
+            options={[
+              { value: 'Today', label: 'Today', icon: 'today' },
+              { value: 'Last 24 Hours', label: 'Last 24 Hours', icon: 'history' },
+              { value: 'Last 7 Days', label: 'Last 7 Days', icon: 'date_range' },
+            ]}
+          />
         </div>
       </section>
 
