@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../data/virtualDb';
 import { DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
@@ -13,8 +14,9 @@ export default function Alerts() {
   const [searchTerm, setSearchTerm] = useState(queryParam);
   const [activeDrawerAlert, setActiveDrawerAlert] = useState<DrugInteractionAlert | null>(null);
   const [activeReportCheck, setActiveReportCheck] = useState<SafetyCheckRecord | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const checks = VirtualDb.getChecks();
+  const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
   // Aggregate all alerts across checks
   const allAlerts: { checkId: string; patientName: string; mrn: string; alert: DrugInteractionAlert }[] = [];
   checks.forEach(c => {
@@ -49,8 +51,10 @@ export default function Alerts() {
     const target = allAlerts.find(a => a.alert.id === alertId);
     if (target) {
       VirtualDb.overrideAlert(target.checkId, alertId, reason, 'Dr. Sarah Lin, PharmD');
-      // trigger rerender
+      setChecks([...VirtualDb.getChecks()]);
       setActiveDrawerAlert(null);
+      setToastMessage('Clinical decision signed & recorded into HIPAA audit trail');
+      setTimeout(() => setToastMessage(null), 4000);
     }
   };
 
@@ -212,6 +216,21 @@ export default function Alerts() {
         isOpen={!!activeReportCheck}
         onClose={() => setActiveReportCheck(null)}
       />
+
+      {/* Floating Signed Protocol Toast */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-6 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-emerald-500 backdrop-blur-md"
+          >
+            <span className="material-symbols-outlined text-[20px] text-emerald-200">verified</span>
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -22,8 +22,26 @@ export default function AlertDetailDrawer({
     'Prescriber Dr. A. Vance contacted via secure line at 09:28. Confirmed dental/pyelonephritis pathogen resistance to cephalosporins. Plan: Proceed with calibrated dose; daily monitoring order placed.'
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   if (!alert) return null;
+
+  const templates = {
+    acknowledge: 'Clinical drug interaction noted. Proceeding under hospital telemetry & monitoring protocol with routine hepatic/renal panel checks.',
+    resolve: 'Order modified to verified non-interacting therapeutic alternative. Interacting agent discontinued or adjusted.',
+    override: 'Prescriber Dr. A. Vance contacted via secure line at 09:28. Confirmed clinical necessity with risk-benefit assessment documented. Plan: Proceed with calibrated dose; daily monitoring order placed.'
+  };
+
+  const handleSelectDecision = (newDecision: 'acknowledge' | 'resolve' | 'override') => {
+    setDecision(newDecision);
+    setOverrideRationale(templates[newDecision]);
+  };
+
+  const handleAdoptAlternative = (alt: string) => {
+    setDecision('resolve');
+    setOverrideRationale(`Order modified to verified alternative: ${alt}. Interacting agent discontinued.`);
+    onSelectAlternative?.(alt);
+  };
 
   const isContraindicated = alert.severity === 'contraindicated';
   const isMajor = alert.severity === 'major';
@@ -40,10 +58,14 @@ export default function AlertDetailDrawer({
     e.preventDefault();
     setIsSubmitting(true);
     setTimeout(() => {
-      onOverride?.(alert.id, `${decision.toUpperCase()}: ${overrideRationale}`);
       setIsSubmitting(false);
-      onClose();
-    }, 350);
+      setIsSuccess(true);
+      setTimeout(() => {
+        onOverride?.(alert.id, `${decision.toUpperCase()}: ${overrideRationale}`);
+        setIsSuccess(false);
+        onClose();
+      }, 700);
+    }, 450);
   };
 
   return (
@@ -173,10 +195,11 @@ export default function AlertDetailDrawer({
                       {(alert.alternativeSuggestion || (alert.alternatives && alert.alternatives[0])) && (
                         <button
                           type="button"
-                          onClick={() => onSelectAlternative?.(alert.alternativeSuggestion || alert.alternatives[0])}
-                          className="mt-1 block text-primary font-bold hover:underline"
+                          onClick={() => handleAdoptAlternative(alert.alternativeSuggestion || alert.alternatives[0])}
+                          className="mt-1.5 inline-flex items-center gap-1 text-primary font-bold hover:underline bg-primary/10 px-2 py-0.5 rounded cursor-pointer transition-colors"
                         >
-                          Adopt Alternative →
+                          <span className="material-symbols-outlined text-[14px]">swap_horiz</span>
+                          <span>Adopt Alternative →</span>
                         </button>
                       )}
                     </div>
@@ -248,11 +271,11 @@ export default function AlertDetailDrawer({
                   {/* Selectable Radio Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup">
                     {/* Option 1: Acknowledge */}
-                    <label
-                      onClick={() => setDecision('acknowledge')}
+                    <div
+                      onClick={() => handleSelectDecision('acknowledge')}
                       className={`relative flex flex-col p-3 rounded-xl border cursor-pointer transition-all ${
                         decision === 'acknowledge'
-                          ? 'border-primary bg-primary/5 shadow-xs'
+                          ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary'
                           : 'border-surface-container-high bg-surface-container-lowest hover:border-primary/40'
                       }`}
                     >
@@ -262,22 +285,22 @@ export default function AlertDetailDrawer({
                           type="radio"
                           name="cds-decision"
                           checked={decision === 'acknowledge'}
-                          onChange={() => setDecision('acknowledge')}
+                          onChange={() => handleSelectDecision('acknowledge')}
                           className="w-4 h-4 text-primary accent-primary"
                         />
                       </div>
                       <span className="text-[11px] text-on-surface-variant leading-tight">
                         Keep visible for team; proceed under standard protocol.
                       </span>
-                    </label>
+                    </div>
 
                     {/* Option 2: Resolve */}
-                    <label
-                      onClick={() => setDecision('resolve')}
+                    <div
+                      onClick={() => handleSelectDecision('resolve')}
                       className={`relative flex flex-col p-3 rounded-xl border cursor-pointer transition-all ${
                         decision === 'resolve'
-                          ? 'border-primary bg-primary/5 shadow-xs'
-                          : 'border-surface-container-high bg-surface-container-lowest hover:border-primary/40'
+                          ? 'border-emerald-600 bg-emerald-500/10 shadow-xs ring-1 ring-emerald-600'
+                          : 'border-surface-container-high bg-surface-container-lowest hover:border-emerald-500/40'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -286,21 +309,21 @@ export default function AlertDetailDrawer({
                           type="radio"
                           name="cds-decision"
                           checked={decision === 'resolve'}
-                          onChange={() => setDecision('resolve')}
-                          className="w-4 h-4 text-primary accent-primary"
+                          onChange={() => handleSelectDecision('resolve')}
+                          className="w-4 h-4 text-emerald-600 accent-emerald-600"
                         />
                       </div>
                       <span className="text-[11px] text-on-surface-variant leading-tight">
                         Order modified to verified non-interacting alternative.
                       </span>
-                    </label>
+                    </div>
 
                     {/* Option 3: Override */}
-                    <label
-                      onClick={() => setDecision('override')}
+                    <div
+                      onClick={() => handleSelectDecision('override')}
                       className={`relative flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
                         decision === 'override'
-                          ? 'border-primary bg-primary/10 shadow-xs'
+                          ? 'border-primary bg-primary/15 shadow-xs ring-1 ring-primary'
                           : 'border-surface-container-high bg-surface-container-lowest hover:border-primary/40'
                       }`}
                     >
@@ -313,14 +336,14 @@ export default function AlertDetailDrawer({
                           type="radio"
                           name="cds-decision"
                           checked={decision === 'override'}
-                          onChange={() => setDecision('override')}
+                          onChange={() => handleSelectDecision('override')}
                           className="w-4 h-4 text-primary accent-primary"
                         />
                       </div>
                       <span className="text-[11px] text-on-surface leading-tight font-medium">
                         Prescriber accepts risk with therapeutic rationale.
                       </span>
-                    </label>
+                    </div>
                   </div>
 
                   {/* Mandatory Override Rationale Box */}
@@ -366,11 +389,29 @@ export default function AlertDetailDrawer({
                   <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
                     <button
                       type="submit"
-                      disabled={isSubmitting || overrideRationale.length < 10}
-                      className="w-full sm:flex-1 h-10 px-4 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      disabled={isSubmitting || isSuccess || overrideRationale.length < 10}
+                      className={`w-full sm:flex-1 h-10 px-4 rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
+                        isSuccess
+                          ? 'bg-emerald-600 text-white shadow-emerald-500/20'
+                          : 'bg-primary hover:bg-primary-container text-on-primary'
+                      }`}
                     >
-                      <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
-                      <span>{isSubmitting ? 'Recording Decision...' : 'Submit Review & Sign Protocol'}</span>
+                      {isSuccess ? (
+                        <>
+                          <span className="material-symbols-outlined text-[18px] text-white">verified</span>
+                          <span>Protocol Signed & Encrypted!</span>
+                        </>
+                      ) : isSubmitting ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                          <span>Recording Decision...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+                          <span>Submit Review & Sign Protocol</span>
+                        </>
+                      )}
                     </button>
                     <button
                       type="button"

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../data/virtualDb';
 import { SafetyCheckRecord, DrugInteractionAlert } from '../types';
 import PrintableReportModal from '../components/PrintableReportModal';
@@ -16,8 +16,9 @@ export default function Dashboard() {
   const [activeDrawerCheckId, setActiveDrawerCheckId] = useState<string>('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const checks = VirtualDb.getChecks();
+  const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
   const highSeverityCount = checks.filter(c => c.alerts.some(a => a.severity === 'contraindicated' && !a.overridden)).length;
   const inQueueCount = checks.filter(c => c.overallStatus === 'Requires Review' || c.overallStatus === 'Contraindicated').length;
 
@@ -114,7 +115,8 @@ export default function Dashboard() {
         {/* Card 1: Checks Today */}
         <motion.div
           whileHover={{ y: -4, transition: { duration: 0.2 } }}
-          className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg transition-shadow cursor-default"
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer"
+          onClick={() => navigate('/check')}
         >
           <div className="flex items-start justify-between">
             <div>
@@ -127,7 +129,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-primary">
+            <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:scale-105 group-hover:bg-primary group-hover:text-on-primary transition-all shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">fact_check</span>
             </div>
           </div>
@@ -141,14 +143,29 @@ export default function Dashboard() {
               <div className="w-full bg-primary-fixed-dim rounded-t h-[70%]"></div>
               <div className="w-full bg-primary-container rounded-t h-[100%]"></div>
             </div>
-            <p className="text-[11px] text-on-surface-variant truncate">189 auto-verified, 1,095 prescriber checked</p>
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[11px] text-on-surface-variant truncate">189 auto, 1,095 checked</p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/check');
+                }}
+                className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary hover:text-on-primary transition-all text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
+                title="Start New Safety Check"
+              >
+                <span>New Check</span>
+                <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
+              </button>
+            </div>
           </div>
         </motion.div>
 
         {/* Card 2: Alerts In Queue */}
         <motion.div
           whileHover={{ y: -4, transition: { duration: 0.2 } }}
-          className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg transition-shadow cursor-default"
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg hover:border-[#975A16]/50 transition-all cursor-pointer"
+          onClick={() => navigate('/alerts')}
         >
           <div className="flex items-start justify-between">
             <div>
@@ -160,20 +177,32 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center text-[#975A16]">
+            <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center text-[#975A16] group-hover:scale-105 group-hover:bg-[#975A16] group-hover:text-white transition-all shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">pending_actions</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between">
-            <span className="text-[11px] text-on-surface-variant">Median queue wait: <strong>3.8 mins</strong></span>
-            <span className="material-symbols-outlined text-outline text-[16px]">schedule</span>
+          <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between gap-1">
+            <span className="text-[11px] text-on-surface-variant truncate">Wait: <strong>3.8 mins</strong></span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/alerts');
+              }}
+              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#975A16] bg-[#FEF3C7] hover:bg-[#975A16] hover:text-white transition-all text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
+              title="Open Alerts Queue"
+            >
+              <span>View Queue</span>
+              <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
+            </button>
           </div>
         </motion.div>
 
         {/* Card 3: High-Severity Open */}
         <motion.div
           whileHover={{ y: -4, transition: { duration: 0.2 } }}
-          className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg transition-shadow relative overflow-hidden cursor-default"
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg hover:border-error/50 transition-all relative overflow-hidden cursor-pointer"
+          onClick={() => navigate('/alerts?q=contraindicated')}
         >
           <div className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full bg-error-container/30 pointer-events-none"></div>
           <div className="flex items-start justify-between">
@@ -187,19 +216,32 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FFDAD6] flex items-center justify-center text-[#BA1A1A]">
+            <div className="w-10 h-10 rounded-xl bg-[#FFDAD6] flex items-center justify-center text-[#BA1A1A] group-hover:scale-105 group-hover:bg-[#BA1A1A] group-hover:text-white transition-all shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">warning</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-surface-container">
-            <p className="text-[11px] text-on-surface-variant">Critical contraindicated combinations flagged</p>
+          <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between gap-1 z-10">
+            <p className="text-[11px] text-on-surface-variant truncate">Critical flagged</p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/alerts?q=contraindicated');
+              }}
+              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#BA1A1A] bg-[#FFDAD6] hover:bg-[#BA1A1A] hover:text-white transition-all text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
+              title="Inspect Urgent Contraindicated Alerts"
+            >
+              <span>Inspect Urgent</span>
+              <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
+            </button>
           </div>
         </motion.div>
 
         {/* Card 4: Unable to Assess */}
         <motion.div
           whileHover={{ y: -4, transition: { duration: 0.2 } }}
-          className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg transition-shadow cursor-default"
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg hover:border-[#553C9A]/50 transition-all cursor-pointer"
+          onClick={() => navigate('/rules')}
         >
           <div className="flex items-start justify-between">
             <div>
@@ -212,12 +254,24 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#553C9A]">
+            <div className="w-10 h-10 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#553C9A] group-hover:scale-105 group-hover:bg-[#553C9A] group-hover:text-white transition-all shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">rule</span>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-surface-container">
-            <p className="text-[11px] text-on-surface-variant truncate">Missing lab values / novel compounding</p>
+          <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between gap-1">
+            <p className="text-[11px] text-on-surface-variant truncate">Missing lab / novel</p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/rules');
+              }}
+              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#553C9A] bg-[#FAF5FF] hover:bg-[#553C9A] hover:text-white transition-all text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
+              title="Manage Clinical CDS Rules"
+            >
+              <span>CDS Rules</span>
+              <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
+            </button>
           </div>
         </motion.div>
       </section>
@@ -547,7 +601,10 @@ export default function Dashboard() {
         onClose={() => setIsDrawerOpen(false)}
         onOverride={(alertId, reason) => {
           VirtualDb.overrideAlert(activeDrawerCheckId || checks[0]?.id, alertId, reason, 'Dr. Sarah Lin, PharmD');
+          setChecks([...VirtualDb.getChecks()]);
           setIsDrawerOpen(false);
+          setToastMessage('Clinical decision signed & recorded into HIPAA audit trail');
+          setTimeout(() => setToastMessage(null), 4000);
         }}
       />
 
@@ -556,6 +613,21 @@ export default function Dashboard() {
         isOpen={!!activeReportCheck}
         onClose={() => setActiveReportCheck(null)}
       />
+
+      {/* Floating Signed Protocol Toast */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-6 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-emerald-500 backdrop-blur-md"
+          >
+            <span className="material-symbols-outlined text-[20px] text-emerald-200">verified</span>
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
