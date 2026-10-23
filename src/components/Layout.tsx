@@ -107,10 +107,8 @@ export default function Layout() {
     { name: 'Dashboard', path: '/dashboard', icon: 'grid_view' },
     { name: 'New Safety Check', path: '/check', icon: 'add_circle' },
     { name: 'Alerts Queue', path: '/alerts', icon: 'warning' },
-    { name: 'Reports Preview', path: '/report', icon: 'analytics' },
     { name: 'Audit Log', path: '/audit-log', icon: 'verified' },
     { name: 'Rules & Data', path: '/rules', icon: 'database' },
-    { name: 'Settings', path: '/settings', icon: 'settings' },
   ];
 
   const handleGlobalSearch = (e: React.FormEvent) => {

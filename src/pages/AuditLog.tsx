@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { VirtualDb } from '../data/virtualDb';
+import { SafetyCheckRecord } from '../types';
+import PrintableReportModal from '../components/PrintableReportModal';
 
 export default function AuditLog() {
   const [filterAction, setFilterAction] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeReportCheck, setActiveReportCheck] = useState<SafetyCheckRecord | null>(null);
 
   const logs = VirtualDb.getAuditLogs();
+  const checks = VirtualDb.getChecks();
 
   const filteredLogs = logs.filter((log) => {
     const matchesAction = filterAction === 'All' || log.action.includes(filterAction);
@@ -104,6 +108,7 @@ export default function AuditLog() {
                 <th className="py-3 px-4">Patient MRN</th>
                 <th className="py-3 px-4">Event Details</th>
                 <th className="py-3 px-4">Severity</th>
+                <th className="py-3 px-4 text-right">Report</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container-low">
@@ -144,6 +149,20 @@ export default function AuditLog() {
                         {log.severity}
                       </span>
                     </td>
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetCheck = checks.find(c => c.mrn === log.patientMrn || c.patientKey === log.patientMrn) || checks[0];
+                          if (targetCheck) setActiveReportCheck(targetCheck);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
+                        title="View Associated Clinical Decision Report"
+                      >
+                        <span className="material-symbols-outlined text-primary text-[15px]">description</span>
+                        <span>Report</span>
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -151,6 +170,13 @@ export default function AuditLog() {
           </table>
         </div>
       </div>
+
+      {/* Full Printable Clinical Report Modal */}
+      <PrintableReportModal
+        check={activeReportCheck}
+        isOpen={!!activeReportCheck}
+        onClose={() => setActiveReportCheck(null)}
+      />
     </div>
   );
 }

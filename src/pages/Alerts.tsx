@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { VirtualDb } from '../data/virtualDb';
-import { DrugInteractionAlert } from '../types';
+import { DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
+import PrintableReportModal from '../components/PrintableReportModal';
 
 export default function Alerts() {
   const [searchParams] = useSearchParams();
@@ -11,6 +12,7 @@ export default function Alerts() {
   const [activeTab, setActiveTab] = useState<'all' | 'contraindicated' | 'major' | 'overridden'>('all');
   const [searchTerm, setSearchTerm] = useState(queryParam);
   const [activeDrawerAlert, setActiveDrawerAlert] = useState<DrugInteractionAlert | null>(null);
+  const [activeReportCheck, setActiveReportCheck] = useState<SafetyCheckRecord | null>(null);
 
   const checks = VirtualDb.getChecks();
   // Aggregate all alerts across checks
@@ -148,8 +150,20 @@ export default function Alerts() {
 
                   <div className="flex items-center gap-2">
                     <button
+                      type="button"
+                      onClick={() => {
+                        const targetCheck = checks.find(c => c.id === item.checkId);
+                        if (targetCheck) setActiveReportCheck(targetCheck);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-surface-container text-secondary font-bold text-xs hover:bg-surface-container-high transition-all flex items-center gap-1.5 border border-surface-container-high shadow-2xs cursor-pointer"
+                      title="View Clinical Report"
+                    >
+                      <span className="material-symbols-outlined text-primary text-[16px]">description</span>
+                      <span>Report</span>
+                    </button>
+                    <button
                       onClick={() => setActiveDrawerAlert(item.alert)}
-                      className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-xs"
+                      className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[16px]">menu_book</span>
                       Review Monograph & Override
@@ -190,6 +204,13 @@ export default function Alerts() {
         isOpen={!!activeDrawerAlert}
         onClose={() => setActiveDrawerAlert(null)}
         onOverride={handleOverride}
+      />
+
+      {/* Full Printable Clinical Report Modal */}
+      <PrintableReportModal
+        check={activeReportCheck}
+        isOpen={!!activeReportCheck}
+        onClose={() => setActiveReportCheck(null)}
       />
     </div>
   );

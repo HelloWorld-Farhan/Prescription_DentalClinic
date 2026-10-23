@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SafetyCheckRecord } from '../types';
+import DownloadFormatModal from './DownloadFormatModal';
 
 interface PrintableReportModalProps {
   check: SafetyCheckRecord | null;
@@ -10,6 +11,7 @@ interface PrintableReportModalProps {
 
 export default function PrintableReportModal({ check, isOpen, onClose }: PrintableReportModalProps) {
   const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   if (!check) return null;
 
@@ -66,11 +68,11 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
                 {/* Action Buttons */}
                 <button
                   type="button"
-                  onClick={handlePrint}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-secondary hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high cursor-pointer"
+                  onClick={() => setShowDownloadModal(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-secondary hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high cursor-pointer shadow-xs"
                 >
                   <span className="material-symbols-outlined text-[16px]">download</span>
-                  <span>Download PDF</span>
+                  <span>Download Report</span>
                 </button>
                 <button
                   type="button"
@@ -342,6 +344,14 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
               </article>
             </div>
           </main>
+
+          {/* Export Format Selector Modal */}
+          <DownloadFormatModal
+            isOpen={showDownloadModal}
+            onClose={() => setShowDownloadModal(false)}
+            check={check}
+            onPrintFallback={handlePrint}
+          />
         </div>
       )}
     </AnimatePresence>

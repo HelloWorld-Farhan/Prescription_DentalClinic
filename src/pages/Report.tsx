@@ -1,9 +1,18 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { VirtualDb } from '../data/virtualDb';
+import { SafetyCheckRecord } from '../types';
+import DownloadFormatModal from '../components/DownloadFormatModal';
 
 export default function Report() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [zoomScale, setZoomScale] = useState(1.0);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+
+  const checkId = searchParams.get('id') || searchParams.get('checkId');
+  const checks = VirtualDb.getChecks();
+  const currentCheck: SafetyCheckRecord = checks.find(c => c.id === checkId || c.checkNumber === checkId) || checks[0];
 
   // Dynamic logged in prescriber
   const prescriberName = sessionStorage.getItem('rxguard_prescriber_name') || 'Dr. Sarah Lin, PharmD';
@@ -162,14 +171,14 @@ export default function Report() {
               <span>Export JSON</span>
             </button>
 
-            {/* Download PDF / Print Button */}
+            {/* Download Report Button (Opens DownloadFormatModal with default PDF) */}
             <button
               type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high"
+              onClick={() => setShowDownloadModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high cursor-pointer shadow-xs"
             >
               <span className="material-symbols-outlined text-[16px]">download</span>
-              <span>Download PDF</span>
+              <span>Download Report</span>
             </button>
 
             {/* Print Report Button */}
@@ -717,6 +726,14 @@ export default function Report() {
           </div>
         </div>
       </footer>
+
+      {/* Export Format Selector Modal */}
+      <DownloadFormatModal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+        check={currentCheck}
+        onPrintFallback={handlePrint}
+      />
     </div>
   );
 }

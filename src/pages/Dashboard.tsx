@@ -351,14 +351,25 @@ export default function Dashboard() {
                         <div className="text-[11px] text-outline font-semibold">{check.overallStatus}</div>
                       </td>
 
-                      <td className="py-3 px-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleInspect(check)}
-                          className="px-3 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors text-xs font-bold"
-                        >
-                          Inspect
-                        </button>
+                      <td className="py-3 px-2 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setActiveReportCheck(check)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
+                            title="Open Clinical Decision Report"
+                          >
+                            <span className="material-symbols-outlined text-[15px] text-primary">description</span>
+                            <span>Report</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleInspect(check)}
+                            className="px-3 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors text-xs font-bold cursor-pointer"
+                          >
+                            Inspect
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
