@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../data/virtualDb';
@@ -9,6 +9,10 @@ import CustomDropdown from '../components/CustomDropdown';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
   const [selectedUnit, setSelectedUnit] = useState('All Units');
   const [timeRange, setTimeRange] = useState('Today');
   const [searchFilter, setSearchFilter] = useState('');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -12,6 +12,10 @@ export const OFFICIAL_PRESCRIBER_CREDENTIALS = {
 
 export default function Login() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
   const [selectedRole, setSelectedRole] = useState<'Clinician' | 'Pharmacist' | 'Reviewer' | 'Admin'>('Pharmacist');
   const [clinicalId, setClinicalId] = useState('');
   const [password, setPassword] = useState('');

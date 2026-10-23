@@ -15,6 +15,12 @@ export default function NewCheck() {
   type FlowPhase = 'input' | 'analyzing' | 'report';
   const [flowPhase, setFlowPhase] = useState<FlowPhase>('input');
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [flowPhase]);
+
   // --- Input Method Tab (Upload, Camera Photo, Manual Form) ---
   type InputMethod = 'upload' | 'camera' | 'manual';
   const [inputMethod, setInputMethod] = useState<InputMethod>('upload');
