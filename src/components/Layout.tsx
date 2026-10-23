@@ -40,7 +40,7 @@ const initialNotifications: NotificationItem[] = [
   {
     id: '3',
     title: 'SMART on FHIR v4.0.1 Synced',
-    desc: 'St. Jude Health System EMR reconciled 1,284 active prescription orders.',
+    desc: 'Smile Clinic Health System EMR reconciled 1,284 active prescription orders.',
     time: '2h ago',
     category: 'System',
     icon: 'sync',
@@ -128,15 +128,7 @@ export default function Layout() {
 
   return (
     <div className="bg-background min-h-screen text-on-surface font-sans flex flex-col">
-      {/* 1. Clinical Decision Support Top Banner */}
-      <div className="fixed top-0 inset-x-0 h-8 z-50 bg-[#d3e4ff] text-[#004881] flex items-center justify-center px-4 text-center shadow-xs border-b border-primary/10">
-        <div className="flex items-center gap-2 text-xs font-semibold">
-          <span className="material-symbols-outlined text-[16px] text-primary">info</span>
-          <span>Clinical decision support only. Not a definitive safety declaration. Confirm with a licensed prescriber.</span>
-        </div>
-      </div>
-
-      {/* 2. Mobile Backdrop */}
+      {/* Mobile Backdrop */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
@@ -144,9 +136,9 @@ export default function Layout() {
         />
       )}
 
-      {/* 3. Left Sidebar Navigation */}
+      {/* Left Sidebar Navigation */}
       <aside 
-        className={`fixed left-0 top-8 bottom-0 w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-surface-container-high transition-transform duration-300 shadow-xl lg:shadow-none ${
+        className={`fixed left-0 top-0 bottom-0 w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-surface-container-high transition-transform duration-300 shadow-xl lg:shadow-none ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -171,8 +163,10 @@ export default function Layout() {
             {navItems.map((item) => {
               const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
               return (
-                <button
+                <motion.button
                   key={item.name}
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     navigate(item.path);
                     setSidebarOpen(false);
@@ -187,24 +181,14 @@ export default function Layout() {
                     {item.icon}
                   </span>
                   {item.name}
-                </button>
+                </motion.button>
               );
             })}
           </nav>
         </div>
 
-        {/* Sidebar Footer - SMART on FHIR Card & Clinician Card */}
+        {/* Sidebar Footer - Clinician Card & Logout */}
         <div className="p-4 space-y-3 border-t border-surface-container-high">
-          {/* FHIR Gateway Status */}
-          <div className="p-3 bg-surface-container-low rounded-xl border border-surface-container-high">
-            <div className="flex items-center gap-1.5 text-primary text-[10px] font-bold uppercase tracking-wider">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-              <span>SMART on FHIR v4.0.1</span>
-            </div>
-            <div className="text-xs font-bold text-on-surface mt-1 truncate">St. Jude Health System</div>
-            <div className="text-[10px] text-outline mt-0.5">Production Gateway Active</div>
-          </div>
-
           {/* Clinician Card */}
           <div className="p-2.5 bg-surface-container-lowest rounded-xl border border-surface-container-high flex items-center gap-2.5 shadow-xs">
             <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/10 text-primary flex items-center justify-center shrink-0 font-bold text-xs ring-1 ring-primary/20">
@@ -218,20 +202,22 @@ export default function Layout() {
             </div>
           </div>
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-error hover:bg-error-container/40 transition-all font-semibold text-xs"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-error hover:bg-error-container/40 transition-all font-semibold text-xs cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">logout</span>
             Lock / Log Out
-          </button>
+          </motion.button>
         </div>
       </aside>
 
-      {/* 4. Top Header & Content Container */}
-      <div className="lg:pl-64 flex flex-col min-h-screen pt-8">
+      {/* Top Header & Content Container */}
+      <div className="lg:pl-64 flex flex-col min-h-screen">
         {/* Fixed Header */}
-        <header className="fixed top-8 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-4 lg:px-8 border-b border-surface-container-high">
+        <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-4 lg:px-8 border-b border-surface-container-high">
           {/* Mobile Menu Button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -435,9 +421,20 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* 5. Main Nested Content Route */}
+        {/* 5. Main Nested Content Route with Fluid Page Transitions */}
         <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto">
-          <Outlet />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full"
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </main>
 
         {/* 6. Standard Legal Footer */}

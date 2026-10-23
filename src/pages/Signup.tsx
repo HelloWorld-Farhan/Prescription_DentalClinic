@@ -141,27 +141,44 @@ export default function Signup() {
   };
 
   return (
-    <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary">
-      {/* Top Clinical Advisory Banner */}
-      <div className="w-full">
-        <div className="bg-[#EBF8FF] text-[#2B6CB0] border-b border-[#BEE3F8] px-4 py-1.5 text-center flex items-center justify-center gap-2">
-          <span className="material-symbols-outlined text-base leading-none select-none">verified_user</span>
-          <span className="text-xs sm:text-sm font-medium leading-tight">
-            Prescriber &amp; Clinical Pharmacist Enrollment Portal · HIPAA Safe Harbor Encrypted
-          </span>
-        </div>
+    <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden">
+      {/* Ambient Animated Gradient Orbs */}
+      <motion.div
+        animate={{
+          scale: [1, 1.1, 1],
+          opacity: [0.35, 0.5, 0.35],
+          x: [0, 20, 0],
+          y: [0, -15, 0]
+        }}
+        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute -top-24 left-1/3 -translate-x-1/2 w-[600px] h-[400px] bg-primary/10 rounded-full blur-3xl pointer-events-none -z-10"
+      />
+      <motion.div
+        animate={{
+          scale: [1, 1.15, 1],
+          opacity: [0.25, 0.45, 0.25],
+          x: [0, -25, 0],
+          y: [0, 20, 0]
+        }}
+        transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+        className="absolute bottom-10 right-1/4 w-[450px] h-[350px] bg-secondary/15 rounded-full blur-3xl pointer-events-none -z-10"
+      />
 
-        {/* Header Bar */}
+      {/* Header Bar */}
+      <div className="w-full">
         <header className="w-full bg-surface-container-lowest/80 backdrop-blur-xl shadow-xs border-b border-surface-container-high z-30">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <Link to="/login" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform overflow-hidden">
+              <motion.div
+                whileHover={{ scale: 1.05, rotate: 2 }}
+                className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs overflow-hidden"
+              >
                 {savedLogo ? (
                   <img src={savedLogo} alt="Clinic Logo" className="w-full h-full object-cover" />
                 ) : (
                   <span className="material-symbols-outlined text-[24px]">shield_with_heart</span>
                 )}
-              </div>
+              </motion.div>
               <div className="flex flex-col">
                 <span className="font-bold text-lg text-primary tracking-tight leading-none">Smile Clinic</span>
                 <span className="text-[10px] text-outline font-medium tracking-wider uppercase">RxGuard Safety Engine</span>
@@ -189,10 +206,10 @@ export default function Signup() {
       <main className="w-full flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-4xl mx-auto py-4">
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            className="bg-surface-container-lowest rounded-2xl shadow-xl border border-surface-container-high/60 overflow-hidden"
+            initial={{ opacity: 0, y: 20, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl shadow-xl shadow-primary/5 border border-surface-container-high/60 overflow-hidden"
           >
             {/* Header Strip */}
             <div className="bg-gradient-to-r from-primary/10 via-primary-container/5 to-transparent p-6 sm:p-8 border-b border-surface-container-high/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -487,13 +504,15 @@ export default function Signup() {
                   <span className="material-symbols-outlined text-[16px] text-primary">security</span>
                   <span>Instant 2FA verification code sent to email &amp; SMS</span>
                 </div>
-                <button
+                <motion.button
                   type="submit"
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
                   className="w-full sm:w-auto px-8 py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-bold text-xs sm:text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span>Continue to 2FA Verification</span>
                   <span className="material-symbols-outlined text-[18px]">lock_clock</span>
-                </button>
+                </motion.button>
               </div>
             </form>
           </motion.div>
@@ -505,9 +524,10 @@ export default function Signup() {
         {showOtpModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 320 }}
               className="w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden"
             >
               {/* Modal Header */}
@@ -606,8 +626,10 @@ export default function Signup() {
                   >
                     Cancel
                   </button>
-                  <button
+                  <motion.button
                     type="submit"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     disabled={isVerifying}
                     className="w-full sm:w-2/3 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
@@ -622,7 +644,7 @@ export default function Signup() {
                         <span>Verify &amp; Create Account</span>
                       </>
                     )}
-                  </button>
+                  </motion.button>
                 </div>
               </form>
             </motion.div>

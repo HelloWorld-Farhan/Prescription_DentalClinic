@@ -53,7 +53,12 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex flex-col w-full gap-6">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      className="flex flex-col w-full gap-6"
+    >
       {/* 1. TOP CONTEXT & FILTER BAR */}
       <section className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
@@ -75,18 +80,20 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex p-1 bg-surface-container-high rounded-xl text-on-surface">
             {units.map((unit) => (
-              <button
+              <motion.button
                 type="button"
                 key={unit}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setSelectedUnit(unit)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   selectedUnit === unit
                     ? 'bg-surface-container-lowest text-primary shadow-xs font-bold'
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
                 {unit}
-              </button>
+              </motion.button>
             ))}
           </div>
           <div className="h-6 w-px bg-surface-container-highest mx-1 hidden sm:block"></div>
@@ -105,7 +112,10 @@ export default function Dashboard() {
       {/* 2. FOUR STAT CARDS */}
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Card 1: Checks Today */}
-        <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-md transition-all">
+        <motion.div
+          whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg transition-shadow cursor-default"
+        >
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Checks Today</span>
@@ -133,10 +143,13 @@ export default function Dashboard() {
             </div>
             <p className="text-[11px] text-on-surface-variant truncate">189 auto-verified, 1,095 prescriber checked</p>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 2: Alerts In Queue */}
-        <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-md transition-all">
+        <motion.div
+          whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg transition-shadow cursor-default"
+        >
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Alerts In Queue</span>
@@ -155,10 +168,13 @@ export default function Dashboard() {
             <span className="text-[11px] text-on-surface-variant">Median queue wait: <strong>3.8 mins</strong></span>
             <span className="material-symbols-outlined text-outline text-[16px]">schedule</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 3: High-Severity Open */}
-        <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden">
+        <motion.div
+          whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg transition-shadow relative overflow-hidden cursor-default"
+        >
           <div className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full bg-error-container/30 pointer-events-none"></div>
           <div className="flex items-start justify-between">
             <div>
@@ -178,10 +194,13 @@ export default function Dashboard() {
           <div className="mt-4 pt-3 border-t border-surface-container">
             <p className="text-[11px] text-on-surface-variant">Critical contraindicated combinations flagged</p>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 4: Unable to Assess */}
-        <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-md transition-all">
+        <motion.div
+          whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:shadow-lg transition-shadow cursor-default"
+        >
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Unable to Assess</span>
@@ -200,7 +219,7 @@ export default function Dashboard() {
           <div className="mt-4 pt-3 border-t border-surface-container">
             <p className="text-[11px] text-on-surface-variant truncate">Missing lab values / novel compounding</p>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* 3. 2-COLUMN MAIN CONTENT (8 cols Left / 4 cols Right) */}
@@ -526,6 +545,6 @@ export default function Dashboard() {
         isOpen={!!activeReportCheck}
         onClose={() => setActiveReportCheck(null)}
       />
-    </div>
+    </motion.div>
   );
 }

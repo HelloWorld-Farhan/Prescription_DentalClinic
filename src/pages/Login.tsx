@@ -133,98 +133,111 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary">
-      {/* Top Advisory Banner */}
-      <div className="w-full">
-        <div className="bg-[#EBF8FF] text-[#2B6CB0] border-b border-[#BEE3F8] px-4 py-1.5 text-center flex items-center justify-center gap-2">
-          <span className="material-symbols-outlined text-base leading-none select-none">info</span>
-          <span className="text-xs sm:text-sm font-medium leading-tight">
-            Clinical decision support only. Not a definitive safety declaration. Confirm with a licensed prescriber or pharmacist.
-          </span>
+    <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden">
+      {/* Global Clinical Header */}
+      <header className="h-16 w-full bg-surface-container-lowest border-b border-outline-variant/30 px-4 lg:px-8 flex items-center justify-between shadow-xs z-20">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-bold shadow-xs overflow-hidden">
+            {savedLogo ? (
+              <img src={savedLogo} alt="Smile Clinic Logo" className="w-full h-full object-contain p-1" />
+            ) : (
+              <span className="material-symbols-outlined text-[22px]">dentistry</span>
+            )}
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-lg text-primary leading-none">Smile Clinic</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold uppercase tracking-wider">RxGuard CDS</span>
+            </div>
+            <span className="text-[11px] text-on-surface-variant font-medium">Prescription Safety &amp; Decision Support</span>
+          </div>
         </div>
 
-        {/* Global Clinical Header */}
-        <header className="h-16 w-full bg-surface-container-lowest border-b border-outline-variant/30 px-4 lg:px-8 flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-bold shadow-xs overflow-hidden">
-              {savedLogo ? (
-                <img src={savedLogo} alt="Smile Clinic Logo" className="w-full h-full object-contain p-1" />
-              ) : (
-                <span className="material-symbols-outlined text-[22px]">dentistry</span>
-              )}
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-lg text-primary leading-none">Smile Clinic</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold uppercase tracking-wider">RxGuard CDS</span>
-              </div>
-              <span className="text-[11px] text-on-surface-variant font-medium">Prescription Safety & Decision Support</span>
-            </div>
+        <div className="flex items-center gap-3">
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            type="button"
+            onClick={handleFillDemo}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors border border-primary/20 cursor-pointer shadow-2xs"
+            title="Auto-fill verified clinical credentials"
+          >
+            <span className="material-symbols-outlined text-sm">bolt</span>
+            1-Click Demo Fill
+          </motion.button>
+          <div className="hidden md:flex items-center gap-1.5 text-on-surface-variant text-xs font-medium bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-container-high">
+            <span className="material-symbols-outlined text-[16px] text-primary">verified_user</span>
+            <span>HIPAA Compliant 256-Bit SSL</span>
           </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors border border-primary/20 cursor-pointer"
-              title="Auto-fill verified clinical credentials"
-            >
-              <span className="material-symbols-outlined text-sm">bolt</span>
-              1-Click Demo Fill
-            </button>
-            <div className="hidden md:flex items-center gap-1.5 text-on-surface-variant text-xs font-medium bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-container-high">
-              <span className="material-symbols-outlined text-[16px] text-primary">verified_user</span>
-              <span>HIPAA Compliant 256-Bit SSL</span>
-            </div>
-            <Link
-              to="/support"
-              className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors text-xs font-semibold"
-            >
-              <span className="material-symbols-outlined text-[18px]">help_outline</span>
-              <span>Support</span>
-            </Link>
-          </div>
-        </header>
-      </div>
+          <Link
+            to="/support"
+            className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors text-xs font-semibold"
+          >
+            <span className="material-symbols-outlined text-[18px]">help_outline</span>
+            <span>Support</span>
+          </Link>
+        </div>
+      </header>
 
       {/* Main Container */}
-      <main className="flex-1 flex items-center justify-center py-8 px-4">
+      <main className="flex-1 flex items-center justify-center py-8 px-4 relative z-10">
         <div className="flex flex-col w-full relative items-center justify-center py-4 sm:py-8 px-1 sm:px-4 min-w-0">
-          {/* Subtle Clinical Teal Ambient Glows */}
-          <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[720px] h-[480px] bg-primary/5 rounded-full blur-3xl pointer-events-none -z-10"></div>
-          <div className="absolute top-1/2 right-1/4 w-[360px] h-[360px] bg-secondary/5 rounded-full blur-2xl pointer-events-none -z-10"></div>
+          {/* High-Modern Floating Ambient Teal & Cyan Orbs */}
+          <motion.div
+            animate={{
+              scale: [1, 1.1, 1],
+              opacity: [0.25, 0.45, 0.25],
+              x: [0, 20, 0],
+              y: [0, -20, 0]
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -top-24 left-1/2 -translate-x-1/2 w-[680px] h-[440px] bg-primary/15 rounded-full blur-3xl pointer-events-none -z-10"
+          />
+          <motion.div
+            animate={{
+              scale: [1, 1.15, 1],
+              opacity: [0.2, 0.4, 0.2],
+              x: [0, -30, 0],
+              y: [0, 25, 0]
+            }}
+            transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+            className="absolute top-1/2 right-1/4 w-[380px] h-[380px] bg-secondary/15 rounded-full blur-2xl pointer-events-none -z-10"
+          />
 
           {/* Central Card Stack (580px optimized) */}
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-[580px] flex flex-col gap-5"
           >
             {/* Top Badge Strip */}
             <div className="flex items-center justify-between px-1 text-on-surface-variant text-xs">
               <div className="flex items-center gap-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                <span className="font-medium text-primary">SMART on FHIR v4.0.1 Ready</span>
+                <span className="font-semibold text-primary">SMART on FHIR v4.0.1 Ready</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-sm text-outline">verified_user</span>
-                <span>HIPAA & HITECH Certified Session</span>
+                <span>HIPAA &amp; HITECH Certified Session</span>
               </div>
             </div>
 
             {/* Main Authentication & Attestation Card */}
-            <div className="bg-surface-container-lowest rounded-2xl shadow-xl shadow-primary/5 border border-outline-variant/30 p-6 sm:p-8 flex flex-col gap-6">
+            <div className="bg-surface-container-lowest rounded-2xl shadow-xl shadow-primary/5 border border-outline-variant/30 p-6 sm:p-8 flex flex-col gap-6 backdrop-blur-xs">
               {/* Card Header */}
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 text-primary">
+                <motion.div
+                  whileHover={{ rotate: 5, scale: 1.05 }}
+                  className="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 text-primary shadow-xs"
+                >
                   <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
                     security
                   </span>
-                </div>
+                </motion.div>
                 <div className="flex flex-col gap-1 min-w-0">
                   <h1 className="text-xl font-bold text-on-surface tracking-tight">
-                    Sign In & Access Attestation
+                    Sign In &amp; Access Attestation
                   </h1>
                   <p className="text-xs sm:text-sm text-on-surface-variant leading-snug">
                     Enter authorized clinical credentials and certify patient safety compliance before entering the interaction engine.
@@ -237,18 +250,20 @@ export default function Login() {
                 <label className="text-xs font-semibold text-on-surface-variant">Active Clinical Role</label>
                 <div className="grid grid-cols-4 p-1 bg-surface-container-low rounded-xl gap-1">
                   {(['Clinician', 'Pharmacist', 'Reviewer', 'Admin'] as const).map((role) => (
-                    <button
+                    <motion.button
                       key={role}
                       type="button"
+                      whileHover={{ scale: 1.02, y: -1 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => setSelectedRole(role)}
-                      className={`flex items-center justify-center py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
+                      className={`flex items-center justify-center py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                         selectedRole === role
-                          ? 'bg-primary-container text-on-primary shadow-xs'
-                          : 'text-on-surface-variant hover:text-on-surface'
+                          ? 'bg-primary-container text-on-primary shadow-xs font-bold'
+                          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
                       }`}
                     >
                       {role}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
@@ -411,16 +426,18 @@ export default function Login() {
 
                 {/* Submit Button (Gated by 3/3 Attestations) */}
                 <div className="flex flex-col gap-2 pt-1">
-                  <button
+                  <motion.button
                     type="submit"
+                    whileHover={isAllAttested && !isLoading ? { scale: 1.015, y: -1 } : {}}
+                    whileTap={isAllAttested && !isLoading ? { scale: 0.985 } : {}}
                     disabled={!isAllAttested || isLoading}
                     className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 select-none ${
                       isAllAttested && !isLoading
-                        ? 'bg-primary-container text-on-primary shadow-md hover:bg-primary cursor-pointer'
+                        ? 'bg-primary-container text-on-primary shadow-md hover:bg-primary cursor-pointer hover:shadow-lg'
                         : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-lg">
+                    <span className={`material-symbols-outlined text-lg ${isLoading ? 'animate-spin' : ''}`}>
                       {isLoading ? 'sync' : isAllAttested ? 'arrow_forward' : 'lock'}
                     </span>
                     <span>
@@ -430,7 +447,7 @@ export default function Login() {
                         ? `Sign In as ${selectedRole}`
                         : 'Requires 3/3 Attestations Above'}
                     </span>
-                  </button>
+                  </motion.button>
 
                   <span className="text-[11px] text-center text-outline">
                     {isAllAttested
