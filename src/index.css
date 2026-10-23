@@ -50,3 +50,49 @@
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
+
+/* Professional Clinical PDF & Paper Print Rules */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Strictly hide UI navigation, toolbars, and popups */
+  header,
+  aside,
+  nav,
+  .print\:hidden,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset document scaling & margins for 100% crisp paper layout */
+  .report-sheet-wrapper {
+    transform: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Avoid breaking clinical cards and tables across paper boundaries */
+  .print-break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}

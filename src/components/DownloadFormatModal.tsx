@@ -46,8 +46,20 @@ export default function DownloadFormatModal({
           setTimeout(() => {
             setIsDownloading(false);
             setProgress(0);
-            executeFileExport(selectedFormat);
-            onClose();
+            if (selectedFormat === 'pdf') {
+              onClose();
+              // Unmount modal cleanly from DOM before browser print preview pauses execution
+              setTimeout(() => {
+                if (onPrintFallback) {
+                  onPrintFallback();
+                } else {
+                  window.print();
+                }
+              }, 120);
+            } else {
+              executeFileExport(selectedFormat);
+              onClose();
+            }
           }, 350);
           return 100;
         }
@@ -217,7 +229,7 @@ export default function DownloadFormatModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm print:hidden">
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
