@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../data/virtualDb';
@@ -10,28 +10,35 @@ export default function NewCheck() {
   const navigate = useNavigate();
   const patients = VirtualDb.getPatients();
 
-  // Multi-step Wizard State (1 to 5)
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  // Workflow Phases: 1. Input -> 2. Animated Analysis -> 3. Final Report & Record
+  type FlowPhase = 'input' | 'analyzing' | 'report';
+  const [flowPhase, setFlowPhase] = useState<FlowPhase>('input');
 
-  // Step 1: Patient Context State
+  // --- Input Method Tab (Upload, Camera Photo, Manual Form) ---
+  type InputMethod = 'upload' | 'camera' | 'manual';
+  const [inputMethod, setInputMethod] = useState<InputMethod>('upload');
+
+  // File Upload State
+  const [uploadedFileName, setUploadedFileName] = useState<string>('dental_surgery_rx_order_vance.pdf');
+  const [uploadedFileSize, setUploadedFileSize] = useState<string>('1.8 MB');
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Camera Photo State
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  // Patient Context Selection
   const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0].id);
   const selectedPatient = patients.find(p => p.id === selectedPatientId) || patients[0];
-
   const [ptKey, setPtKey] = useState<string>('MRN-HASH-9042-XF');
-  const [customWeight, setCustomWeight] = useState<number>(selectedPatient.weightKg || 78.4);
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>('kg');
+  const [customWeight, setCustomWeight] = useState<number>(selectedPatient.weightKg || 64.5);
   const [customEgfr, setCustomEgfr] = useState<number>(selectedPatient.egfr || 42);
-  const [childPugh, setChildPugh] = useState<'Class A' | 'Class B' | 'Class C'>('Class A');
-  const [customPregnancy, setCustomPregnancy] = useState(selectedPatient.pregnancyStatus || 'No');
-  const [heightCm, setHeightCm] = useState<number>(176);
-
-  // Step 2: Meds & Allergies
   const [activeMeds, setActiveMeds] = useState<string[]>(selectedPatient.activeMedications);
-  const [newMedInput, setNewMedInput] = useState('');
   const [allergies, setAllergies] = useState<string[]>(selectedPatient.allergies);
-  const [newAllergyInput, setNewAllergyInput] = useState('');
 
-  // Step 3: New Proposed Prescriptions
+  // Prescriptions List
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([
     {
       id: 'rx-p1',
@@ -45,160 +52,250 @@ export default function NewCheck() {
     }
   ]);
 
-  const [drugName, setDrugName] = useState('');
-  const [genericName, setGenericName] = useState('');
-  const [dosage, setDosage] = useState('');
-  const [frequency, setFrequency] = useState('Every 12 hours (BID)');
-  const [route, setRoute] = useState('Oral (PO)');
-  const [duration, setDuration] = useState('7 days');
-  const [indication, setIndication] = useState('Acute Periapical Abscess');
-  const [isPrn, setIsPrn] = useState(false);
+  // Manual Medicine Input Fields
+  const [manualDrugName, setManualDrugName] = useState('');
+  const [manualGenericName, setManualGenericName] = useState('');
+  const [manualDosage, setManualDosage] = useState('500mg');
+  const [manualFrequency, setManualFrequency] = useState('Every 12 hours (BID)');
+  const [manualRoute, setManualRoute] = useState('Oral (PO)');
+  const [manualDuration, setManualDuration] = useState('7 days');
+  const [manualIndication, setManualIndication] = useState('Post-Op Dental Infection Prophylaxis');
 
-  // Step 4: Extraction & Verification Flags
-  const [confirmStrength, setConfirmStrength] = useState(true);
-  const [confirmUnit, setConfirmUnit] = useState(true);
+  // --- Automated Animated Pipeline State ---
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [currentAnalysisStage, setCurrentAnalysisStage] = useState(1);
+  const [activeStageLog, setActiveStageLog] = useState('Initiating multi-modal OCR vision pipeline...');
 
-  // Step 5 Screening Results
+  // --- Final Results State ---
   const [alerts, setAlerts] = useState<DrugInteractionAlert[]>([]);
-  const [activeAlertForDrawer, setActiveAlertForDrawer] = useState<DrugInteractionAlert | null>(null);
   const [savedCheckRecord, setSavedCheckRecord] = useState<SafetyCheckRecord | null>(null);
+  const [activeAlertForDrawer, setActiveAlertForDrawer] = useState<DrugInteractionAlert | null>(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
-  // Update context when patient changes
-  const handlePatientChange = (patientId: string) => {
-    setSelectedPatientId(patientId);
-    const p = patients.find(pat => pat.id === patientId);
+  // Sync patient context when selection changes
+  const handlePatientSelect = (patId: string) => {
+    setSelectedPatientId(patId);
+    const p = patients.find(pat => pat.id === patId);
     if (p) {
       setCustomWeight(p.weightKg);
       setCustomEgfr(p.egfr);
-      setCustomPregnancy(p.pregnancyStatus);
       setActiveMeds(p.activeMedications);
       setAllergies(p.allergies);
       setPtKey('MRN-HASH-' + p.mrn.replace(/[^0-9]/g, '').slice(0, 4) + '-XF');
     }
   };
 
-  const handleAutoGenerateToken = () => {
+  const handleGenerateKey = () => {
     const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
     setPtKey(`PT-${Math.floor(1000 + Math.random() * 9000)}-${randomHex}`);
   };
 
-  const handleAddMed = (e: React.FormEvent) => {
+  // Add Prescription manually
+  const handleAddManualPrescription = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMedInput.trim()) {
-      setActiveMeds([...activeMeds, newMedInput.trim()]);
-      setNewMedInput('');
-    }
-  };
-
-  const handleRemoveMed = (index: number) => {
-    setActiveMeds(activeMeds.filter((_, i) => i !== index));
-  };
-
-  const handleAddAllergy = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newAllergyInput.trim()) {
-      setAllergies([...allergies, newAllergyInput.trim()]);
-      setNewAllergyInput('');
-    }
-  };
-
-  const handleRemoveAllergy = (index: number) => {
-    setAllergies(allergies.filter((_, i) => i !== index));
-  };
-
-  const handleAddPrescription = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!drugName.trim()) return;
+    if (!manualDrugName.trim()) return;
 
     const newItem: PrescriptionItem = {
       id: 'rx-' + Date.now(),
-      drugName: drugName.trim(),
-      genericName: genericName.trim() || drugName.trim(),
-      dosage: dosage.trim() || 'Standard Dose',
-      frequency,
-      route,
-      duration,
-      indication
+      drugName: manualDrugName.trim(),
+      genericName: manualGenericName.trim() || manualDrugName.trim(),
+      dosage: manualDosage.trim() || 'Standard Dose',
+      frequency: manualFrequency,
+      route: manualRoute,
+      duration: manualDuration,
+      indication: manualIndication
     };
 
     setPrescriptions([...prescriptions, newItem]);
-    setDrugName('');
-    setGenericName('');
-    setDosage('');
+    setManualDrugName('');
+    setManualGenericName('');
   };
 
   const handleRemovePrescription = (id: string) => {
     setPrescriptions(prescriptions.filter(p => p.id !== id));
   };
 
-  const handleQuickAddDental = (name: string, gen: string, dose: string, freq: string, dur: string, ind: string) => {
-    setPrescriptions([
-      ...prescriptions,
-      {
-        id: 'rx-' + Date.now(),
-        drugName: name,
-        genericName: gen,
-        dosage: dose,
-        frequency: freq,
-        route: 'Oral (PO)',
-        duration: dur,
-        indication: ind
-      }
-    ]);
-  };
-
-  // Run Real-Time Safety Screening
-  const runSafetyScreen = () => {
-    const updatedPatient: Patient = {
-      ...selectedPatient,
-      weightKg: customWeight,
-      egfr: customEgfr,
-      pregnancyStatus: customPregnancy,
-      activeMedications: activeMeds,
-      allergies: allergies
-    };
-
-    const screenAlerts = VirtualDb.evaluateScreening(updatedPatient, prescriptions);
-    setAlerts(screenAlerts);
-
-    const hasContra = screenAlerts.some(a => a.severity === 'contraindicated');
-    const hasMajor = screenAlerts.some(a => a.severity === 'major');
-    const status = hasContra ? 'Contraindicated' : hasMajor ? 'Requires Review' : 'Safe to Dispense';
-
-    const newRecord: SafetyCheckRecord = {
-      id: 'chk-' + Date.now(),
-      checkNumber: 'CHK-2026-' + Math.floor(1000 + Math.random() * 9000),
-      timestamp: 'Just now',
-      patientId: updatedPatient.id,
-      patientName: updatedPatient.name,
-      mrn: updatedPatient.mrn,
-      patientKey: ptKey,
-      unit: updatedPatient.roomOrUnit || 'Dental Surgery & Inpatient',
-      prescriptions,
-      alerts: screenAlerts,
-      overallStatus: status,
-      reviewerName: 'Dr. Sarah Lin, PharmD',
-      prescriberName: 'Arthur Vance, MD',
-      prescriberNpi: 'NPI-1092837482',
-      fhirSynced: true
-    };
-
-    VirtualDb.addCheck(newRecord);
-    setSavedCheckRecord(newRecord);
-    setCurrentStep(5);
-  };
-
-  const handleOverrideFromDrawer = (alertId: string, reason: string) => {
-    if (savedCheckRecord) {
-      VirtualDb.overrideAlert(savedCheckRecord.id, alertId, reason, 'Dr. Sarah Lin, PharmD');
-      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, overridden: true, overrideReason: reason, overrideAuthor: 'Dr. Sarah Lin, PharmD' } : a));
+  // Quick preset loader helper
+  const handleLoadPresetRx = (preset: 'cipro_warfarin' | 'amox_penicillin' | 'clean_clinda') => {
+    if (preset === 'cipro_warfarin') {
+      handlePatientSelect(patients[0].id); // Eleanor Vance (Warfarin, Fluconazole, eGFR 42)
+      setPrescriptions([
+        {
+          id: 'rx-p1',
+          drugName: 'Ciprofloxacin 500mg',
+          genericName: 'Ciprofloxacin Hydrochloride',
+          dosage: '500mg Film-Coated Tablet',
+          frequency: 'Every 12 hours (BID)',
+          route: 'Oral (PO)',
+          duration: '7 days',
+          indication: 'Acute Odontogenic / Maxillary Infection'
+        }
+      ]);
+      setUploadedFileName('dental_surgery_rx_slip_cipro.pdf');
+      setUploadedFileSize('1.8 MB');
+    } else if (preset === 'amox_penicillin') {
+      handlePatientSelect(patients[0].id); // Has Penicillin Anaphylaxis allergy
+      setPrescriptions([
+        {
+          id: 'rx-p2',
+          drugName: 'Amoxicillin 500mg',
+          genericName: 'Amoxicillin Trihydrate',
+          dosage: '500mg Capsule',
+          frequency: 'Every 8 hours (TID)',
+          route: 'Oral (PO)',
+          duration: '5 days',
+          indication: 'Periapical Dental Abscess Drainage'
+        }
+      ]);
+      setUploadedFileName('periapical_abscess_amoxicillin_rx.jpg');
+      setUploadedFileSize('2.4 MB');
+    } else {
+      // Clean Dental Antibiotic
+      handlePatientSelect(patients[1]?.id || patients[0].id);
+      setPrescriptions([
+        {
+          id: 'rx-p3',
+          drugName: 'Clindamycin 300mg',
+          genericName: 'Clindamycin Hydrochloride',
+          dosage: '300mg Capsule',
+          frequency: 'Every 8 hours',
+          route: 'Oral (PO)',
+          duration: '7 days',
+          indication: 'Penicillin-Allergic Dental Surgery Prophylaxis'
+        }
+      ]);
+      setUploadedFileName('clindamycin_prophylaxis_rx.png');
+      setUploadedFileSize('950 KB');
     }
   };
 
+  // Camera Snap Handler
+  const handleTakePhoto = () => {
+    setIsCapturing(true);
+    setTimeout(() => {
+      setIsCapturing(false);
+      setIsCameraActive(false);
+      setCapturedPhoto('captured_prescription_scan.jpg');
+      setUploadedFileName('camera_captured_rx_slip.jpg');
+      setUploadedFileSize('3.2 MB');
+    }, 600);
+  };
+
+  // File Drop / Selection Handler
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      setUploadedFileName(file.name);
+      setUploadedFileSize(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setUploadedFileName(file.name);
+      setUploadedFileSize(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+    }
+  };
+
+  // --- START AUTOMATED SAFETY CHECK PIPELINE ---
+  const handleStartSafetyCheck = () => {
+    setFlowPhase('analyzing');
+    setAnalysisProgress(5);
+    setCurrentAnalysisStage(1);
+    setActiveStageLog('Extracting optical text & pharmacological entities from prescription...');
+
+    // Run sequential animated stages
+    // Stage 1: OCR Extraction (0% to 28%)
+    setTimeout(() => {
+      setAnalysisProgress(30);
+      setCurrentAnalysisStage(2);
+      setActiveStageLog(`Matching patient chart #${selectedPatient.mrn} • eGFR: ${customEgfr} mL/min • Reconciling allergies...`);
+    }, 900);
+
+    // Stage 2: Patient Context & Allergies (28% to 58%)
+    setTimeout(() => {
+      setAnalysisProgress(65);
+      setCurrentAnalysisStage(3);
+      setActiveStageLog(`Cross-matching against ${activeMeds.length} active medications (${activeMeds.join(', ')})...`);
+    }, 1800);
+
+    // Stage 3: Drug-Drug & Dosing Matrix (58% to 88%)
+    setTimeout(() => {
+      setAnalysisProgress(90);
+      setCurrentAnalysisStage(4);
+      setActiveStageLog('Evaluating CDS safety rules, Beers criteria & CYP450 contraindications...');
+    }, 2700);
+
+    // Stage 4: Finalize & Generate Safety Record
+    setTimeout(() => {
+      setAnalysisProgress(100);
+
+      // Perform actual CDS evaluation
+      const updatedPatient: Patient = {
+        ...selectedPatient,
+        weightKg: customWeight,
+        egfr: customEgfr,
+        activeMedications: activeMeds,
+        allergies: allergies
+      };
+
+      const evaluatedAlerts = VirtualDb.evaluateScreening(updatedPatient, prescriptions);
+      setAlerts(evaluatedAlerts);
+
+      const hasContra = evaluatedAlerts.some(a => a.severity === 'contraindicated');
+      const hasMajor = evaluatedAlerts.some(a => a.severity === 'major');
+      const overallStatus = hasContra ? 'Contraindicated' : hasMajor ? 'Requires Review' : 'Safe to Dispense';
+
+      const newRecord: SafetyCheckRecord = {
+        id: 'chk-' + Date.now(),
+        checkNumber: 'CHK-2026-' + Math.floor(1000 + Math.random() * 9000),
+        timestamp: 'Just now',
+        patientId: updatedPatient.id,
+        patientName: updatedPatient.name,
+        mrn: updatedPatient.mrn,
+        patientKey: ptKey,
+        unit: updatedPatient.roomOrUnit || 'Dental Surgery & Inpatient',
+        prescriptions,
+        alerts: evaluatedAlerts,
+        overallStatus,
+        reviewerName: 'Dr. Sarah Lin, PharmD',
+        prescriberName: 'Arthur Vance, MD',
+        prescriberNpi: 'NPI-1092837482',
+        fhirSynced: true
+      };
+
+      VirtualDb.addCheck(newRecord);
+      setSavedCheckRecord(newRecord);
+
+      // Automatically transition directly into the complete Clinical Safety Report & Record screen
+      setTimeout(() => {
+        setFlowPhase('report');
+      }, 500);
+    }, 3600);
+  };
+
+  // Override alert from detail drawer
+  const handleOverrideFromDrawer = (alertId: string, reason: string) => {
+    if (savedCheckRecord) {
+      VirtualDb.overrideAlert(savedCheckRecord.id, alertId, reason, 'Dr. Sarah Lin, PharmD');
+      setAlerts(prev =>
+        prev.map(a =>
+          a.id === alertId
+            ? { ...a, overridden: true, overrideReason: reason, overrideAuthor: 'Dr. Sarah Lin, PharmD' }
+            : a
+        )
+      );
+    }
+  };
+
+  // Substitute safer alternative
   const handleSelectAlternativeFromDrawer = (altDrug: string) => {
-    setPrescriptions(prev => [
-      ...prev.slice(1),
+    setPrescriptions([
       {
         id: 'rx-' + Date.now(),
         drugName: altDrug,
@@ -212,11 +309,52 @@ export default function NewCheck() {
     ]);
   };
 
-  const bmi = (customWeight / Math.pow(heightCm / 100, 2)).toFixed(1);
+  // PDF Download Trigger with Animation
+  const handleDownloadPdfReport = () => {
+    setIsDownloadingReport(true);
+    setDownloadProgress(20);
+
+    const interval = setInterval(() => {
+      setDownloadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setIsDownloadingReport(false);
+            setDownloadProgress(0);
+
+            // Trigger simulated browser download
+            const blob = new Blob([
+              `SMILE CLINIC CLINICAL DECISION SUPPORT SAFETY REPORT\n` +
+              `Check Number: ${savedCheckRecord?.checkNumber || 'CHK-2026-9042'}\n` +
+              `Patient Key: ${ptKey}\n` +
+              `Status: ${savedCheckRecord?.overallStatus || 'Contraindicated'}\n` +
+              `Candidate Rx: ${prescriptions.map(p => p.drugName).join(', ')}\n` +
+              `Concurrent Meds: ${activeMeds.join(', ')}\n` +
+              `Verified Date: ${new Date().toISOString()}\n` +
+              `Authority: Smile Clinic Health System (21 CFR Part 11 Verified)\n`
+            ], { type: 'text/plain' });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${savedCheckRecord?.checkNumber || 'CHK-9042'}-Clinical-Verification.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 400);
+          return 100;
+        }
+        return prev + 30;
+      });
+    }, 200);
+  };
 
   return (
-    <div className="flex flex-col w-full gap-6 max-w-6xl mx-auto">
-      {/* 1. Stepper Header Strip */}
+    <div className="flex flex-col w-full gap-6 max-w-6xl mx-auto py-2">
+      {/* ========================================================================= */}
+      {/* 1. TOP PROGRESS STEPPER */}
+      {/* ========================================================================= */}
       <div className="w-full bg-surface-container-lowest rounded-2xl p-5 border border-surface-container-high/60 shadow-xs">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
@@ -228,34 +366,44 @@ export default function NewCheck() {
             <div className="text-xl font-bold text-on-surface flex items-center gap-2">
               <span>Safety Check Verification Engine</span>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
-                FHIR R4 Ingest
+                FHIR R4 Ingest Active
               </span>
             </div>
           </div>
 
-          {/* Stepper Nodes */}
-          <nav aria-label="Workflow progress" className="flex items-center gap-1 sm:gap-2">
+          {/* Stepper Navigation */}
+          <nav aria-label="Workflow progress" className="flex items-center gap-2 sm:gap-3">
             {[
-              { num: 1, label: '1. Patient' },
-              { num: 2, label: '2. Regimen' },
-              { num: 3, label: '3. Order' },
-              { num: 4, label: '4. Extraction' },
-              { num: 5, label: '5. CDS Results' }
+              { id: 'input', num: 1, label: '1. Prescription Input' },
+              { id: 'analyzing', num: 2, label: '2. Animated AI Cross-Match' },
+              { id: 'report', num: 3, label: '3. Clinical Safety Report' }
             ].map((node, index) => {
-              const isPast = currentStep > node.num;
-              const isCurrent = currentStep === node.num;
+              const isPast =
+                (flowPhase === 'analyzing' && node.id === 'input') ||
+                (flowPhase === 'report' && node.id !== 'report');
+              const isCurrent = flowPhase === node.id;
 
               return (
                 <React.Fragment key={node.num}>
                   {index > 0 && (
-                    <div className={`w-3 sm:w-4 h-0.5 ${isPast ? 'bg-primary-container' : 'bg-surface-container-high'}`} />
+                    <div
+                      className={`w-4 sm:w-8 h-0.5 transition-colors ${
+                        isPast ? 'bg-primary-container' : 'bg-surface-container-high'
+                      }`}
+                    />
                   )}
                   <div
                     onClick={() => {
-                      if (node.num < currentStep) setCurrentStep(node.num as any);
+                      if (node.id === 'input' && flowPhase === 'report') {
+                        setFlowPhase('input');
+                      }
                     }}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full cursor-pointer transition-all ${
-                      isCurrent ? 'bg-primary/10 ring-2 ring-primary ring-offset-1' : ''
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
+                      isCurrent
+                        ? 'bg-primary/10 ring-2 ring-primary ring-offset-1 font-bold'
+                        : isPast
+                        ? 'cursor-pointer hover:bg-surface-container'
+                        : 'opacity-60'
                     }`}
                   >
                     <div
@@ -263,15 +411,21 @@ export default function NewCheck() {
                         isPast
                           ? 'bg-primary-container text-on-primary'
                           : isCurrent
-                          ? 'bg-primary text-on-primary'
+                          ? 'bg-primary text-on-primary shadow-xs'
                           : 'bg-surface-container-high text-on-surface-variant'
                       }`}
                     >
                       {isPast ? <span className="material-symbols-outlined text-[14px]">check</span> : node.num}
                     </div>
-                    <span className={`hidden md:inline text-xs font-semibold ${
-                      isCurrent ? 'text-primary font-bold' : isPast ? 'text-on-surface' : 'text-on-surface-variant'
-                    }`}>
+                    <span
+                      className={`text-xs font-semibold ${
+                        isCurrent
+                          ? 'text-primary font-bold'
+                          : isPast
+                          ? 'text-on-surface'
+                          : 'text-on-surface-variant'
+                      }`}
+                    >
                       {node.label}
                     </span>
                   </div>
@@ -282,7 +436,7 @@ export default function NewCheck() {
         </div>
       </div>
 
-      {/* Patient Context Strip */}
+      {/* Patient Demographic & Clinical Context Strip */}
       <div className="w-full bg-surface-container-low rounded-xl border border-surface-container px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-primary font-bold text-xs">
@@ -291,7 +445,7 @@ export default function NewCheck() {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-bold text-on-surface">{ptKey}</span>
             <span className="text-outline">•</span>
-            <span className="text-on-surface-variant">{selectedPatient.name} (64y Male)</span>
+            <span className="text-on-surface-variant">{selectedPatient.name} ({selectedPatient.age}y {selectedPatient.gender})</span>
             <span className="text-outline">•</span>
             <span className="inline-flex items-center gap-1 text-on-surface">
               <span className={`w-2 h-2 rounded-full ${customEgfr < 50 ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
@@ -306,921 +460,831 @@ export default function NewCheck() {
         </div>
         <div className="flex items-center gap-2 text-on-surface-variant">
           <span className="material-symbols-outlined text-[16px] text-primary">stethoscope</span>
-          <span>Prescriber: <strong className="text-on-surface">Arthur Vance, MD</strong> (Inpatient & Surgery)</span>
+          <span>Prescriber: <strong className="text-on-surface">Arthur Vance, MD</strong> (Inpatient &amp; Surgery)</span>
         </div>
       </div>
 
-      {/* STEP CONTENT SWITCHER */}
-      <AnimatePresence mode="wait">
-        {/* STEP 1: PATIENT CONTEXT */}
-        {currentStep === 1 && (
-          <motion.div
-            key="step1"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
-          >
-            {/* Left 8 cols: Form */}
-            <div className="lg:col-span-8 space-y-6">
-              <section className="bg-surface-container-lowest rounded-2xl p-6 shadow-xs border border-surface-container-high/60 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-surface-container">
+      {/* ========================================================================= */}
+      {/* 2. PHASE 1: PRESCRIPTION INPUT WINDOW (PHOTO, UPLOAD, OR MANUAL WRITE) */}
+      {/* ========================================================================= */}
+      {flowPhase === 'input' && (
+        <motion.div
+          key="inputPhase"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.3 }}
+          className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
+        >
+          {/* LEFT COLUMN: Input Forms (8 cols) */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            <section className="bg-surface-container-lowest rounded-2xl p-6 shadow-xs border border-surface-container-high/60 flex flex-col gap-5">
+              {/* Header with Quick Presets */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-surface-container gap-3">
+                <div>
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-[24px]">badge</span>
-                    <div>
-                      <h2 className="text-base sm:text-lg font-bold text-on-surface">Identification & Physical Metrics</h2>
-                      <p className="text-xs text-on-surface-variant">Validated demographics for baseline clearances</p>
-                    </div>
+                    <span className="material-symbols-outlined text-primary text-[24px]">medication</span>
+                    <h2 className="text-base sm:text-lg font-bold text-on-surface">Enter or Capture Prescription</h2>
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-semibold">
-                    Section 1A
-                  </span>
-                </div>
-
-                {/* Pseudonymous Key */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-on-surface block" htmlFor="pt-key">
-                    Pseudonymous Patient Key <span className="text-error">*</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="pt-key"
-                      type="text"
-                      value={ptKey}
-                      onChange={(e) => setPtKey(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs font-mono outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAutoGenerateToken}
-                      className="h-10 px-4 rounded-xl bg-surface-container-high text-primary hover:bg-surface-container text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">key</span>
-                      <span>Auto-generate</span>
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-on-surface-variant">
-                    Cryptographic collision-free pseudonym mapped within local EMR enclave under HIPAA safe harbor.
+                  <p className="text-xs text-outline mt-0.5">
+                    Submit prescription slip via image upload, camera photo capture, or manual medication entry.
                   </p>
                 </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-outline font-medium">Quick Demo Test:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadPresetRx('cipro_warfarin')}
+                    className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    Cipro + Warfarin Flag
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadPresetRx('amox_penicillin')}
+                    className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    Amoxicillin Allergy Flag
+                  </button>
+                </div>
+              </div>
 
-                {/* Select Clinic Patient */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-on-surface block">Associated Clinic Chart</label>
+              {/* 3 Input Mode Tabs */}
+              <div className="grid grid-cols-3 p-1.5 bg-surface-container-low rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setInputMethod('upload')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    inputMethod === 'upload'
+                      ? 'bg-primary-container text-on-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
+                  <span>Upload File / PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInputMethod('camera')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    inputMethod === 'camera'
+                      ? 'bg-primary-container text-on-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+                  <span>Click / Scan Photo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInputMethod('manual')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    inputMethod === 'manual'
+                      ? 'bg-primary-container text-on-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                  <span>Write Medicine Names</span>
+                </button>
+              </div>
+
+              {/* TAB 1: UPLOAD FILE */}
+              {inputMethod === 'upload' && (
+                <div className="space-y-4">
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragOver(true);
+                    }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={handleFileDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`p-8 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                      isDragOver
+                        ? 'border-primary bg-primary/10'
+                        : 'border-surface-container-high bg-surface-container-low/60 hover:bg-surface-container-low'
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={handleFileInputChange}
+                      className="hidden"
+                    />
+                    <div className="w-14 h-14 rounded-2xl bg-surface-container text-primary flex items-center justify-center mb-3 shadow-xs">
+                      <span className="material-symbols-outlined text-[32px]">upload_file</span>
+                    </div>
+                    <div className="text-sm font-bold text-on-surface">
+                      Drop prescription scan here or click to browse
+                    </div>
+                    <p className="text-xs text-outline mt-1">
+                      Supports PDF, JPG, PNG e-prescriptions up to 25MB (Multi-page enabled)
+                    </p>
+                  </div>
+
+                  {/* Attached Document Card */}
+                  {uploadedFileName && (
+                    <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[22px]">
+                            {uploadedFileName.endsWith('.pdf') ? 'picture_as_pdf' : 'image'}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-on-surface">{uploadedFileName}</div>
+                          <div className="text-[11px] text-outline flex items-center gap-2 mt-0.5">
+                            <span>{uploadedFileSize}</span>
+                            <span>•</span>
+                            <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
+                              <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                              98% OCR Readiness
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
+                        Ready to Extract
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: CAMERA PHOTO SCAN */}
+              {inputMethod === 'camera' && (
+                <div className="space-y-4">
+                  {!capturedPhoto ? (
+                    <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 p-6 flex flex-col items-center justify-center min-h-[280px]">
+                      {/* Grid crosshair viewfinder overlay */}
+                      <div className="absolute inset-4 border border-dashed border-white/20 rounded-xl pointer-events-none flex items-center justify-center">
+                        <span className="material-symbols-outlined text-white/30 text-[48px]">crop_free</span>
+                      </div>
+
+                      <div className="z-10 flex flex-col items-center gap-3 text-center">
+                        <div className="w-14 h-14 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur-md">
+                          <span className="material-symbols-outlined text-[28px]">photo_camera</span>
+                        </div>
+                        <div className="text-white text-sm font-semibold">
+                          Hold prescription slip in front of camera
+                        </div>
+                        <p className="text-xs text-slate-400 max-w-sm">
+                          Align handwritten Rx or hospital slip within grid guidelines for optimal text extraction.
+                        </p>
+
+                        <motion.button
+                          type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={handleTakePhoto}
+                          className="mt-2 px-6 py-2.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">camera</span>
+                          <span>{isCapturing ? 'Snapping Photo...' : 'Click Photo / Scan Prescription'}</span>
+                        </motion.button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Captured Photo Preview */
+                    <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[24px]">image</span>
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-on-surface">Prescription Photo Captured</div>
+                          <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
+                            <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                            Clear illumination &amp; high-res orientation
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCapturedPhoto(null)}
+                        className="px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container"
+                      >
+                        Retake Photo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: DIRECT MANUAL MEDICINE ENTRY */}
+              {inputMethod === 'manual' && (
+                <form onSubmit={handleAddManualPrescription} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Medication / Brand Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={manualDrugName}
+                        onChange={(e) => setManualDrugName(e.target.value)}
+                        placeholder="e.g. Ciprofloxacin 500mg or Amoxicillin"
+                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Generic Ingredient</label>
+                      <input
+                        type="text"
+                        value={manualGenericName}
+                        onChange={(e) => setManualGenericName(e.target.value)}
+                        placeholder="e.g. Ciprofloxacin Hydrochloride"
+                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Dose Strength</label>
+                      <input
+                        type="text"
+                        value={manualDosage}
+                        onChange={(e) => setManualDosage(e.target.value)}
+                        placeholder="e.g. 500mg tablet"
+                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Frequency</label>
+                      <select
+                        value={manualFrequency}
+                        onChange={(e) => setManualFrequency(e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none cursor-pointer"
+                      >
+                        <option>Every 8 hours (TID)</option>
+                        <option>Every 12 hours (BID)</option>
+                        <option>Once Daily (QD)</option>
+                        <option>As Needed (PRN)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Duration</label>
+                      <input
+                        type="text"
+                        value={manualDuration}
+                        onChange={(e) => setManualDuration(e.target.value)}
+                        placeholder="e.g. 7 days"
+                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-primary font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      <span>Add Medication to Prescription Queue</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Candidate Prescriptions Staging Queue */}
+              <div className="space-y-2 pt-2 border-t border-surface-container">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-on-surface">
+                    Prescribed Medication Queue ({prescriptions.length} items to cross-check):
+                  </span>
+                  <span className="text-outline text-[11px]">Validated against RxNorm &amp; First Databank</span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {prescriptions.map((rx) => (
+                    <div
+                      key={rx.id}
+                      className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[18px]">pill</span>
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-on-surface">
+                            {rx.drugName} <span className="text-outline font-normal">({rx.genericName})</span>
+                          </div>
+                          <div className="text-[11px] text-outline">
+                            {rx.dosage} • {rx.route} • {rx.frequency} • {rx.duration}
+                          </div>
+                        </div>
+                      </div>
+
+                      {prescriptions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePrescription(rx.id)}
+                          className="p-1 rounded text-outline hover:text-rose-600"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Patient Chart Linker */}
+              <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-on-surface">Associated EMR Patient Chart</span>
+                  <span className="text-[11px] text-outline">Cross-checks medical history, GFR, and concurrent regimens</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <select
                     value={selectedPatientId}
-                    onChange={(e) => handlePatientChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs font-semibold outline-none cursor-pointer"
+                    onChange={(e) => handlePatientSelect(e.target.value)}
+                    className="h-9 px-3 rounded-xl border border-surface-container-high bg-white text-xs font-semibold text-on-surface outline-none cursor-pointer"
                   >
                     {patients.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.mrn}) — {p.age}y • {p.gender} • {p.roomOrUnit}
+                        {p.name} ({p.mrn}) — {p.age}y • eGFR {p.egfr}
                       </option>
                     ))}
                   </select>
                 </div>
+              </div>
 
-                {/* Physical Metrics Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                  {/* Weight */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-on-surface">Current Weight</label>
-                      <div className="flex items-center bg-surface-container-low rounded-lg p-0.5 text-[11px]">
-                        <button
-                          type="button"
-                          onClick={() => setWeightUnit('kg')}
-                          className={`px-2 py-0.5 rounded-md font-bold ${weightUnit === 'kg' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
-                        >
-                          kg
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setWeightUnit('lb')}
-                          className={`px-2 py-0.5 rounded-md font-bold ${weightUnit === 'lb' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
-                        >
-                          lb
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={customWeight}
-                      onChange={(e) => setCustomWeight(parseFloat(e.target.value) || 0)}
-                      className="w-full h-10 px-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs font-bold outline-none"
-                    />
-                    <span className="text-[10px] text-emerald-700 block">Verified today by Nursing</span>
-                  </div>
-
-                  {/* Height */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-on-surface">Height (cm)</label>
-                    <input
-                      type="number"
-                      value={heightCm}
-                      onChange={(e) => setHeightCm(parseFloat(e.target.value) || 170)}
-                      className="w-full h-10 px-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs font-bold outline-none"
-                    />
-                    <span className="text-[10px] text-on-surface-variant block">Derived BMI: <strong>{bmi} kg/m²</strong></span>
-                  </div>
-
-                  {/* eGFR */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-on-surface">Renal eGFR</label>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${customEgfr < 50 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                        {customEgfr < 30 ? 'Stage G4' : customEgfr < 60 ? 'Stage G3b' : 'Stage G1/G2'}
-                      </span>
-                    </div>
-                    <input
-                      type="number"
-                      value={customEgfr}
-                      onChange={(e) => setCustomEgfr(parseFloat(e.target.value) || 0)}
-                      className="w-full h-10 px-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs font-bold outline-none"
-                    />
-                    <span className="text-[10px] text-outline block">mL/min/1.73m²</span>
-                  </div>
-                </div>
-
-                {/* Organ Clearances & Special Populations */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-on-surface">Hepatic Function (Child-Pugh)</label>
-                    <select
-                      value={childPugh}
-                      onChange={(e) => setChildPugh(e.target.value as any)}
-                      className="w-full h-10 px-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs font-semibold outline-none"
-                    >
-                      <option value="Class A">Class A (Mild Impairment 5-6)</option>
-                      <option value="Class B">Class B (Moderate Impairment 7-9)</option>
-                      <option value="Class C">Class C (Severe Impairment 10-15)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-on-surface">Pregnancy & Lactation</label>
-                    <select
-                      value={customPregnancy}
-                      onChange={(e) => setCustomPregnancy(e.target.value as any)}
-                      className="w-full h-10 px-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs font-semibold outline-none"
-                    >
-                      <option value="No">No / Not Applicable</option>
-                      <option value="First Trimester">First Trimester</option>
-                      <option value="Second Trimester">Second Trimester</option>
-                      <option value="Third Trimester">Third Trimester</option>
-                      <option value="Lactating">Lactating / Breastfeeding</option>
-                    </select>
-                  </div>
-                </div>
-              </section>
-
-              {/* Action Button */}
-              <div className="flex justify-end pt-2">
-                <button
+              {/* PRIMARY START ACTION BUTTON */}
+              <div className="pt-2">
+                <motion.button
                   type="button"
-                  onClick={() => setCurrentStep(2)}
-                  className="px-6 py-3 rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm hover:bg-primary-container transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                  whileHover={{ scale: 1.015, y: -1 }}
+                  whileTap={{ scale: 0.985 }}
+                  onClick={handleStartSafetyCheck}
+                  className="w-full h-12 rounded-xl bg-primary-container hover:bg-primary text-on-primary font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 cursor-pointer"
                 >
-                  <span>Proceed to Step 2: Meds & Allergies</span>
+                  <span className="material-symbols-outlined text-[22px] animate-pulse">radar</span>
+                  <span>Run Automated Safety Screening &amp; Extraction</span>
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </button>
+                </motion.button>
               </div>
-            </div>
+            </section>
+          </div>
 
-            {/* Right 4 cols: Info Cards */}
-            <div className="lg:col-span-4 space-y-4">
-              <div className="bg-surface-container-lowest rounded-2xl p-5 border border-surface-container-high/60 shadow-xs space-y-3">
-                <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider">
-                  <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                  <span>Safe Harbor Standards</span>
-                </div>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  No direct patient identifiers (full names, SSN, street addresses) should ever be entered into the CDS engine. All records are processed under de-identification safe harbor standards (45 CFR §164.514).
-                </p>
-                <div className="p-3 bg-surface-container-low rounded-xl text-xs text-on-surface">
-                  <strong>Current Chart Token: </strong>
-                  <span className="font-mono text-primary font-bold">{ptKey}</span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* STEP 2: MEDS & ALLERGIES */}
-        {currentStep === 2 && (
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
-          >
-            <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-bold text-on-surface">Active Medications & Documented Allergies</h2>
-                    <span className="px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-xs font-bold">
-                      {activeMeds.length} Active Regimens
-                    </span>
-                  </div>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    Prioritize agents with narrow therapeutic indexes, active renal elimination, or CYP450 activity.
-                  </p>
-                </div>
+          {/* RIGHT COLUMN: Pre-Screening Radar & Insights Preview (4 cols) */}
+          <aside className="lg:col-span-4 flex flex-col gap-6">
+            <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-xs border border-surface-container-high/60 flex flex-col gap-4">
+              <div className="flex items-center justify-between pb-2 border-b border-surface-container">
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveMeds([...activeMeds, 'Warfarin Sodium 5mg PO QD'])}
-                    className="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-primary font-bold text-xs border border-surface-container-high transition-colors"
-                  >
-                    + Add Warfarin (Coumadin)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveMeds([...activeMeds, 'Lisinopril 20mg PO QD'])}
-                    className="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-primary font-bold text-xs border border-surface-container-high transition-colors"
-                  >
-                    + Add Lisinopril
-                  </button>
+                  <span className="material-symbols-outlined text-primary text-[20px]">troubleshoot</span>
+                  <h3 className="text-sm font-bold text-on-surface">Screening Readiness</h3>
                 </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  Engine Ready
+                </span>
               </div>
 
-              {/* Active Meds Table */}
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-on-surface flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-[18px]">medication</span>
-                  <span>Active Medication Regimens ({activeMeds.length})</span>
-                </label>
-
-                <div className="divide-y divide-surface-container border border-surface-container-high rounded-xl overflow-hidden text-xs">
-                  {activeMeds.map((med, idx) => (
-                    <div key={idx} className="p-3 bg-surface-container-lowest flex items-center justify-between gap-3 hover:bg-surface-container-low/50">
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
-                          {idx + 1}
-                        </span>
-                        <div>
-                          <span className="font-bold text-on-surface block">{med}</span>
-                          <span className="text-[11px] text-on-surface-variant font-mono">RxNorm Code #855332 • Ongoing Therapy</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMed(idx)}
-                        className="text-outline hover:text-error p-1"
-                        title="Remove"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
+              <div className="space-y-2.5 text-xs">
+                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
+                  <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">hub</span>
+                  <div>
+                    <div className="font-bold text-on-surface">EMR Active Regimens</div>
+                    <div className="text-[11px] text-outline mt-0.5">
+                      Reconciling {activeMeds.length} active drugs on file: <strong>{activeMeds.join(', ')}</strong>.
                     </div>
-                  ))}
+                  </div>
                 </div>
 
-                <form onSubmit={handleAddMed} className="flex gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={newMedInput}
-                    onChange={(e) => setNewMedInput(e.target.value)}
-                    placeholder="Type medication name (e.g., Warfarin 5mg QD, Lisinopril 20mg)..."
-                    className="flex-1 h-10 px-3 bg-surface-container-low border border-surface-container-high rounded-xl text-xs text-on-surface outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-primary text-on-primary font-bold text-xs rounded-xl hover:bg-primary-container cursor-pointer"
-                  >
-                    + Add Medication
-                  </button>
-                </form>
-              </div>
-
-              {/* Documented Allergies */}
-              <div className="space-y-3 pt-3 border-t border-surface-container">
-                <label className="text-xs font-bold text-rose-800 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-rose-600 text-[18px]">warning</span>
-                  <span>Documented Drug Allergies & Hypersensitivities ({allergies.length})</span>
-                </label>
-
-                <div className="flex flex-wrap gap-2">
-                  {allergies.map((allergy, idx) => (
-                    <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl text-xs font-bold">
-                      <span>{allergy}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAllergy(idx)}
-                        className="text-rose-400 hover:text-rose-700 cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">close</span>
-                      </button>
+                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
+                  <span className="material-symbols-outlined text-rose-600 text-[18px] shrink-0 mt-0.5">emergency</span>
+                  <div>
+                    <div className="font-bold text-on-surface">Documented Allergies</div>
+                    <div className="text-[11px] text-rose-700 font-semibold mt-0.5">
+                      {allergies.join(', ') || 'No known allergies'}
                     </div>
-                  ))}
+                  </div>
                 </div>
 
-                <form onSubmit={handleAddAllergy} className="flex gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={newAllergyInput}
-                    onChange={(e) => setNewAllergyInput(e.target.value)}
-                    placeholder="Add drug allergy (e.g., Penicillin Anaphylaxis, Sulfa, Aspirin)..."
-                    className="flex-1 h-10 px-3 bg-surface-container-low border border-surface-container-high rounded-xl text-xs text-on-surface outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-xs rounded-xl cursor-pointer"
-                  >
-                    + Add Allergy
-                  </button>
-                </form>
+                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
+                  <span className="material-symbols-outlined text-amber-600 text-[18px] shrink-0 mt-0.5">health_and_safety</span>
+                  <div>
+                    <div className="font-bold text-on-surface">Renal Function Indicator</div>
+                    <div className="text-[11px] text-outline mt-0.5">
+                      eGFR {customEgfr} mL/min (Stage 3b). Renally cleared medications require dosage titration.
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Step Navigation */}
-              <div className="flex items-center justify-between pt-4 border-t border-surface-container">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(1)}
-                  className="px-5 py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container text-xs font-bold text-on-surface cursor-pointer"
-                >
-                  ← Back to Step 1
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(3)}
-                  className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm hover:bg-primary-container transition-all flex items-center gap-2 shadow-sm cursor-pointer"
-                >
-                  <span>Proceed to Step 3: Prescriptions</span>
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </button>
+              <div className="p-3 rounded-xl bg-primary/5 text-primary text-[11px] font-medium flex items-center gap-2 border border-primary/20">
+                <span className="material-symbols-outlined text-[16px]">lock</span>
+                <span>Protected under HIPAA Safe Harbor de-identification (45 CFR §164.514).</span>
               </div>
             </div>
-          </motion.div>
-        )}
+          </aside>
+        </motion.div>
+      )}
 
-        {/* STEP 3: PROPOSED PRESCRIPTIONS */}
-        {currentStep === 3 && (
-          <motion.div
-            key="step3"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
+      {/* ========================================================================= */}
+      {/* 3. PHASE 2: AUTOMATED ANIMATED AI EXTRACTION & CROSS-MATCH */}
+      {/* ========================================================================= */}
+      {flowPhase === 'analyzing' && (
+        <motion.div
+          key="analyzingPhase"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.3 }}
+          className="w-full bg-surface-container-lowest rounded-2xl p-8 border border-surface-container-high/60 shadow-xl flex flex-col items-center justify-center text-center space-y-6 max-w-3xl mx-auto py-12"
+        >
+          {/* Animated Pulsing Radar Scanner */}
+          <div className="relative w-28 h-28 flex items-center justify-center">
+            <motion.div
+              animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.7, 0.3] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute inset-0 rounded-full bg-primary/15"
+            />
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+              className="w-20 h-20 rounded-full border-2 border-primary/30 border-t-primary flex items-center justify-center"
+            >
+              <span className="material-symbols-outlined text-primary text-[32px]">biotech</span>
+            </motion.div>
+          </div>
+
+          <div className="space-y-1">
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary uppercase tracking-wider">
+              Stage {currentAnalysisStage} of 4 Active
+            </span>
+            <h2 className="text-2xl font-bold text-on-surface">
+              Automated Safety Screening in Progress
+            </h2>
+            <p className="text-xs sm:text-sm text-outline max-w-lg mx-auto font-mono">
+              {activeStageLog}
+            </p>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full max-w-md space-y-1.5">
+            <div className="flex justify-between items-center text-xs font-bold">
+              <span className="text-on-surface">Screening Completion</span>
+              <span className="text-primary font-mono">{analysisProgress}%</span>
+            </div>
+            <div className="w-full h-2.5 bg-surface-container-high rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
+                animate={{ width: `${analysisProgress}%` }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              />
+            </div>
+          </div>
+
+          {/* 4 Sequential Analysis Stage Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl text-left text-xs pt-2">
+            {[
+              {
+                num: 1,
+                title: 'OCR & Entity Extraction',
+                desc: `Identified: ${prescriptions.map(p => p.drugName).join(', ')}`,
+                done: currentAnalysisStage > 1
+              },
+              {
+                num: 2,
+                title: 'Patient History & Renal Check',
+                desc: `Age ${selectedPatient.age}y • eGFR ${customEgfr} mL/min • Allergy profile`,
+                done: currentAnalysisStage > 2
+              },
+              {
+                num: 3,
+                title: 'Current Medication Cross-Match',
+                desc: `Evaluating interplay with ${activeMeds.join(', ')}`,
+                done: currentAnalysisStage > 3
+              },
+              {
+                num: 4,
+                title: 'CDS Interaction & Hazard Engine',
+                desc: 'Scrutinizing CYP2C9 inhibition & Beers criteria',
+                done: analysisProgress === 100
+              }
+            ].map((stage) => (
+              <div
+                key={stage.num}
+                className={`p-3.5 rounded-xl border flex items-start gap-3 transition-all ${
+                  stage.done
+                    ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
+                    : currentAnalysisStage === stage.num
+                    ? 'bg-primary/5 border-primary shadow-xs text-on-surface'
+                    : 'bg-surface-container-low border-surface-container text-outline opacity-60'
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                    stage.done
+                      ? 'bg-emerald-600 text-white'
+                      : currentAnalysisStage === stage.num
+                      ? 'bg-primary text-on-primary'
+                      : 'bg-surface-container-high text-outline'
+                  }`}
+                >
+                  {stage.done ? <span className="material-symbols-outlined text-[14px]">check</span> : stage.num}
+                </div>
+                <div>
+                  <div className="font-bold text-xs">{stage.title}</div>
+                  <div className="text-[11px] opacity-80 mt-0.5">{stage.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. PHASE 3: FINAL CLINICAL SAFETY REPORT & RECORD SCREEN */}
+      {/* ========================================================================= */}
+      {flowPhase === 'report' && savedCheckRecord && (
+        <motion.div
+          key="reportPhase"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -16 }}
+          transition={{ duration: 0.35 }}
+          className="flex flex-col gap-6"
+        >
+          {/* Main Safety Status Verdict Card */}
+          <div
+            className={`p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+              savedCheckRecord.overallStatus === 'Contraindicated'
+                ? 'bg-[#FFDAD6] border-[#BA1A1A]/40 text-[#BA1A1A]'
+                : savedCheckRecord.overallStatus === 'Requires Review'
+                ? 'bg-[#FEF3C7] border-[#975A16]/40 text-[#975A16]'
+                : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+            }`}
           >
-            <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs space-y-6">
+            <div className="flex items-start gap-3.5">
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs ${
+                  savedCheckRecord.overallStatus === 'Contraindicated'
+                    ? 'bg-[#BA1A1A]'
+                    : savedCheckRecord.overallStatus === 'Requires Review'
+                    ? 'bg-[#D97706]'
+                    : 'bg-emerald-600'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[28px]">
+                  {savedCheckRecord.overallStatus === 'Contraindicated'
+                    ? 'dangerous'
+                    : savedCheckRecord.overallStatus === 'Requires Review'
+                    ? 'warning'
+                    : 'verified_user'}
+                </span>
+              </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-on-surface">Step 3: Candidate Medication Order</h2>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Validated against National Drug Code & First Databank v2025.
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl font-bold tracking-tight">
+                    {savedCheckRecord.overallStatus === 'Contraindicated'
+                      ? 'Severe Contraindicated Interaction Flagged'
+                      : savedCheckRecord.overallStatus === 'Requires Review'
+                      ? 'Major Clinical Safety Review Required'
+                      : 'Prescription Cleared — Safe to Dispense'}
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/70 shadow-2xs">
+                    {savedCheckRecord.checkNumber}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm mt-1 opacity-90 leading-relaxed">
+                  {savedCheckRecord.overallStatus === 'Contraindicated'
+                    ? 'Critical drug-drug contraindication or allergy conflict detected. Statutory clinical pharmacist override or medication substitution required prior to dispensing.'
+                    : 'All rule evaluations processed against patient eGFR, current medications, and known allergies.'}
                 </p>
               </div>
+            </div>
 
-              {/* Quick Regimen Templates */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-bold text-primary uppercase tracking-wider block">
-                  Quick Clinical Prescribing Templates
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAddDental('Ciprofloxacin 500mg', 'Ciprofloxacin HCl', '500mg Tablet', 'Every 12 hours (BID)', '7 days', 'Severe Maxillary Infection')}
-                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high rounded-xl text-xs font-bold text-on-surface border border-surface-container-high flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-primary">add</span>
-                    Ciprofloxacin 500mg (Fluoroquinolone)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAddDental('Amoxicillin 500mg', 'Amoxicillin', '500mg Capsule', 'Every 8 hours (TID)', '7 days', 'Odontogenic Infection')}
-                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high rounded-xl text-xs font-bold text-on-surface border border-surface-container-high flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-primary">add</span>
-                    Amoxicillin 500mg (Antibiotic)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAddDental('Ibuprofen 600mg', 'Ibuprofen', '600mg Tablet', 'Every 6 hours PRN', '5 days', 'Post-Extraction Dental Pain')}
-                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high rounded-xl text-xs font-bold text-on-surface border border-surface-container-high flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-primary">add</span>
-                    Ibuprofen 600mg (NSAID)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAddDental('Clindamycin 300mg', 'Clindamycin HCl', '300mg Capsule', 'Every 8 hours (TID)', '7 days', 'Penicillin-Allergic Alternative')}
-                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high rounded-xl text-xs font-bold text-on-surface border border-surface-container-high flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-primary">add</span>
-                    Clindamycin 300mg (Alternative)
-                  </button>
+            {/* Quick Actions in Banner */}
+            <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setReportModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px] text-primary">description</span>
+                <span>Open Printable A4 Report</span>
+              </motion.button>
+            </div>
+          </div>
+
+          {/* 2-Column Report Breakdown (8 cols Left / 4 cols Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left 8 cols: Interaction Alerts & Evaluated Orders */}
+            <div className="lg:col-span-8 flex flex-col gap-6">
+              {/* Evaluated Interaction Alerts */}
+              <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col gap-4">
+                <div className="flex items-center justify-between pb-3 border-b border-surface-container">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[22px]">warning</span>
+                    <h3 className="text-base font-bold text-on-surface">
+                      Evaluated CDS Interactions ({alerts.length} Flagged)
+                    </h3>
+                  </div>
+                  <span className="text-xs text-outline font-medium">Click alert to review mechanism</span>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`p-4 rounded-xl border flex flex-col gap-2 transition-all ${
+                        alert.severity === 'contraindicated'
+                          ? 'bg-[#FFDAD6]/30 border-[#BA1A1A]/40'
+                          : alert.severity === 'major'
+                          ? 'bg-[#FEF3C7]/40 border-[#975A16]/30'
+                          : 'bg-surface-container-low border-surface-container-high'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                              alert.severity === 'contraindicated'
+                                ? 'bg-[#BA1A1A] text-white'
+                                : alert.severity === 'major'
+                                ? 'bg-[#D97706] text-white'
+                                : 'bg-slate-700 text-white'
+                            }`}
+                          >
+                            {alert.severity}
+                          </span>
+                          <span className="text-xs font-bold text-on-surface">{alert.title}</span>
+                        </div>
+                        {alert.overridden ? (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                            Overridden by Pharmacist
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setActiveAlertForDrawer(alert)}
+                            className="text-xs font-bold text-primary hover:underline"
+                          >
+                            Review &amp; Override →
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-on-surface-variant leading-relaxed">
+                        {alert.description}
+                      </p>
+                      <div className="pt-2 border-t border-surface-container flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-outline gap-1">
+                        <span>Evidence Grade: <strong className="font-mono text-on-surface">{alert.evidenceGrade}</strong></span>
+                        <span className="truncate max-w-sm">Action: <strong className="text-on-surface">{alert.recommendation}</strong></span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {alerts.length === 0 && (
+                    <div className="p-8 text-center text-outline text-xs">
+                      No drug-drug, dosing, or allergy contraindications detected for this regimen.
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Prescriptions List */}
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-on-surface block">
-                  Prescriptions Under Evaluation ({prescriptions.length})
-                </label>
-                <div className="divide-y divide-surface-container border border-surface-container-high rounded-xl overflow-hidden text-xs">
+              {/* Prescriptions Evaluated */}
+              <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col gap-4">
+                <div className="flex items-center justify-between pb-3 border-b border-surface-container">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[22px]">receipt_long</span>
+                    <h3 className="text-base font-bold text-on-surface">Candidate Prescriptions Evaluated</h3>
+                  </div>
+                  <span className="text-xs text-outline">{prescriptions.length} Orders</span>
+                </div>
+
+                <div className="flex flex-col gap-2.5">
                   {prescriptions.map((p) => (
-                    <div key={p.id} className="p-3.5 bg-surface-container-lowest flex items-center justify-between gap-3">
+                    <div
+                      key={p.id}
+                      className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between"
+                    >
                       <div>
-                        <div className="font-bold text-on-surface">{p.drugName} ({p.genericName})</div>
-                        <div className="text-[11px] text-on-surface-variant mt-0.5">
-                          {p.dosage} • {p.frequency} • {p.route} • {p.duration} — <span className="font-semibold text-primary">{p.indication}</span>
+                        <div className="text-xs font-bold text-on-surface">{p.drugName}</div>
+                        <div className="text-[11px] text-outline">
+                          {p.dosage} • {p.frequency} • {p.route} • {p.duration}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePrescription(p.id)}
-                        className="text-outline hover:text-error p-1 cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
+                      <span className="text-xs font-semibold text-primary">{p.indication}</span>
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* Form to Add Item */}
-              <form onSubmit={handleAddPrescription} className="p-4 bg-surface-container-low rounded-xl border border-surface-container-high space-y-3 text-xs">
-                <span className="font-bold text-primary block">Add Candidate Order Form</span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <input
-                    type="text"
-                    value={drugName}
-                    onChange={(e) => setDrugName(e.target.value)}
-                    placeholder="Brand Name (e.g., Cipro 500mg)"
-                    className="h-10 px-3 rounded-lg bg-surface-container-lowest border border-surface-container-high text-on-surface outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={genericName}
-                    onChange={(e) => setGenericName(e.target.value)}
-                    placeholder="Generic Substance"
-                    className="h-10 px-3 rounded-lg bg-surface-container-lowest border border-surface-container-high text-on-surface outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={dosage}
-                    onChange={(e) => setDosage(e.target.value)}
-                    placeholder="Dosage & Strength"
-                    className="h-10 px-3 rounded-lg bg-surface-container-lowest border border-surface-container-high text-on-surface outline-none"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={!drugName.trim()}
-                    className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg hover:bg-primary-container disabled:opacity-40 cursor-pointer"
-                  >
-                    + Add Item
-                  </button>
-                </div>
-              </form>
-
-              {/* Step Navigation */}
-              <div className="flex items-center justify-between pt-4 border-t border-surface-container">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(2)}
-                  className="px-5 py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container text-xs font-bold text-on-surface cursor-pointer"
-                >
-                  ← Back to Step 2
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(4)}
-                  disabled={prescriptions.length === 0}
-                  className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm hover:bg-primary-container transition-all flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
-                >
-                  <span>Proceed to Step 4: Extraction & Reconcile</span>
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* STEP 4: EXTRACTION & VALIDATION REVIEW */}
-        {currentStep === 4 && (
-          <motion.div
-            key="step4"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
-          >
-            {/* Split View Workdesk */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-              {/* LEFT PANEL (5 cols): OCR Scan Overlay Canvas */}
-              <div className="xl:col-span-5 bg-surface-container-lowest rounded-2xl p-5 border border-surface-container-high/60 shadow-xs flex flex-col gap-4">
-                <div className="flex items-center justify-between pb-2 border-b border-surface-container">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-[20px]">picture_as_pdf</span>
-                    <span className="text-xs font-bold text-on-surface">prescription_order_scan.pdf</span>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                    300 DPI OCR Synced
-                  </span>
-                </div>
-
-                {/* Simulated Prescription Scan Sheet with Bounding Boxes */}
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-900 font-mono text-xs space-y-3">
-                  <div className="text-[10px] text-slate-500 uppercase pb-1 border-b border-slate-200">
-                    Smile Clinic Inpatient Center • Prescriber: Dr. Arthur Vance
-                  </div>
-
-                  {/* BBox 1: Patient */}
-                  <div className="p-2 rounded bg-emerald-500/10 border-2 border-emerald-500">
-                    <div className="text-[10px] text-emerald-800 font-bold">MATCH 99% • PATIENT_ID</div>
-                    <div className="font-bold">{ptKey} (64y Male)</div>
-                  </div>
-
-                  {/* BBox 2: Candidate Drug */}
-                  <div className="p-2 rounded bg-emerald-500/10 border-2 border-emerald-500">
-                    <div className="text-[10px] text-emerald-800 font-bold">MATCH 98% • CANDIDATE_RX</div>
-                    <div className="font-bold">Rx: {prescriptions[0]?.drugName || 'Ciprofloxacin 500mg'}</div>
-                  </div>
-
-                  {/* BBox 3: Ambiguous Strength (Amber) */}
-                  <div className="p-2 rounded bg-amber-500/15 border-2 border-amber-500">
-                    <div className="text-[10px] text-amber-900 font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[12px]">warning</span>
-                      OCR CONFLICT (58%) • RESOLVED AS 500mg
-                    </div>
-                    <div className="text-slate-800 text-[11px]">
-                      Strength: <span className="line-through text-red-500">0.5g</span> / 500 mg Film-Coated Tablet
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT PANEL (7 cols): Extraction Validation Pipeline */}
-              <div className="xl:col-span-7 bg-surface-container-lowest rounded-2xl p-6 border border-surface-container-high/60 shadow-xs space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-surface-container">
-                  <div>
-                    <h3 className="text-base font-bold text-on-surface">Extraction Validation Pipeline</h3>
-                    <p className="text-xs text-on-surface-variant">6 data tokens parsed • Clinician verification confirmed</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary">
-                    100% Verified
-                  </span>
-                </div>
-
-                {/* Flagged Verification Checks */}
-                <div className="space-y-3">
-                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-amber-900">Field: Strength & Formulation</span>
-                      <span className="font-mono text-[10px] text-amber-800">RxNorm: 197507</span>
-                    </div>
-                    <p className="text-[11px] text-amber-900/90">
-                      Standard adult fluoroquinolone oral dosage recommendation indicates 500mg BID. Confirmed metric units.
-                    </p>
-                    <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-950">
-                      <input
-                        type="checkbox"
-                        checked={confirmStrength}
-                        onChange={(e) => setConfirmStrength(e.target.checked)}
-                        className="w-4 h-4 text-primary accent-primary"
-                      />
-                      <span>Confirmed strength as 500 mg Film-Coated Tablet</span>
-                    </label>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-amber-900">Field: Administration Route & Frequency</span>
-                      <span className="font-mono text-[10px] text-amber-800">SNOMED: 260548002</span>
-                    </div>
-                    <p className="text-[11px] text-amber-900/90">
-                      Sig specifies oral Q12H interval. Mapped to calculate cumulative clearance.
-                    </p>
-                    <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-950">
-                      <input
-                        type="checkbox"
-                        checked={confirmUnit}
-                        onChange={(e) => setConfirmUnit(e.target.checked)}
-                        className="w-4 h-4 text-primary accent-primary"
-                      />
-                      <span>Confirmed route as Oral (PO) every 12 hours</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Step Navigation & Execution */}
-                <div className="flex items-center justify-between pt-4 border-t border-surface-container">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(3)}
-                    className="px-5 py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container text-xs font-bold text-on-surface cursor-pointer"
-                  >
-                    ← Edit Order
-                  </button>
-                  <button
-                    type="button"
-                    onClick={runSafetyScreen}
-                    className="px-6 py-3 rounded-xl bg-primary text-on-primary font-bold text-sm hover:bg-primary-container transition-all flex items-center gap-2 shadow-md cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">shield_with_heart</span>
-                    <span>Execute Deterministic Safety Check</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* STEP 5: CDS SAFETY RESULTS (9 DETERMINISTIC BATTERY MATRIX) */}
-        {currentStep === 5 && (
-          <motion.div
-            key="step5"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
-          >
-            {/* Status Declaration Banner */}
-            <div className="w-full rounded-2xl bg-surface-container-low border border-surface-container-high p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[26px]">verified_user</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-secondary-fixed text-on-secondary-fixed-variant">
-                      Needs Professional Review
-                    </span>
-                    <span className="text-xs text-on-surface-variant font-medium">
-                      Clinical Decision Support Rule Engine v4.2
-                    </span>
-                  </div>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    This is not a definitive declaration that the prescription is safe or unsafe. Pharmacist adjudication is required prior to dispense.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setReportModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container text-xs font-bold transition-all shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">print</span>
-                <span>Export CDS Summary</span>
-              </button>
             </div>
 
-            {/* Severity Metrics Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-surface-container-lowest p-4 rounded-2xl border border-error/20 flex items-center justify-between shadow-xs">
-                <div>
-                  <div className="text-xs text-on-surface-variant font-medium">High Severity</div>
-                  <div className="text-2xl font-black text-error leading-tight">
-                    {alerts.filter(a => a.severity === 'contraindicated').length || 1}
-                  </div>
-                </div>
-                <div className="w-9 h-9 rounded-xl bg-error-container text-on-error-container flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[20px]">dangerous</span>
-                </div>
-              </div>
-
-              <div className="bg-surface-container-lowest p-4 rounded-2xl border border-surface-container-high flex items-center justify-between shadow-xs">
-                <div>
-                  <div className="text-xs text-on-surface-variant font-medium">Moderate Severity</div>
-                  <div className="text-2xl font-black text-[#B7791F] leading-tight">
-                    {alerts.filter(a => a.severity === 'major').length || 2}
-                  </div>
-                </div>
-                <div className="w-9 h-9 rounded-xl bg-[#FEFCBF] text-[#B7791F] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[20px]">warning</span>
-                </div>
-              </div>
-
-              <div className="bg-surface-container-lowest p-4 rounded-2xl border border-surface-container-high flex items-center justify-between shadow-xs">
-                <div>
-                  <div className="text-xs text-on-surface-variant font-medium">Info / Caution</div>
-                  <div className="text-2xl font-black text-secondary leading-tight">1</div>
-                </div>
-                <div className="w-9 h-9 rounded-xl bg-secondary-fixed text-on-secondary-fixed-variant flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[20px]">info</span>
-                </div>
-              </div>
-
-              <div className="bg-surface-container-lowest p-4 rounded-2xl border border-surface-container-high flex items-center justify-between shadow-xs">
-                <div>
-                  <div className="text-xs text-on-surface-variant font-medium">No Alert Found</div>
-                  <div className="text-2xl font-black text-emerald-600 leading-tight">5</div>
-                </div>
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Systematic Deterministic Safety Battery (9 Modules Evaluated) */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm sm:text-base font-bold text-on-surface flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-[20px]">fact_check</span>
-                  <span>Systematic Deterministic Safety Battery (9 Modules Evaluated)</span>
+            {/* Right 4 cols: Actions, Download & Patient Snapshot */}
+            <aside className="lg:col-span-4 flex flex-col gap-6">
+              {/* Report Actions Card */}
+              <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col gap-3">
+                <h3 className="text-sm font-bold text-on-surface pb-2 border-b border-surface-container">
+                  Report Actions &amp; Delivery
                 </h3>
-                <span className="text-xs text-outline font-mono">CDS Protocol v4.18.2-SaMD</span>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* 1. DDI */}
-                <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-high/60 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-error text-[18px]">sync_problem</span>
-                        1. Drug–Drug Interaction
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-error-container text-error text-[10px] font-bold">
-                        High Alert
-                      </span>
-                    </div>
-                    <p className="text-xs text-on-surface-variant line-clamp-3">
-                      Ciprofloxacin inhibits CYP1A2 & CYP3A4, potentiating Warfarin (Coumadin) anticoagulant effect; major bleeding hazard.
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-surface-container flex items-center justify-between text-xs">
-                    <span className="text-error font-bold">Flagged: Potentiation</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const alertItem = alerts[0] || {
-                          id: 'DDI-01',
-                          severity: 'contraindicated',
-                          title: 'Warfarin + Ciprofloxacin CYP1A2 Blockade',
-                          description: 'Marked prolongation of INR and clinical hemorrhage danger.',
-                          mechanism: 'CYP1A2 / CYP3A4 hepatic inhibition',
-                          recommendation: 'Select non-interacting alternative antibiotic.'
-                        };
-                        setActiveAlertForDrawer(alertItem as any);
-                      }}
-                      className="text-primary font-bold hover:underline"
-                    >
-                      View details →
-                    </button>
-                  </div>
-                </div>
+                {/* Animated Download Button */}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={isDownloadingReport}
+                  onClick={handleDownloadPdfReport}
+                  className="w-full h-11 rounded-xl bg-primary-container hover:bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                >
+                  {isDownloadingReport ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Generating PDF ({downloadProgress}%)...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">download</span>
+                      <span>Download Official PDF Report</span>
+                    </>
+                  )}
+                </motion.button>
 
-                {/* 2. Dose & Frequency */}
-                <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-high/60 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-error text-[18px]">speed</span>
-                        2. Dose and Frequency
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-error-container text-error text-[10px] font-bold">
-                        High Alert
-                      </span>
-                    </div>
-                    <p className="text-xs text-on-surface-variant line-clamp-3">
-                      Dose 500mg Q12H exceeds recommended renal threshold for eGFR {customEgfr} mL/min (recommend 250–500mg Q18–24H).
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-surface-container flex items-center justify-between text-xs">
-                    <span className="text-error font-bold">Renal Mismatch</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const alertItem = alerts.find(a => a.severity === 'major') || alerts[0];
-                        setActiveAlertForDrawer(alertItem as any);
-                      }}
-                      className="text-primary font-bold hover:underline"
-                    >
-                      View details →
-                    </button>
-                  </div>
-                </div>
+                {/* Print Button */}
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-full h-10 rounded-xl border border-surface-container-high hover:bg-surface-container text-on-surface font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">print</span>
+                  <span>Print Clinical Verification Slip</span>
+                </button>
 
-                {/* 3. Allergy & Cross Reactivity */}
-                <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-high/60 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-emerald-600 text-[18px]">security</span>
-                        3. Allergy & Cross-Reactivity
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px] font-medium">
-                        No alert found
-                      </span>
-                    </div>
-                    <p className="text-xs text-on-surface-variant line-clamp-3">
-                      No structural beta-lactam overlap between fluoroquinolones and documented Penicillin allergy.
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-surface-container text-xs text-emerald-700 font-bold">
-                    Safe: Non-reactive
-                  </div>
-                </div>
-
-                {/* 4. Duplicate Therapy */}
-                <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-high/60 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-emerald-600 text-[18px]">content_copy</span>
-                        4. Duplicate Therapy
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px] font-medium">
-                        No alert found
-                      </span>
-                    </div>
-                    <p className="text-xs text-on-surface-variant line-clamp-3">
-                      No overlapping antimicrobial or anticoagulant therapy duplicate detected on chart.
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-surface-container text-xs text-emerald-700 font-bold">
-                    Clear: Unique Class
-                  </div>
-                </div>
-
-                {/* 5. Contraindication (Condition) */}
-                <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-high/60 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[#B7791F] text-[18px]">medical_services</span>
-                        5. Contraindication
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-[#FEFCBF] text-[#B7791F] text-[10px] font-bold">
-                        Moderate
-                      </span>
-                    </div>
-                    <p className="text-xs text-on-surface-variant line-clamp-3">
-                      Cautious prescribing with chronic kidney disease (CKD Stage G3b) due to crystalluria danger.
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-surface-container text-xs text-[#B7791F] font-bold">
-                    Hydration Protocol Advised
-                  </div>
-                </div>
-
-                {/* 6. Completeness & Data Guard */}
-                <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-high/60 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-secondary text-[18px]">rule</span>
-                        6. Data Guard
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-[10px] font-bold">
-                        Info Note
-                      </span>
-                    </div>
-                    <p className="text-xs text-on-surface-variant line-clamp-3">
-                      Baseline INR lab value &gt;60 days old in EMR. Repeat assay strongly recommended upon dispense.
-                    </p>
-                  </div>
-                  <div className="mt-3 pt-2 border-t border-surface-container text-xs text-secondary font-bold">
-                    Lab Advisory
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step Navigation & Action Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-surface-container">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(4)}
-                className="px-5 py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container text-xs font-bold text-on-surface cursor-pointer"
-              >
-                ← Back to Review
-              </button>
-              <div className="flex items-center gap-2">
+                {/* Fullscreen A4 Report Preview */}
                 <button
                   type="button"
                   onClick={() => navigate('/report')}
-                  className="px-4 py-2.5 rounded-xl bg-surface-container text-secondary hover:bg-surface-container-high text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  className="w-full h-10 rounded-xl bg-surface-container-low hover:bg-surface-container text-primary font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">print</span>
-                  <span>Full A4 Report</span>
+                  <span className="material-symbols-outlined text-[18px]">fullscreen</span>
+                  <span>Open Fullscreen A4 Viewer</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setReportModalOpen(true)}
-                  className="px-4 py-2.5 rounded-xl border border-primary text-primary hover:bg-primary/5 text-xs font-bold transition-all cursor-pointer"
-                >
-                  Quick Modal Audit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/dashboard')}
-                  className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container transition-all shadow-sm cursor-pointer"
-                >
-                  Done / Return to Dashboard
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Slide-over Monograph & Override Drawer */}
+                <div className="pt-2 border-t border-surface-container flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFlowPhase('input');
+                    }}
+                    className="flex-1 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface hover:bg-surface-container"
+                  >
+                    New Check
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/dashboard')}
+                    className="flex-1 py-2 rounded-xl bg-primary/10 text-primary font-bold text-xs hover:bg-primary/20"
+                  >
+                    Back to Feed
+                  </button>
+                </div>
+              </div>
+
+              {/* Patient Demographics Snapshot Card */}
+              <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col gap-3 text-xs">
+                <h3 className="text-sm font-bold text-on-surface pb-2 border-b border-surface-container">
+                  Patient &amp; Clinical Context
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-outline">Patient Key:</span>
+                    <span className="font-mono font-bold text-on-surface">{ptKey}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-outline">Clinic Chart:</span>
+                    <span className="font-semibold text-on-surface">{selectedPatient.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-outline">Renal Clearance:</span>
+                    <span className="font-bold text-rose-600">eGFR {customEgfr} mL/min</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-outline">Concurrent Meds:</span>
+                    <span className="font-medium text-on-surface text-right max-w-[180px] truncate">
+                      {activeMeds.join(', ')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-outline">Verified Allergies:</span>
+                    <span className="font-bold text-rose-600">{allergies.join(', ')}</span>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Alert Detail Drawer for Overrides & Safer Substitutions */}
       <AlertDetailDrawer
         alert={activeAlertForDrawer}
         isOpen={!!activeAlertForDrawer}
