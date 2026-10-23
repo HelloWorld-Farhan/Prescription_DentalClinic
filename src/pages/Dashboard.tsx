@@ -78,24 +78,26 @@ export default function Dashboard() {
         </div>
 
         {/* Quick shift / dept / time filter */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="inline-flex p-1 bg-surface-container-high rounded-xl text-on-surface">
-            {units.map((unit) => (
-              <motion.button
-                type="button"
-                key={unit}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedUnit(unit)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  selectedUnit === unit
-                    ? 'bg-surface-container-lowest text-primary shadow-xs font-bold'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                {unit}
-              </motion.button>
-            ))}
+        <div className="flex items-center gap-2 flex-wrap max-w-full">
+          <div className="w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 max-w-full">
+            <div className="inline-flex p-1 bg-surface-container-high rounded-xl text-on-surface whitespace-nowrap">
+              {units.map((unit) => (
+                <motion.button
+                  type="button"
+                  key={unit}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedUnit(unit)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                    selectedUnit === unit
+                      ? 'bg-surface-container-lowest text-primary shadow-xs font-bold'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {unit}
+                </motion.button>
+              ))}
+            </div>
           </div>
           <div className="h-6 w-px bg-surface-container-highest mx-1 hidden sm:block"></div>
           <select
@@ -111,7 +113,7 @@ export default function Dashboard() {
       </section>
 
       {/* 2. FOUR STAT CARDS */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-w-0 max-w-full">
         {/* Card 1: Checks Today */}
         <motion.div
           whileHover={{ y: -4, transition: { duration: 0.2 } }}
@@ -277,9 +279,9 @@ export default function Dashboard() {
       </section>
 
       {/* 3. 2-COLUMN MAIN CONTENT (8 cols Left / 4 cols Right) */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-w-0 max-w-full">
         {/* LEFT COLUMN (8 cols): Recent Checks Table */}
-        <div className="lg:col-span-8 flex flex-col gap-4 bg-surface-container-lowest rounded-2xl p-6 shadow-xs border border-surface-container-high/60">
+        <div className="lg:col-span-8 flex flex-col gap-4 bg-surface-container-lowest rounded-2xl p-4 sm:p-6 shadow-xs border border-surface-container-high/60 min-w-0 max-w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container">
             <div>
               <div className="flex items-center gap-2">
@@ -316,7 +318,7 @@ export default function Dashboard() {
           </div>
 
           {/* Table Wrapper */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto w-full max-w-full">
             <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 <tr className="text-outline text-xs uppercase tracking-wider border-b border-surface-container font-semibold">
@@ -451,7 +453,7 @@ export default function Dashboard() {
         </div>
 
         {/* RIGHT COLUMN (4 cols): Action CTA & Critical Review Queue */}
-        <div className="lg:col-span-4 flex flex-col gap-5">
+        <div className="lg:col-span-4 flex flex-col gap-5 min-w-0 max-w-full">
           {/* CTAs Card */}
           <div className="flex flex-col gap-2.5">
             <button

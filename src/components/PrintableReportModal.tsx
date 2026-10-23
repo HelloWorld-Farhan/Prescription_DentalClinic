@@ -53,47 +53,59 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
       {isOpen && (
         <div className="fixed inset-0 z-[100] w-screen h-screen overflow-y-auto bg-slate-950/95 backdrop-blur-md flex flex-col items-center print:bg-white print:p-0 print:overflow-visible print:static">
           {/* Top Document Controls Bar (Hidden on print) */}
-          <header className="sticky top-0 z-40 w-full bg-slate-900/98 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 lg:px-8 py-3 shadow-2xl text-slate-100 print:hidden">
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-              {/* Document Identity & Safe Harbor Badge */}
-              <div className="flex flex-col gap-1 min-w-0">
-                <div className="flex items-center gap-2 text-xs text-slate-400 font-medium truncate">
-                  <span className="hover:text-slate-200 transition-colors cursor-pointer" onClick={onClose}>Reports</span>
-                  <span className="text-slate-600">/</span>
-                  <span className="text-slate-200 font-semibold font-mono truncate">Audit #{check.checkNumber}</span>
-                  <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
-                    PASS / MONITORED
-                  </span>
+          <header className="sticky top-0 z-40 w-full bg-slate-900/98 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 shadow-2xl text-slate-100 print:hidden">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
+              {/* Document Identity & Safe Harbor Badge + Mobile Close */}
+              <div className="flex items-center justify-between gap-2 min-w-0 w-full md:w-auto">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium truncate">
+                    <span className="hover:text-slate-200 transition-colors cursor-pointer" onClick={onClose}>Reports</span>
+                    <span className="text-slate-600">/</span>
+                    <span className="text-slate-200 font-semibold font-mono truncate">Audit #{check.checkNumber}</span>
+                    <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                      PASS
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 text-[11px] sm:text-xs font-semibold border border-slate-700 truncate">
+                      <span className="material-symbols-outlined text-[13px] sm:text-[14px]">description</span>
+                      <span className="truncate">Clinical Verification Report</span>
+                    </span>
+                    <span className="text-xs text-emerald-400 hidden lg:inline-flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Verified Safe Harbor
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300 text-xs font-semibold border border-slate-700">
-                    <span className="material-symbols-outlined text-[14px]">description</span>
-                    <span>Clinical Verification & Decision Support Report</span>
-                  </span>
-                  <span className="text-xs text-slate-400 hidden xl:inline">• A4 Standard (210 × 297 mm)</span>
-                  <span className="text-xs text-emerald-400 hidden sm:inline flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Verified Safe Harbor Export
-                  </span>
-                </div>
+
+                {/* Close Button on Mobile (visible < md) */}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="md:hidden p-2 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-700 text-xs font-bold transition-all cursor-pointer shrink-0"
+                  title="Close (Esc)"
+                  aria-label="Close report"
+                >
+                  <span className="material-symbols-outlined text-[20px] block">close</span>
+                </button>
               </div>
 
               {/* Action Toolbar */}
-              <div className="flex items-center justify-between md:justify-end gap-2 shrink-0">
+              <div className="flex items-center justify-between md:justify-end gap-1.5 sm:gap-2 w-full md:w-auto overflow-x-auto no-scrollbar py-0.5">
                 {/* Zoom Controller */}
-                <div className="flex items-center bg-slate-800/90 rounded-xl px-2 py-1 gap-1 border border-slate-700 shadow-inner">
+                <div className="flex items-center bg-slate-800/90 rounded-xl px-1.5 sm:px-2 py-1 gap-0.5 sm:gap-1 border border-slate-700 shadow-inner shrink-0">
                   <button
                     type="button"
                     onClick={() => setZoomScale((prev) => Math.max(0.6, Math.round((prev - 0.1) * 10) / 10))}
                     className="p-1 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
                     title="Zoom Out"
                   >
-                    <span className="material-symbols-outlined text-[16px] block">remove</span>
+                    <span className="material-symbols-outlined text-[15px] sm:text-[16px] block">remove</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setZoomScale(1.0)}
-                    className="text-xs font-mono font-bold text-slate-200 px-1.5 min-w-[50px] text-center hover:text-cyan-300 cursor-pointer"
+                    className="text-[11px] sm:text-xs font-mono font-bold text-slate-200 px-1 min-w-[42px] sm:min-w-[50px] text-center hover:text-cyan-300 cursor-pointer"
                     title="Reset Zoom (100%)"
                   >
                     {Math.round(zoomScale * 100)}%
@@ -104,7 +116,7 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
                     className="p-1 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
                     title="Zoom In"
                   >
-                    <span className="material-symbols-outlined text-[16px] block">add</span>
+                    <span className="material-symbols-outlined text-[15px] sm:text-[16px] block">add</span>
                   </button>
                 </div>
 
@@ -112,7 +124,7 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
                 <button
                   type="button"
                   onClick={() => setShowDownloadModal(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition-all text-xs font-bold border border-slate-700 hover:border-slate-600 cursor-pointer shadow-xs"
+                  className="inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition-all text-xs font-bold border border-slate-700 hover:border-slate-600 cursor-pointer shadow-xs shrink-0"
                 >
                   <span className="material-symbols-outlined text-[16px] text-cyan-400">download</span>
                   <span className="hidden sm:inline">Download Report</span>
@@ -123,30 +135,30 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary transition-all shadow-md text-xs font-bold cursor-pointer hover:shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
+                  className="inline-flex items-center justify-center gap-1 sm:gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary transition-all shadow-md text-xs font-bold cursor-pointer hover:shadow-primary/20 shrink-0"
                 >
                   <span className="material-symbols-outlined text-[16px]">print</span>
                   <span>Print Report</span>
                 </button>
 
-                {/* Close Button */}
+                {/* Desktop Close Button (hidden on mobile) */}
                 <button
                   type="button"
                   onClick={onClose}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/30 text-xs font-bold transition-all cursor-pointer"
+                  className="hidden md:inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/30 text-xs font-bold transition-all cursor-pointer shrink-0"
                   title="Close (Esc)"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
-                  <span className="hidden md:inline">Close</span>
+                  <span>Close</span>
                 </button>
               </div>
             </div>
           </header>
 
           {/* Dark Slate PDF Presentation Viewport */}
-          <main className="w-full bg-[#0F172A] py-6 sm:py-10 px-2 sm:px-6 flex flex-col items-center flex-1 min-h-[calc(100vh-65px)] print:bg-white print:py-0 print:px-0">
+          <main className="w-full max-w-full overflow-x-hidden bg-[#0F172A] py-4 sm:py-10 px-2 sm:px-6 flex flex-col items-center flex-1 min-h-[calc(100vh-65px)] print:bg-white print:py-0 print:px-0">
             {/* Floating Document Canvas Pagination Indicator */}
-            <div className="mb-5 flex flex-wrap items-center justify-center gap-2 sm:gap-3 bg-slate-900/90 text-slate-100 px-4 py-1.5 rounded-full shadow-lg backdrop-blur-md text-xs font-semibold border border-slate-800 print:hidden">
+            <div className="mb-4 sm:mb-5 flex flex-wrap items-center justify-center gap-2 sm:gap-3 bg-slate-900/90 text-slate-100 px-3 sm:px-4 py-1.5 rounded-full shadow-lg backdrop-blur-md text-xs font-semibold border border-slate-800 print:hidden text-center">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>A4 Format (210 × 297 mm)</span>
@@ -163,7 +175,7 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
               className="w-full max-w-full flex justify-center transition-transform duration-150 overflow-x-auto pb-8"
             >
               {/* High-Fidelity A4 White Sheet (Simulated Physical Paper) */}
-              <article className="w-full max-w-[840px] bg-white text-[#0F172A] rounded-md sm:rounded-sm shadow-2xl p-4 sm:p-8 md:p-10 flex flex-col gap-6 selection:bg-cyan-100 font-sans print:shadow-none print:p-4 print:max-w-none print:w-full">
+              <article className="w-full max-w-[840px] bg-white text-[#0F172A] rounded-xl sm:rounded-sm shadow-2xl p-3.5 sm:p-8 md:p-10 flex flex-col gap-5 sm:gap-6 selection:bg-cyan-100 font-sans print:shadow-none print:p-4 print:max-w-none print:w-full min-w-0 break-words">
                 {/* SECTION A: Document Clinical Masthead & Verification Header */}
                 <header className="flex flex-col gap-4 pb-4 border-b border-slate-200">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -185,7 +197,7 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-600"></span>
                         <span>Audit Authenticated</span>
                       </div>
-                      <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                      <div className="text-[10px] text-slate-400 mt-1 font-mono break-all">
                         HASH: SHA256-4f8b9e892c21a
                       </div>
                     </div>

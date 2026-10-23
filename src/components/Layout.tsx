@@ -126,7 +126,7 @@ export default function Layout() {
   };
 
   return (
-    <div className="bg-background min-h-screen text-on-surface font-sans flex flex-col">
+    <div className="bg-background min-h-screen text-on-surface font-sans flex flex-col overflow-x-hidden w-full max-w-full">
       {/* Mobile Backdrop */}
       {sidebarOpen && (
         <div 
@@ -214,13 +214,14 @@ export default function Layout() {
       </aside>
 
       {/* Top Header & Content Container */}
-      <div className="lg:pl-64 flex flex-col min-h-screen">
+      <div className="lg:pl-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
         {/* Fixed Header */}
-        <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-4 lg:px-8 border-b border-surface-container-high">
+        <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-surface-container-high w-full max-w-full">
           {/* Mobile Menu Button */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 text-on-surface hover:bg-surface-container rounded-xl mr-2"
+            className="lg:hidden p-2 text-on-surface hover:bg-surface-container rounded-xl mr-2 cursor-pointer"
+            aria-label="Open navigation menu"
           >
             <span className="material-symbols-outlined text-2xl">menu</span>
           </button>
@@ -241,19 +242,20 @@ export default function Layout() {
           </form>
 
           {/* Right Header Badges & Actions */}
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-1.5 sm:gap-3 ml-auto shrink-0">
             {/* EMR Integrated Pill */}
             <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-surface-container-low border border-surface-container-high rounded-full">
               <span className="material-symbols-outlined text-secondary text-[16px]">verified_user</span>
               <span className="text-[11px] font-bold text-secondary">EMR Integrated</span>
             </div>
 
-            {/* Quick Action Button */}
+            {/* Quick Action Button: New Check */}
             <button
               onClick={() => navigate('/check')}
-              className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm"
+              className="p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="Start New Prescription Safety Check"
             >
-              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              <span className="material-symbols-outlined text-[18px] sm:text-[16px]">add_circle</span>
               <span className="hidden sm:inline">New Check</span>
             </button>
 
@@ -264,8 +266,9 @@ export default function Layout() {
                   setNotificationsOpen(!notificationsOpen);
                   setProfileOpen(false);
                 }}
-                className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-all relative"
+                className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-all relative cursor-pointer"
                 title="Notifications"
+                aria-label="Clinical notifications"
               >
                 <span className="material-symbols-outlined text-[20px] block">notifications</span>
                 {unreadCount > 0 && (
@@ -277,48 +280,55 @@ export default function Layout() {
 
               <AnimatePresence>
                 {notificationsOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 w-80 sm:w-96 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-50"
-                  >
-                    <div className="p-4 border-b border-surface-container-low flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-sm text-on-surface">Clinical Notifications</h4>
+                  <>
+                    {/* Mobile Backdrop for safe touch dismissal */}
+                    <div
+                      className="fixed inset-0 bg-black/30 backdrop-blur-2xs z-40 sm:hidden"
+                      onClick={() => setNotificationsOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="fixed top-16 left-3 right-3 max-w-sm mx-auto sm:absolute sm:top-12 sm:left-auto sm:right-0 sm:w-96 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-50"
+                    >
+                      <div className="p-4 border-b border-surface-container-low flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-on-surface">Clinical Notifications</h4>
+                          {unreadCount > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
+                              {unreadCount} new
+                            </span>
+                          )}
+                        </div>
                         {unreadCount > 0 && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
-                            {unreadCount} new
-                          </span>
+                          <button
+                            onClick={markAllAsRead}
+                            className="text-xs text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">done_all</span>
+                            Mark read
+                          </button>
                         )}
                       </div>
-                      {unreadCount > 0 && (
-                        <button
-                          onClick={markAllAsRead}
-                          className="text-xs text-primary font-bold hover:underline flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">done_all</span>
-                          Mark read
-                        </button>
-                      )}
-                    </div>
 
-                    <div className="divide-y divide-surface-container-low max-h-80 overflow-y-auto">
-                      {notifications.map((n) => (
-                        <div key={n.id} className="p-3.5 hover:bg-surface-container-low transition-colors flex items-start gap-3">
-                          <div className={`p-2 rounded-xl shrink-0 ${n.bgClass} ${n.textClass}`}>
-                            <span className="material-symbols-outlined text-[18px]">{n.icon}</span>
+                      <div className="divide-y divide-surface-container-low max-h-80 overflow-y-auto">
+                        {notifications.map((n) => (
+                          <div key={n.id} className="p-3.5 hover:bg-surface-container-low transition-colors flex items-start gap-3">
+                            <div className={`p-2 rounded-xl shrink-0 ${n.bgClass} ${n.textClass}`}>
+                              <span className="material-symbols-outlined text-[18px]">{n.icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-bold text-xs text-on-surface">{n.title}</h5>
+                              <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">{n.desc}</p>
+                              <span className="text-[10px] text-outline mt-1 block">{n.time}</span>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h5 className="font-bold text-xs text-on-surface">{n.title}</h5>
-                            <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">{n.desc}</p>
-                            <span className="text-[10px] text-outline mt-1 block">{n.time}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  </>
                 )}
               </AnimatePresence>
             </div>
@@ -330,7 +340,8 @@ export default function Layout() {
                   setProfileOpen(!profileOpen);
                   setNotificationsOpen(false);
                 }}
-                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-surface-container-high transition-all"
+                className="flex items-center gap-1.5 p-1 sm:p-1.5 rounded-xl hover:bg-surface-container-high transition-all cursor-pointer"
+                aria-label="Clinician profile options"
               >
                 <div className="w-8 h-8 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-xs">
                   SL
@@ -340,33 +351,39 @@ export default function Layout() {
 
               <AnimatePresence>
                 {profileOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                    className="absolute right-0 top-12 w-64 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-2 z-50 space-y-1"
-                  >
-                    <div className="p-3 border-b border-surface-container-low">
-                      <div className="font-bold text-xs text-on-surface">
-                        {sessionStorage.getItem('rxguard_prescriber_name') || 'Dr. Sarah Lin, PharmD'}
-                      </div>
-                      <div className="text-[10px] text-outline">
-                        {sessionStorage.getItem('rxguard_prescriber_role') || 'Lead Clinical Pharmacist'}
-                      </div>
-                      <div className="text-[10px] text-primary font-mono mt-0.5">
-                        {sessionStorage.getItem('rxguard_prescriber_npi') || 'NPI-1092837482'}
-                      </div>
-                    </div>
-
-                    <a
-                      href="https://doctor-dental-clinic.vercel.app/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                  <>
+                    {/* Mobile Backdrop */}
+                    <div
+                      className="fixed inset-0 bg-black/30 backdrop-blur-2xs z-40 sm:hidden"
+                      onClick={() => setProfileOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      className="fixed top-16 right-3 left-auto w-64 max-w-[calc(100vw-24px)] sm:absolute sm:top-12 sm:right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-2 z-50 space-y-1"
                     >
-                      <span className="material-symbols-outlined text-[18px] text-primary">stethoscope</span>
-                      Open Doctor Portal
-                    </a>
+                      <div className="p-3 border-b border-surface-container-low">
+                        <div className="font-bold text-xs text-on-surface">
+                          {sessionStorage.getItem('rxguard_prescriber_name') || 'Dr. Sarah Lin, PharmD'}
+                        </div>
+                        <div className="text-[10px] text-outline">
+                          {sessionStorage.getItem('rxguard_prescriber_role') || 'Lead Clinical Pharmacist'}
+                        </div>
+                        <div className="text-[10px] text-primary font-mono mt-0.5">
+                          {sessionStorage.getItem('rxguard_prescriber_npi') || 'NPI-1092837482'}
+                        </div>
+                      </div>
+
+                      <a
+                        href="https://doctor-dental-clinic.vercel.app/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[18px] text-primary">stethoscope</span>
+                        Open Doctor Portal
+                      </a>
 
                     <a
                       href="https://patient-dental-clinic.vercel.app/"
@@ -414,8 +431,9 @@ export default function Layout() {
                       </button>
                     </div>
                   </motion.div>
-                )}
-              </AnimatePresence>
+                </>
+              )}
+            </AnimatePresence>
             </div>
           </div>
         </header>
