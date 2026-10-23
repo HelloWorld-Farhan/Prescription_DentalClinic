@@ -50,7 +50,12 @@ export default function Support() {
   ];
 
   return (
-    <div className="bg-[#f7fafc] font-sans text-on-surface min-h-screen flex flex-col justify-between selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      className="bg-[#f7fafc] font-sans text-on-surface min-h-screen flex flex-col justify-between selection:bg-secondary-fixed selection:text-on-secondary-fixed"
+    >
       {/* Top Header */}
       <LegalPageHeader title="Support & Helpdesk" showPrintButton={false} />
 
@@ -326,6 +331,6 @@ export default function Support() {
           </div>
         </div>
       </footer>
-    </div>
+    </motion.div>
   );
 }

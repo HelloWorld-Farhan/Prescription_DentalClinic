@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { VirtualDb } from '../data/virtualDb';
 import { SafetyCheckRecord } from '../types';
 import DownloadFormatModal from '../components/DownloadFormatModal';
@@ -109,7 +110,12 @@ export default function Report() {
   };
 
   return (
-    <div className="flex flex-col w-full bg-background min-h-screen">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      className="flex flex-col w-full bg-background min-h-screen"
+    >
       {/* Top Document Controls & Breadcrumb Bar */}
       <header className="sticky top-0 z-30 w-full bg-surface-container-lowest px-4 sm:px-6 py-2.5 shadow-sm border-b border-surface-container-high/60">
         <div className="max-w-[1340px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -734,6 +740,6 @@ export default function Report() {
         check={currentCheck}
         onPrintFallback={handlePrint}
       />
-    </div>
+    </motion.div>
   );
 }

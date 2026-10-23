@@ -141,7 +141,12 @@ export default function Signup() {
   };
 
   return (
-    <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden"
+    >
       {/* Ambient Animated Gradient Orbs */}
       <motion.div
         animate={{
@@ -663,6 +668,6 @@ export default function Signup() {
           </div>
         </div>
       </footer>
-    </div>
+    </motion.div>
   );
 }

@@ -216,7 +216,7 @@ export default function Layout() {
       {/* Top Header & Content Container */}
       <div className="lg:pl-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
         {/* Fixed Header */}
-        <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-surface-container-high w-full max-w-full">
+        <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-surface-container-high">
           {/* Mobile Menu Button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -441,15 +441,18 @@ export default function Layout() {
         {/* 5. Main Nested Content Route with Fluid Page Transitions */}
         <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto min-h-[calc(100vh-140px)]">
           <ErrorBoundary fallbackTitle="Unable to load this clinical safety view">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.16, ease: 'easeOut' }}
-              className="w-full"
-            >
-              <Outlet />
-            </motion.div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                className="w-full"
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
           </ErrorBoundary>
         </main>
 

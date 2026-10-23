@@ -133,7 +133,12 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden"
+    >
       {/* Global Clinical Header */}
       <header className="h-16 w-full bg-surface-container-lowest border-b border-outline-variant/30 px-4 lg:px-8 flex items-center justify-between shadow-xs z-20">
         <div className="flex items-center gap-3">
@@ -536,6 +541,6 @@ export default function Login() {
           </div>
         </div>
       </footer>
-    </div>
+    </motion.div>
   );
 }
