@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import ErrorBoundary from './ErrorBoundary';
 
 interface NotificationItem {
   id: string;
@@ -420,19 +421,18 @@ export default function Layout() {
         </header>
 
         {/* 5. Main Nested Content Route with Fluid Page Transitions */}
-        <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto">
-          <AnimatePresence mode="wait">
+        <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto min-h-[calc(100vh-140px)]">
+          <ErrorBoundary fallbackTitle="Unable to load this clinical safety view">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
               className="w-full"
             >
               <Outlet />
             </motion.div>
-          </AnimatePresence>
+          </ErrorBoundary>
         </main>
 
         {/* 6. Standard Legal Footer */}

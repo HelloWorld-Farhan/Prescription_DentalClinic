@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VirtualDb } from '../data/virtualDb';
+import { VirtualDb, INITIAL_PATIENTS } from '../data/virtualDb';
 import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import PrintableReportModal from '../components/PrintableReportModal';
 
 export default function NewCheck() {
   const navigate = useNavigate();
-  const patients = VirtualDb.getPatients();
+  const rawPatients = VirtualDb.getPatients();
+  const patients = rawPatients && rawPatients.length > 0 ? rawPatients : INITIAL_PATIENTS;
 
   // Workflow Phases: 1. Input -> 2. Animated Analysis -> 3. Final Report & Record
   type FlowPhase = 'input' | 'analyzing' | 'report';
@@ -30,13 +31,13 @@ export default function NewCheck() {
   const [isCapturing, setIsCapturing] = useState(false);
 
   // Patient Context Selection
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0].id);
-  const selectedPatient = patients.find(p => p.id === selectedPatientId) || patients[0];
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(() => patients[0]?.id || 'pt-1');
+  const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || patients[0] || INITIAL_PATIENTS[0];
   const [ptKey, setPtKey] = useState<string>('MRN-HASH-9042-XF');
-  const [customWeight, setCustomWeight] = useState<number>(selectedPatient.weightKg || 64.5);
-  const [customEgfr, setCustomEgfr] = useState<number>(selectedPatient.egfr || 42);
-  const [activeMeds, setActiveMeds] = useState<string[]>(selectedPatient.activeMedications);
-  const [allergies, setAllergies] = useState<string[]>(selectedPatient.allergies);
+  const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? 64.5);
+  const [customEgfr, setCustomEgfr] = useState<number>(() => selectedPatient?.egfr ?? 42);
+  const [activeMeds, setActiveMeds] = useState<string[]>(() => selectedPatient?.activeMedications ?? ['Warfarin 5mg QD']);
+  const [allergies, setAllergies] = useState<string[]>(() => selectedPatient?.allergies ?? ['Penicillin (Anaphylaxis)']);
 
   // Prescriptions List
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([

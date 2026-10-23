@@ -16,15 +16,18 @@ export default function Alerts() {
   const [activeReportCheck, setActiveReportCheck] = useState<SafetyCheckRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
+  const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => {
+    const raw = VirtualDb.getChecks();
+    return raw && raw.length > 0 ? raw : [];
+  });
   // Aggregate all alerts across checks
   const allAlerts: { checkId: string; patientName: string; mrn: string; alert: DrugInteractionAlert }[] = [];
-  checks.forEach(c => {
-    c.alerts.forEach(a => {
+  (checks || []).forEach(c => {
+    (c.alerts || []).forEach(a => {
       allAlerts.push({
         checkId: c.id,
-        patientName: c.patientName,
-        mrn: c.mrn,
+        patientName: c.patientName || 'Unknown Patient',
+        mrn: c.mrn || 'N/A',
         alert: a
       });
     });
@@ -35,14 +38,16 @@ export default function Alerts() {
       activeTab === 'all'
         ? true
         : activeTab === 'overridden'
-        ? item.alert.overridden
-        : item.alert.severity === activeTab;
+        ? item.alert?.overridden
+        : item.alert?.severity === activeTab;
 
+    const query = searchTerm.toLowerCase();
+    const drugs = item.alert?.interactingDrugs || [];
     const matchesSearch =
-      item.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.mrn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.alert.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.alert.interactingDrugs.some(d => d.toLowerCase().includes(searchTerm.toLowerCase()));
+      (item.patientName || '').toLowerCase().includes(query) ||
+      (item.mrn || '').toLowerCase().includes(query) ||
+      (item.alert?.title || '').toLowerCase().includes(query) ||
+      drugs.some(d => (d || '').toLowerCase().includes(query));
 
     return matchesTab && matchesSearch;
   });
