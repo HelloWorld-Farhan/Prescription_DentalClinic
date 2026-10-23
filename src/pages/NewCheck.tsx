@@ -356,83 +356,108 @@ export default function NewCheck() {
       {/* ========================================================================= */}
       {/* 1. TOP PROGRESS STEPPER */}
       {/* ========================================================================= */}
-      <div className="w-full bg-surface-container-lowest rounded-2xl p-5 border border-surface-container-high/60 shadow-xs">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="w-full bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-surface-container-high/60 shadow-xs">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-1.5 text-on-surface-variant text-xs mb-1">
               <span>Clinical Workflow</span>
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span>Rx-PreCheck Session: {ptKey}</span>
+              <span className="material-symbols-outlined text-[13px] text-outline">chevron_right</span>
+              <span className="font-mono text-primary font-bold">Rx-PreCheck Session: {ptKey}</span>
             </div>
-            <div className="text-xl font-bold text-on-surface flex items-center gap-2">
-              <span>Safety Check Verification Engine</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
-                FHIR R4 Ingest Active
-              </span>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-lg sm:text-xl font-extrabold text-on-surface tracking-tight">
+                Safety Check Verification Engine
+              </h1>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>FHIR R4 Ingest Active</span>
+              </div>
             </div>
           </div>
 
-          {/* Stepper Navigation */}
-          <nav aria-label="Workflow progress" className="flex items-center gap-2 sm:gap-3">
-            {[
-              { id: 'input', num: 1, label: '1. Prescription Input' },
-              { id: 'analyzing', num: 2, label: '2. Animated AI Cross-Match' },
-              { id: 'report', num: 3, label: '3. Clinical Safety Report' }
-            ].map((node, index) => {
-              const isPast =
-                (flowPhase === 'analyzing' && node.id === 'input') ||
-                (flowPhase === 'report' && node.id !== 'report');
-              const isCurrent = flowPhase === node.id;
+          {/* Stepper Navigation with Animated Sliding Indicator */}
+          <nav aria-label="Workflow progress" className="w-full lg:w-auto overflow-x-auto no-scrollbar py-0.5">
+            <div className="inline-flex items-center gap-1.5 sm:gap-2.5 bg-surface-container-low p-1.5 rounded-2xl border border-surface-container-high">
+              {[
+                { id: 'input', num: 1, title: 'Prescription Input', shortTitle: 'Input', icon: 'edit_note', sub: 'Ingest' },
+                { id: 'analyzing', num: 2, title: 'AI Cross-Match', shortTitle: 'Screening', icon: 'auto_awesome', sub: 'Analysis' },
+                { id: 'report', num: 3, title: 'Clinical Report', shortTitle: 'Report', icon: 'verified_user', sub: 'Decision' }
+              ].map((node, index) => {
+                const isPast =
+                  (flowPhase === 'analyzing' && node.id === 'input') ||
+                  (flowPhase === 'report' && node.id !== 'report');
+                const isCurrent = flowPhase === node.id;
 
-              return (
-                <React.Fragment key={node.num}>
-                  {index > 0 && (
-                    <div
-                      className={`w-4 sm:w-8 h-0.5 transition-colors ${
-                        isPast ? 'bg-primary-container' : 'bg-surface-container-high'
-                      }`}
-                    />
-                  )}
-                  <div
-                    onClick={() => {
-                      if (node.id === 'input' && flowPhase === 'report') {
-                        setFlowPhase('input');
-                      }
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
-                      isCurrent
-                        ? 'bg-primary/10 ring-2 ring-primary ring-offset-1 font-bold'
-                        : isPast
-                        ? 'cursor-pointer hover:bg-surface-container'
-                        : 'opacity-60'
-                    }`}
-                  >
-                    <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                        isPast
-                          ? 'bg-primary-container text-on-primary'
-                          : isCurrent
-                          ? 'bg-primary text-on-primary shadow-xs'
-                          : 'bg-surface-container-high text-on-surface-variant'
-                      }`}
-                    >
-                      {isPast ? <span className="material-symbols-outlined text-[14px]">check</span> : node.num}
-                    </div>
-                    <span
-                      className={`text-xs font-semibold ${
+                return (
+                  <React.Fragment key={node.num}>
+                    {index > 0 && (
+                      <div className="w-3 sm:w-5 h-0.5 relative bg-surface-container-high shrink-0 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={false}
+                          animate={{ width: isPast || isCurrent ? '100%' : '0%' }}
+                          transition={{ duration: 0.35, ease: 'easeInOut' }}
+                          className="h-full bg-primary rounded-full"
+                        />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (node.id === 'input' && flowPhase === 'report') {
+                          setFlowPhase('input');
+                        }
+                      }}
+                      className={`relative flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all select-none shrink-0 cursor-pointer ${
                         isCurrent
-                          ? 'text-primary font-bold'
+                          ? 'text-primary font-bold shadow-xs'
                           : isPast
-                          ? 'text-on-surface'
-                          : 'text-on-surface-variant'
+                          ? 'text-on-surface hover:text-primary cursor-pointer'
+                          : 'text-on-surface-variant/70 cursor-default'
                       }`}
                     >
-                      {node.label}
-                    </span>
-                  </div>
-                </React.Fragment>
-              );
-            })}
+                      {/* Animated Sliding Pill Highlight */}
+                      {isCurrent && (
+                        <motion.div
+                          layoutId="stepper-active-pill"
+                          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                          className="absolute inset-0 bg-surface-container-lowest rounded-xl border border-primary/30 shadow-xs"
+                        />
+                      )}
+
+                      <div className="relative z-10 flex items-center gap-2">
+                        <div
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold transition-all shadow-2xs ${
+                            isPast
+                              ? 'bg-primary text-on-primary'
+                              : isCurrent
+                              ? 'bg-primary text-on-primary shadow-xs'
+                              : 'bg-surface-container text-outline'
+                          }`}
+                        >
+                          {isPast ? (
+                            <span className="material-symbols-outlined text-[15px]">done</span>
+                          ) : isCurrent && node.id === 'analyzing' ? (
+                            <span className="material-symbols-outlined text-[15px] animate-spin">progress_activity</span>
+                          ) : (
+                            <span className="material-symbols-outlined text-[15px]">{node.icon}</span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs font-semibold leading-tight whitespace-nowrap">
+                            <span className="sm:hidden">{node.shortTitle}</span>
+                            <span className="hidden sm:inline">{node.title}</span>
+                          </span>
+                          <span className="text-[10px] text-outline leading-none mt-0.5 hidden md:block">
+                            Step {node.num} • {isPast ? 'Done' : isCurrent ? 'Active' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+            </div>
           </nav>
         </div>
       </div>
