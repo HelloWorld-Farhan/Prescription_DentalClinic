@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../data/virtualDb';
 import { InteractionRule } from '../types';
+import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
 
 export default function RulesAdmin() {
   const [activeTab, setActiveTab] = useState<'rules' | 'knowledge' | 'regression'>('rules');
@@ -8,29 +10,48 @@ export default function RulesAdmin() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatusText, setSyncStatusText] = useState('All engines synchronized 14m ago');
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [syncStatusText, setSyncStatusText] = useState('All 4 knowledge engines synchronized just now (v2025.02-B)');
   const [regressionRunning, setRegressionRunning] = useState(false);
+  const [inspectRule, setInspectRule] = useState<InteractionRule | null>(null);
+  const [inspectGateway, setInspectGateway] = useState<{ id: string; name: string; endpoint: string; latency: string; uptime: string; hash: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const [tests, setTests] = useState([
+    { id: 'TEST-01', name: 'Warfarin + Fluconazole CYP2C9 Potentiation', status: 'PASS', time: '12ms' },
+    { id: 'TEST-02', name: 'Lisinopril + Spironolactone Hyperkalemia', status: 'PASS', time: '9ms' },
+    { id: 'TEST-03', name: 'Penicillin Anaphylaxis vs Amoxicillin', status: 'PASS', time: '14ms' },
+    { id: 'TEST-04', name: 'Ciprofloxacin eGFR < 50mL Renal Threshold', status: 'PASS', time: '11ms' },
+    { id: 'TEST-05', name: 'Atorvastatin + Clarithromycin Rhabdo Warning', status: 'PASS', time: '16ms' },
+    { id: 'TEST-06', name: 'Levothyroxine + Calcium Chelation Window', status: 'PASS', time: '8ms' },
+    { id: 'TEST-07', name: 'Duplicate Opioid / Sedative Co-prescribing', status: 'PASS', time: '10ms' },
+    { id: 'TEST-08', name: 'Methotrexate + NSAID Clearance Suppression', status: 'PASS', time: '15ms' },
+    { id: 'TEST-09', name: 'Pregnancy Category D / X Teratogenicity Guard', status: 'PASS', time: '13ms' },
+  ]);
 
   const handleToggle = (id: string) => {
     const updated = VirtualDb.toggleRule(id);
     setRules([...updated]);
-  };
-
-  const handleSyncEngines = () => {
-    setIsSyncing(true);
-    setSyncStatusText('Connecting to FDB & Lexicomp CDG gateways...');
-    setTimeout(() => {
-      setIsSyncing(false);
-      setSyncStatusText('All 4 knowledge engines synchronized just now (v2025.02-B)');
-    }, 1200);
+    const target = updated.find(r => r.id === id);
+    setToastMessage(`Rule ${id} is now ${target?.active ? 'ACTIVE' : 'DISABLED'}`);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleRunRegression = () => {
     setRegressionRunning(true);
+    setToastMessage('Executing deterministic golden test suite battery...');
     setTimeout(() => {
+      setTests((prev) =>
+        prev.map((t) => ({
+          ...t,
+          status: 'PASS',
+          time: `${Math.floor(Math.random() * 8 + 7)}ms`
+        }))
+      );
       setRegressionRunning(false);
-    }, 900);
+      setToastMessage('All 9/9 Golden Invariant Assertions Passed (0 regression defects)');
+      setTimeout(() => setToastMessage(null), 4000);
+    }, 1200);
   };
 
   const filteredRules = rules.filter((r) => {
@@ -94,10 +115,10 @@ export default function RulesAdmin() {
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={handleSyncEngines}
-              className="flex items-center gap-1.5 px-4 h-10 rounded-xl bg-primary-container text-on-primary hover:bg-primary transition-all text-xs font-bold shadow-xs cursor-pointer"
+              onClick={() => setIsSyncModalOpen(true)}
+              className="group flex items-center gap-1.5 px-4 h-10 rounded-xl bg-primary-container text-on-primary hover:bg-primary transition-all text-xs font-bold shadow-xs cursor-pointer hover:shadow-md"
             >
-              <span className={`material-symbols-outlined text-[18px] ${isSyncing ? 'animate-spin' : ''}`}>
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:rotate-180 duration-500">
                 sync
               </span>
               <span>Sync Knowledge Bases</span>
@@ -137,7 +158,7 @@ export default function RulesAdmin() {
           <button
             type="button"
             onClick={() => setActiveTab('rules')}
-            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'rules'
                 ? 'border-primary-container text-primary font-bold'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -153,7 +174,7 @@ export default function RulesAdmin() {
           <button
             type="button"
             onClick={() => setActiveTab('knowledge')}
-            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'knowledge'
                 ? 'border-primary-container text-primary font-bold'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -169,14 +190,14 @@ export default function RulesAdmin() {
           <button
             type="button"
             onClick={() => setActiveTab('regression')}
-            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'regression'
                 ? 'border-primary-container text-primary font-bold'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
             }`}
           >
             <span className="material-symbols-outlined text-[18px]">checklist_rtl</span>
-            <span>Test Suite & Regression</span>
+            <span>Test Suite &amp; Regression</span>
             <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">
               9/9 passing
             </span>
@@ -211,7 +232,7 @@ export default function RulesAdmin() {
                 <option value="ALL">Check Type: All Categories</option>
                 <option value="Interaction">Drug-Drug Interaction</option>
                 <option value="Allergy">Allergy Conflict</option>
-                <option value="Dose">Dose & Frequency</option>
+                <option value="Dose">Dose &amp; Frequency</option>
                 <option value="Duplicate">Duplicate Therapy</option>
               </select>
 
@@ -246,12 +267,12 @@ export default function RulesAdmin() {
               <table className="w-full text-left border-collapse min-w-[700px] text-xs">
                 <thead>
                   <tr className="bg-surface-container-low text-outline uppercase tracking-wider font-semibold border-b border-surface-container">
-                    <th className="py-3 px-4">Rule Target & Mechanism</th>
+                    <th className="py-3 px-4">Rule Target &amp; Mechanism</th>
                     <th className="py-3 px-4">Category</th>
                     <th className="py-3 px-4">Default Severity</th>
                     <th className="py-3 px-4">Evidence Level</th>
                     <th className="py-3 px-4">Active State</th>
-                    <th className="py-3 px-4 text-right">Action</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container text-on-surface">
@@ -309,14 +330,30 @@ export default function RulesAdmin() {
                           </label>
                         </td>
 
-                        <td className="py-3.5 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleToggle(rule.id)}
-                            className="text-xs font-bold text-primary hover:underline"
-                          >
-                            {rule.active ? 'Disable' : 'Enable'}
-                          </button>
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setInspectRule(rule)}
+                              className="px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors text-[11px] font-bold border border-surface-container-high shadow-2xs cursor-pointer flex items-center gap-1"
+                              title="Inspect Compiled AST Logic"
+                            >
+                              <span className="material-symbols-outlined text-[13px] text-primary">data_object</span>
+                              <span>Inspect AST</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggle(rule.id)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                rule.active
+                                  ? 'text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+                                  : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                              }`}
+                            >
+                              {rule.active ? 'Disable' : 'Enable'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -331,99 +368,211 @@ export default function RulesAdmin() {
       {/* TAB 2: KNOWLEDGE SOURCES */}
       {activeTab === 'knowledge' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                  FDB
+          {/* FDB Card */}
+          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                    FDB
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-on-surface">First Databank (FDB) MedKnowledge</h3>
+                    <span className="text-[11px] text-on-surface-variant font-medium">Licensed Clinical Pharmacopeia</span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-on-surface">First Databank (FDB) MedKnowledge</h3>
-                  <span className="text-[11px] text-on-surface-variant font-medium">Licensed Clinical Pharmacopeia</span>
-                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                  Active &amp; Synced
+                </span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                Active & Synced
-              </span>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Provides primary deterministic clinical rules for drug-drug interactions, duplicate therapies, and dose ceiling validation.
+              </p>
             </div>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Provides primary deterministic clinical rules for drug-drug interactions, duplicate therapies, and dose ceiling validation.
-            </p>
-            <div className="pt-2 border-t border-surface-container flex items-center justify-between text-[11px] text-outline font-mono">
-              <span>Database v2025.02-B</span>
-              <span>Updated: Today 09:22 UTC</span>
+            <div className="pt-2 border-t border-surface-container flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span className="font-mono text-outline">Database v2025.02-B</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInspectGateway({
+                      id: 'fdb',
+                      name: 'First Databank MedKnowledge Gateway',
+                      endpoint: 'https://cdg.fdbhealth.com/v2/cds-stream',
+                      latency: '38ms',
+                      uptime: '99.99%',
+                      hash: 'SHA256: 0x9f8e41a...c82b'
+                    })
+                  }
+                  className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-container text-on-surface text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  Inspect Gateway
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSyncModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary hover:text-white text-primary text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[13px]">sync</span>
+                  <span>Sync Feed</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                  LEX
+          {/* Lexicomp Card */}
+          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                    LEX
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-on-surface">Wolters Kluwer Lexicomp DDI</h3>
+                    <span className="text-[11px] text-on-surface-variant font-medium">Evidence Monograph Engine</span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-on-surface">Wolters Kluwer Lexicomp DDI</h3>
-                  <span className="text-[11px] text-on-surface-variant font-medium">Evidence Monograph Engine</span>
-                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                  Active &amp; Synced
+                </span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                Active & Synced
-              </span>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Provides deep pharmacokinetics explanations, severity grading matrices, CYP enzyme inhibition pathways, and patient guidance.
+              </p>
             </div>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Provides deep pharmacokinetics explanations, severity grading matrices, CYP enzyme inhibition pathways, and patient guidance.
-            </p>
-            <div className="pt-2 border-t border-surface-container flex items-center justify-between text-[11px] text-outline font-mono">
-              <span>Release 2025-Q1</span>
-              <span>Updated: Today 09:22 UTC</span>
+            <div className="pt-2 border-t border-surface-container flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span className="font-mono text-outline">Release 2025-Q1</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInspectGateway({
+                      id: 'lexicomp',
+                      name: 'Wolters Kluwer Lexicomp Monograph Gateway',
+                      endpoint: 'https://api.lexicomp.wolterskluwer.com/v3/monographs',
+                      latency: '45ms',
+                      uptime: '99.98%',
+                      hash: 'SHA256: 0x4a7c19b...f30e'
+                    })
+                  }
+                  className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-container text-on-surface text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  Inspect Gateway
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSyncModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary hover:text-white text-primary text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[13px]">sync</span>
+                  <span>Sync Feed</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                  RXN
+          {/* RxNorm Card */}
+          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                    RXN
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-on-surface">NIH NLM DailyMed &amp; RxNorm</h3>
+                    <span className="text-[11px] text-on-surface-variant font-medium">Standardized Drug Ontology</span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-on-surface">NIH NLM DailyMed & RxNorm</h3>
-                  <span className="text-[11px] text-on-surface-variant font-medium">Standardized Drug Ontology</span>
-                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                  Active &amp; Synced
+                </span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                Active & Synced
-              </span>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Maps national drug codes (NDC), concept unique identifiers (RxCUI), package inserts, and FDA black-box warnings.
+              </p>
             </div>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Maps national drug codes (NDC), concept unique identifiers (RxCUI), package inserts, and FDA black-box warnings.
-            </p>
-            <div className="pt-2 border-t border-surface-container flex items-center justify-between text-[11px] text-outline font-mono">
-              <span>RxNorm 2025-02</span>
-              <span>Updated: 2 days ago</span>
+            <div className="pt-2 border-t border-surface-container flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span className="font-mono text-outline">RxNorm 2025-02</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInspectGateway({
+                      id: 'rxnorm',
+                      name: 'NIH National Library of Medicine Gateway',
+                      endpoint: 'https://rxnav.nlm.nih.gov/REST/rxcui',
+                      latency: '26ms',
+                      uptime: '99.95%',
+                      hash: 'SHA256: 0x81da30c...7e41'
+                    })
+                  }
+                  className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-container text-on-surface text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  Inspect Gateway
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSyncModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary hover:text-white text-primary text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[13px]">sync</span>
+                  <span>Sync Feed</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                  CPIC
+          {/* CPIC Card */}
+          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                    CPIC
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-on-surface">Clinical Pharmacogenetics (CPIC)</h3>
+                    <span className="text-[11px] text-on-surface-variant font-medium">Genomic Guideline Set</span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-on-surface">Clinical Pharmacogenetics (CPIC)</h3>
-                  <span className="text-[11px] text-on-surface-variant font-medium">Genomic Guideline Set</span>
-                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                  Active &amp; Synced
+                </span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                Active & Synced
-              </span>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Provides genotype-guided drug dosing algorithms (CYP2C9, VKORC1, HLA-B*5701) for personalized prescribing precision.
+              </p>
             </div>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Provides genotype-guided drug dosing algorithms (CYP2C9, VKORC1, HLA-B*5701) for personalized prescribing precision.
-            </p>
-            <div className="pt-2 border-t border-surface-container flex items-center justify-between text-[11px] text-outline font-mono">
-              <span>CPIC v3.1</span>
-              <span>Updated: Weekly auto-fetch</span>
+            <div className="pt-2 border-t border-surface-container flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span className="font-mono text-outline">CPIC v3.1</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInspectGateway({
+                      id: 'cpic',
+                      name: 'CPIC Pharmacogenetics Guideline API',
+                      endpoint: 'https://api.cpicpgx.org/v1/recommendations',
+                      latency: '52ms',
+                      uptime: '99.97%',
+                      hash: 'SHA256: 0x3e18a9d...61c0'
+                    })
+                  }
+                  className="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-container text-on-surface text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  Inspect Gateway
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSyncModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary hover:text-white text-primary text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[13px]">sync</span>
+                  <span>Sync Feed</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -446,24 +595,14 @@ export default function RulesAdmin() {
               className="px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
             >
               <span className={`material-symbols-outlined text-[16px] ${regressionRunning ? 'animate-spin' : ''}`}>
-                play_arrow
+                {regressionRunning ? 'sync' : 'play_arrow'}
               </span>
               <span>{regressionRunning ? 'Executing Test Assertions...' : 'Run All Test Assertions'}</span>
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { id: 'TEST-01', name: 'Warfarin + Fluconazole CYP2C9 Potentiation', status: 'PASS', time: '12ms' },
-              { id: 'TEST-02', name: 'Lisinopril + Spironolactone Hyperkalemia', status: 'PASS', time: '9ms' },
-              { id: 'TEST-03', name: 'Penicillin Anaphylaxis vs Amoxicillin', status: 'PASS', time: '14ms' },
-              { id: 'TEST-04', name: 'Ciprofloxacin eGFR < 50mL Renal Threshold', status: 'PASS', time: '11ms' },
-              { id: 'TEST-05', name: 'Atorvastatin + Clarithromycin Rhabdo Warning', status: 'PASS', time: '16ms' },
-              { id: 'TEST-06', name: 'Levothyroxine + Calcium Chelation Window', status: 'PASS', time: '8ms' },
-              { id: 'TEST-07', name: 'Duplicate Opioid / Sedative Co-prescribing', status: 'PASS', time: '10ms' },
-              { id: 'TEST-08', name: 'Methotrexate + NSAID Clearance Suppression', status: 'PASS', time: '15ms' },
-              { id: 'TEST-09', name: 'Pregnancy Category D / X Teratogenicity Guard', status: 'PASS', time: '13ms' },
-            ].map((tc) => (
+            {tests.map((tc) => (
               <div key={tc.id} className="p-4 rounded-xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs font-bold text-primary">{tc.id}</span>
@@ -475,13 +614,231 @@ export default function RulesAdmin() {
                 <h4 className="text-xs font-bold text-on-surface line-clamp-2">{tc.name}</h4>
                 <div className="flex items-center justify-between pt-2 border-t border-surface-container text-[11px] text-outline">
                   <span>Deterministic Invariant</span>
-                  <span className="font-mono">{tc.time}</span>
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <span>{tc.time}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTests(prev => prev.map(t => t.id === tc.id ? { ...t, status: 'PASS', time: `${Math.floor(Math.random() * 6 + 6)}ms` } : t));
+                        setToastMessage(`Test assertion ${tc.id} re-verified: PASS`);
+                        setTimeout(() => setToastMessage(null), 3000);
+                      }}
+                      className="hover:text-primary transition-colors cursor-pointer"
+                      title="Re-run Assertion"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">refresh</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      {/* Sync Knowledge Modal Popup */}
+      <SyncKnowledgeModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        onSyncComplete={(version) => {
+          setSyncStatusText(`All 4 knowledge engines synchronized just now (${version})`);
+          setToastMessage(`Knowledge bases successfully updated (${version})`);
+          setTimeout(() => setToastMessage(null), 4000);
+        }}
+      />
+
+      {/* Inspect Rule AST Modal */}
+      <AnimatePresence>
+        {inspectRule && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              className="bg-surface-container-lowest rounded-2xl p-6 max-w-xl w-full border border-surface-container-high shadow-2xl space-y-4"
+            >
+              <div className="flex items-start justify-between border-b border-surface-container pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[20px]">account_tree</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-on-surface">Compiled Rule AST Inspector</h3>
+                    <span className="font-mono text-xs text-primary font-bold">{inspectRule.id}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInspectRule(null)}
+                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="text-outline font-semibold block mb-1">Target Interactions:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">
+                      {inspectRule.drugA}
+                    </span>
+                    <span className="material-symbols-outlined text-outline text-[14px]">sync_alt</span>
+                    <span className="font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">
+                      {inspectRule.drugB}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-outline font-semibold block mb-1">Deterministic AST Pattern:</span>
+                  <div className="bg-slate-950 text-emerald-400 font-mono text-[11px] p-3 rounded-xl border border-slate-800 leading-relaxed overflow-x-auto">
+                    {`IF candidate_prescription.matches("${inspectRule.drugA}")\n` +
+                      `AND patient.active_medications.contains("${inspectRule.drugB}")\n` +
+                      `THEN TRIGGER_CDS_ALERT(\n` +
+                      `    severity = "${inspectRule.severity.toUpperCase()}",\n` +
+                      `    category = "${inspectRule.category}",\n` +
+                      `    mechanism = "Pharmacokinetic enzyme pathway interference",\n` +
+                      `    evidence_grade = "Level 1 - FDB Core",\n` +
+                      `    action_required = TRUE\n` +
+                      `);`}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-outline font-semibold block mb-1">Clinical Impact & Description:</span>
+                  <p className="text-on-surface-variant bg-surface-container-low p-3 rounded-xl border border-surface-container leading-relaxed">
+                    {inspectRule.description}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-surface-container">
+                  <span className="text-on-surface font-semibold">Active Engine Execution State:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleToggle(inspectRule.id);
+                      setInspectRule({ ...inspectRule, active: !inspectRule.active });
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      inspectRule.active
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-surface-container text-on-surface-variant'
+                    }`}
+                  >
+                    {inspectRule.active ? 'ACTIVE & ENFORCED' : 'DISABLED / STAGED'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-surface-container flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setInspectRule(null)}
+                  className="px-4 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs hover:bg-surface-container-high transition-colors cursor-pointer"
+                >
+                  Close Inspector
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Inspect Gateway Modal */}
+      <AnimatePresence>
+        {inspectGateway && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              className="bg-surface-container-lowest rounded-2xl p-6 max-w-lg w-full border border-surface-container-high shadow-2xl space-y-4 text-xs"
+            >
+              <div className="flex items-start justify-between border-b border-surface-container pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                    <span className="material-symbols-outlined text-[20px]">lan</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-on-surface">{inspectGateway.name}</h3>
+                    <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Gateway Connected &amp; Certified
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInspectGateway(null)}
+                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="p-3 rounded-xl bg-surface-container-low space-y-1.5">
+                  <span className="text-outline font-semibold block">Gateway Endpoint URI</span>
+                  <span className="font-mono text-primary break-all">{inspectGateway.endpoint}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 rounded-xl bg-surface-container-low">
+                    <span className="text-outline font-semibold block">Round-Trip Latency</span>
+                    <span className="font-bold text-on-surface text-sm">{inspectGateway.latency}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-surface-container-low">
+                    <span className="text-outline font-semibold block">Gateway Uptime SLA</span>
+                    <span className="font-bold text-emerald-700 text-sm">{inspectGateway.uptime}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-surface-container-low space-y-1">
+                  <span className="text-outline font-semibold block">Cryptographic Feed Hash</span>
+                  <span className="font-mono text-on-surface text-[11px] break-all">{inspectGateway.hash}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-surface-container flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInspectGateway(null);
+                    setIsSyncModalOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[14px]">sync</span>
+                  <span>Sync This Feed</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectGateway(null)}
+                  className="px-4 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs hover:bg-surface-container-high transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Signed Protocol Toast */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-6 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-emerald-500 backdrop-blur-md"
+          >
+            <span className="material-symbols-outlined text-[20px] text-emerald-200">verified</span>
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
