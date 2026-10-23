@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SafetyCheckRecord } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
@@ -13,108 +14,156 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
   const [zoomScale, setZoomScale] = useState<number>(1.0);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
 
+  // Lock background scroll when report modal is open and handle Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    const originalPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    document.body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !showDownloadModal) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.paddingRight = originalPaddingRight;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose, showDownloadModal]);
+
   if (!check) return null;
+  if (typeof document === 'undefined') return null;
 
   const handlePrint = () => {
     window.print();
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-xs flex flex-col items-center print:bg-white print:p-0 print:overflow-visible">
+        <div className="fixed inset-0 z-[100] w-screen h-screen overflow-y-auto bg-slate-950/95 backdrop-blur-md flex flex-col items-center print:bg-white print:p-0 print:overflow-visible print:static">
           {/* Top Document Controls Bar (Hidden on print) */}
-          <header className="sticky top-0 z-50 w-full bg-surface-container-lowest border-b border-surface-container-high px-4 sm:px-8 py-3 shadow-md print:hidden">
-            <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-2 text-xs text-outline font-medium">
-                  <span>Reports</span>
-                  <span>/</span>
-                  <span className="text-on-surface font-semibold">Verification Audit #{check.checkNumber}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-secondary text-xs font-semibold">
-                    <span className="material-symbols-outlined text-[13px]">description</span>
-                    Clinical Verification & Decision Support Report (A4 Printable Document)
+          <header className="sticky top-0 z-40 w-full bg-slate-900/98 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 lg:px-8 py-3 shadow-2xl text-slate-100 print:hidden">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Document Identity & Safe Harbor Badge */}
+              <div className="flex flex-col gap-1 min-w-0">
+                <div className="flex items-center gap-2 text-xs text-slate-400 font-medium truncate">
+                  <span className="hover:text-slate-200 transition-colors cursor-pointer" onClick={onClose}>Reports</span>
+                  <span className="text-slate-600">/</span>
+                  <span className="text-slate-200 font-semibold font-mono truncate">Audit #{check.checkNumber}</span>
+                  <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    PASS / MONITORED
                   </span>
-                  <span className="text-xs text-outline hidden lg:inline">• Verified Safe Harbor Export</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300 text-xs font-semibold border border-slate-700">
+                    <span className="material-symbols-outlined text-[14px]">description</span>
+                    <span>Clinical Verification & Decision Support Report</span>
+                  </span>
+                  <span className="text-xs text-slate-400 hidden xl:inline">• A4 Standard (210 × 297 mm)</span>
+                  <span className="text-xs text-emerald-400 hidden sm:inline flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Verified Safe Harbor Export
+                  </span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+              {/* Action Toolbar */}
+              <div className="flex items-center justify-between md:justify-end gap-2 shrink-0">
                 {/* Zoom Controller */}
-                <div className="flex items-center bg-surface-container-low rounded-lg px-2 py-1 gap-1 border border-surface-container-high">
+                <div className="flex items-center bg-slate-800/90 rounded-xl px-2 py-1 gap-1 border border-slate-700 shadow-inner">
                   <button
                     type="button"
-                    onClick={() => setZoomScale((prev) => Math.max(0.7, prev - 0.1))}
-                    className="p-1 rounded hover:bg-surface-container text-on-surface-variant cursor-pointer"
+                    onClick={() => setZoomScale((prev) => Math.max(0.6, Math.round((prev - 0.1) * 10) / 10))}
+                    className="p-1 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
                     title="Zoom Out"
                   >
-                    <span className="material-symbols-outlined text-[16px]">remove</span>
+                    <span className="material-symbols-outlined text-[16px] block">remove</span>
                   </button>
-                  <span className="text-xs font-mono font-bold text-on-surface px-1 min-w-[50px] text-center">
-                    {Math.round(zoomScale * 100)}%
-                  </span>
                   <button
                     type="button"
-                    onClick={() => setZoomScale((prev) => Math.min(1.4, prev + 0.1))}
-                    className="p-1 rounded hover:bg-surface-container text-on-surface-variant cursor-pointer"
+                    onClick={() => setZoomScale(1.0)}
+                    className="text-xs font-mono font-bold text-slate-200 px-1.5 min-w-[50px] text-center hover:text-cyan-300 cursor-pointer"
+                    title="Reset Zoom (100%)"
+                  >
+                    {Math.round(zoomScale * 100)}%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoomScale((prev) => Math.min(1.4, Math.round((prev + 0.1) * 10) / 10))}
+                    className="p-1 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
                     title="Zoom In"
                   >
-                    <span className="material-symbols-outlined text-[16px]">add</span>
+                    <span className="material-symbols-outlined text-[16px] block">add</span>
                   </button>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Download Report Button */}
                 <button
                   type="button"
                   onClick={() => setShowDownloadModal(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-secondary hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition-all text-xs font-bold border border-slate-700 hover:border-slate-600 cursor-pointer shadow-xs"
                 >
-                  <span className="material-symbols-outlined text-[16px]">download</span>
-                  <span>Download Report</span>
+                  <span className="material-symbols-outlined text-[16px] text-cyan-400">download</span>
+                  <span className="hidden sm:inline">Download Report</span>
+                  <span className="sm:hidden">Export</span>
                 </button>
+
+                {/* Print Button */}
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary hover:bg-primary-container transition-colors shadow-sm text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary transition-all shadow-md text-xs font-bold cursor-pointer hover:shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
                 >
                   <span className="material-symbols-outlined text-[16px]">print</span>
                   <span>Print Report</span>
                 </button>
+
+                {/* Close Button */}
                 <button
                   type="button"
                   onClick={onClose}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-outline hover:text-on-surface text-xs font-bold transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/30 text-xs font-bold transition-all cursor-pointer"
+                  title="Close (Esc)"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
-                  <span className="hidden sm:inline">Close</span>
+                  <span className="hidden md:inline">Close</span>
                 </button>
               </div>
             </div>
           </header>
 
           {/* Dark Slate PDF Presentation Viewport */}
-          <main className="w-full bg-[#1E293B] py-8 sm:py-12 px-2 sm:px-6 flex flex-col items-center min-h-[calc(100vh-65px)] print:bg-white print:py-0 print:px-0">
+          <main className="w-full bg-[#0F172A] py-6 sm:py-10 px-2 sm:px-6 flex flex-col items-center flex-1 min-h-[calc(100vh-65px)] print:bg-white print:py-0 print:px-0">
             {/* Floating Document Canvas Pagination Indicator */}
-            <div className="mb-4 flex items-center gap-3 bg-slate-900/90 text-slate-100 px-4 py-1.5 rounded-full shadow-lg backdrop-blur-md text-xs font-semibold border border-slate-700 print:hidden">
+            <div className="mb-5 flex flex-wrap items-center justify-center gap-2 sm:gap-3 bg-slate-900/90 text-slate-100 px-4 py-1.5 rounded-full shadow-lg backdrop-blur-md text-xs font-semibold border border-slate-800 print:hidden">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>A4 Format (210 × 297 mm)</span>
               </div>
-              <span className="text-slate-500">•</span>
+              <span className="text-slate-600 hidden sm:inline">•</span>
               <span>Page 1 of 1</span>
-              <span className="text-slate-500">•</span>
+              <span className="text-slate-600 hidden sm:inline">•</span>
               <span className="text-cyan-300">Confidential Clinical Audit</span>
             </div>
 
             {/* Scalable Document Container Wrapper */}
             <div
               style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }}
-              className="w-full flex justify-center transition-transform duration-150"
+              className="w-full max-w-full flex justify-center transition-transform duration-150 overflow-x-auto pb-8"
             >
               {/* High-Fidelity A4 White Sheet (Simulated Physical Paper) */}
-              <article className="w-full max-w-[820px] bg-white text-[#0F172A] rounded-sm shadow-2xl p-6 sm:p-10 flex flex-col gap-6 selection:bg-cyan-100 font-sans print:shadow-none print:p-4 print:max-w-none">
+              <article className="w-full max-w-[840px] bg-white text-[#0F172A] rounded-md sm:rounded-sm shadow-2xl p-4 sm:p-8 md:p-10 flex flex-col gap-6 selection:bg-cyan-100 font-sans print:shadow-none print:p-4 print:max-w-none print:w-full">
                 {/* SECTION A: Document Clinical Masthead & Verification Header */}
                 <header className="flex flex-col gap-4 pb-4 border-b border-slate-200">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -146,7 +195,7 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
                     <h1 className="text-base sm:text-lg font-bold text-slate-900 mb-3 tracking-tight">
                       PRESCRIPTION SAFETY & CDS VERIFICATION REPORT
                     </h1>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-4 text-xs">
                       <div>
                         <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-bold">
                           Report Identifier
@@ -354,6 +403,7 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
           />
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
