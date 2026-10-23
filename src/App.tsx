@@ -3,6 +3,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import NewCheck from './pages/NewCheck';
 import Alerts from './pages/Alerts';
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Dedicated Fullscreen Printable Clinical Report */}
         <Route path="/report" element={<Report />} />

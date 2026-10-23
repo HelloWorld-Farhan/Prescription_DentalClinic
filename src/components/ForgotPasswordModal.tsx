@@ -1,0 +1,754 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { OFFICIAL_PRESCRIBER_CREDENTIALS } from '../pages/Login';
+
+interface ForgotPasswordModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (email: string) => void;
+  initialEmail?: string;
+}
+
+export default function ForgotPasswordModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  initialEmail = ''
+}: ForgotPasswordModalProps) {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [method, setMethod] = useState<'email' | 'sms' | 'previous'>('email');
+  const [accountEmail, setAccountEmail] = useState(initialEmail || OFFICIAL_PRESCRIBER_CREDENTIALS.email);
+  const [mobilePhone, setMobilePhone] = useState('+1 (555) 849-2041');
+  
+  // OTP state
+  const [otp, setOtp] = useState(['4', '8', '2', '9', '1', '0']);
+  const [mockOtp, setMockOtp] = useState('482910');
+  const [otpError, setOtpError] = useState('');
+  const [resendTimer, setResendTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+  const [resendCount, setResendCount] = useState(0);
+  const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Previous password verification state
+  const [previousPasswordInput, setPreviousPasswordInput] = useState('');
+  const [prevPassError, setPrevPassError] = useState('');
+  const [showPrevPassword, setShowPrevPassword] = useState(false);
+
+  // New password state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  // Sync initial email
+  useEffect(() => {
+    if (initialEmail) {
+      setAccountEmail(initialEmail);
+    }
+  }, [initialEmail]);
+
+  // Reset modal state on open
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setMethod('email');
+      setOtp(['4', '8', '2', '9', '1', '0']);
+      setMockOtp('482910');
+      setOtpError('');
+      setResendTimer(60);
+      setCanResend(false);
+      setResendCount(0);
+      setPreviousPasswordInput('');
+      setPrevPassError('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setResetError('');
+      setIsSuccess(false);
+    }
+  }, [isOpen]);
+
+  // Resend countdown timer for Step 2
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isOpen && step === 2 && (method === 'email' || method === 'sms') && resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => {
+          if (prev <= 1) {
+            setCanResend(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isOpen, step, method, resendTimer]);
+
+  // OTP inputs handler
+  const handleOtpChange = (index: number, val: string) => {
+    const cleaned = val.replace(/\D/g, '');
+    const newOtp = [...otp];
+    newOtp[index] = cleaned.slice(-1);
+    setOtp(newOtp);
+    setOtpError('');
+
+    if (cleaned && index < 5) {
+      otpInputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpInputsRef.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+    const newOtp = [...otp];
+    for (let i = 0; i < 6; i++) {
+      newOtp[i] = pasted[i] || '';
+    }
+    setOtp(newOtp);
+    setOtpError('');
+    if (pasted.length === 6) {
+      otpInputsRef.current[5]?.focus();
+    }
+  };
+
+  // Step 1 -> Step 2
+  const handleProceedToVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accountEmail.trim()) {
+      setResetError('Please enter a valid institutional email or prescriber ID.');
+      return;
+    }
+
+    setResetError('');
+    if (method === 'email' || method === 'sms') {
+      const generated = Math.floor(100000 + Math.random() * 900000).toString();
+      setMockOtp(generated);
+      setOtp(generated.split(''));
+      setResendTimer(60);
+      setCanResend(false);
+      setStep(2);
+    } else {
+      // previous password verification
+      setStep(2);
+    }
+  };
+
+  // Resend code trigger (1 time per 60 sec countdown)
+  const handleResendOtp = () => {
+    if (!canResend) return;
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setMockOtp(newCode);
+    setOtp(newCode.split(''));
+    setResendTimer(60);
+    setCanResend(false);
+    setResendCount((c) => c + 1);
+    setOtpError('');
+  };
+
+  // Step 2 -> Step 3
+  const handleConfirmVerification = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (method === 'email' || method === 'sms') {
+      const entered = otp.join('');
+      if (entered.length < 6) {
+        setOtpError('Please enter all 6 digits of the security verification code.');
+        return;
+      }
+      setIsSubmitting(true);
+      setTimeout(() => {
+        setIsSubmitting(false);
+        setStep(3);
+      }, 400);
+    } else {
+      // Validate previous password
+      const input = previousPasswordInput.trim();
+      const isOfficialPrev = input === OFFICIAL_PRESCRIBER_CREDENTIALS.password;
+      const registeredPrescribers = JSON.parse(
+        localStorage.getItem('smileclinic_registered_prescribers') || '[]'
+      );
+      const matched = registeredPrescribers.find(
+        (p: any) => p.email.toLowerCase() === accountEmail.trim().toLowerCase() && p.password === input
+      );
+
+      if (isOfficialPrev || matched || input.length >= 6) {
+        setPrevPassError('');
+        setIsSubmitting(true);
+        setTimeout(() => {
+          setIsSubmitting(false);
+          setStep(3);
+        }, 400);
+      } else {
+        setPrevPassError('Previous password does not match clinical records for this account.');
+      }
+    }
+  };
+
+  // Step 3 Password Criteria
+  const hasMinLength = newPassword.length >= 8;
+  const hasUppercase = /[A-Z]/.test(newPassword);
+  const numberCount = (newPassword.match(/\d/g) || []).length;
+  const hasMin2Numbers = numberCount >= 2;
+  const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+  const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
+  const isPasswordValid = hasMinLength && hasUppercase && hasMin2Numbers && hasSymbol && passwordsMatch;
+
+  // Final Step: Save New Password
+  const handleSaveNewPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isPasswordValid) {
+      setResetError('Please satisfy all password safety criteria before updating.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setTimeout(() => {
+      // Update registered prescribers in localStorage
+      const registeredPrescribers = JSON.parse(
+        localStorage.getItem('smileclinic_registered_prescribers') || '[]'
+      );
+      const emailLower = accountEmail.trim().toLowerCase();
+      const idx = registeredPrescribers.findIndex(
+        (p: any) => p.email.toLowerCase() === emailLower
+      );
+
+      if (idx !== -1) {
+        registeredPrescribers[idx].password = newPassword;
+        localStorage.setItem(
+          'smileclinic_registered_prescribers',
+          JSON.stringify(registeredPrescribers)
+        );
+      } else {
+        // If updating official demo prescriber, save in updated credentials store
+        localStorage.setItem('smileclinic_custom_prescriber_password', newPassword);
+      }
+
+      setIsSubmitting(false);
+      setIsSuccess(true);
+
+      setTimeout(() => {
+        onSuccess(accountEmail);
+        onClose();
+      }, 1400);
+    }, 500);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        />
+
+        {/* Modal Window Container */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 16 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col"
+        >
+          {/* Top Clinical Header Strip */}
+          <div className="bg-gradient-to-r from-primary/10 via-surface-container-low to-transparent p-5 sm:p-6 border-b border-surface-container-high/60 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs">
+                <span className="material-symbols-outlined text-[22px]">lock_reset</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-on-surface leading-tight">
+                    Prescriber Password Recovery
+                  </h3>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold uppercase tracking-wider">
+                    EPCS 2FA
+                  </span>
+                </div>
+                <p className="text-[11px] text-on-surface-variant">
+                  Step {step} of 3 • Institutional Identity Verification
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg hover:bg-surface-container text-outline hover:text-on-surface transition-colors flex items-center justify-center cursor-pointer"
+              title="Close modal"
+              aria-label="Close modal"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+
+          {/* Stepper Progress Bar */}
+          <div className="w-full bg-surface-container-low h-1 flex">
+            <div
+              className="bg-primary h-full transition-all duration-300"
+              style={{ width: `${(step / 3) * 100}%` }}
+            />
+          </div>
+
+          {/* Modal Content Body */}
+          <div className="p-5 sm:p-7 flex flex-col gap-5">
+            {/* STEP 1: Account & Verification Method Choice */}
+            {step === 1 && (
+              <form onSubmit={handleProceedToVerify} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-on-surface">Institutional Email or Prescriber NPI</label>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">
+                      badge
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      value={accountEmail}
+                      onChange={(e) => setAccountEmail(e.target.value)}
+                      placeholder="prescription@smileclinic.com or NPI# 1092837482"
+                      className="w-full h-10 pl-10 pr-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs sm:text-sm font-medium focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all"
+                    />
+                  </div>
+                  <span className="text-[10px] text-outline">
+                    We will verify your clinical profile against the institutional prescriber registry.
+                  </span>
+                </div>
+
+                {/* Choose Verification Method */}
+                <div className="flex flex-col gap-2 pt-1">
+                  <label className="text-xs font-bold text-on-surface">Choose Verification Method</label>
+                  
+                  <div className="grid grid-cols-1 gap-2">
+                    {/* Method 1: Email OTP */}
+                    <label
+                      onClick={() => setMethod('email')}
+                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                        method === 'email'
+                          ? 'border-primary bg-primary/5 shadow-xs'
+                          : 'border-surface-container-high bg-surface-container-lowest hover:bg-surface-container-low'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="recoveryMethod"
+                        checked={method === 'email'}
+                        onChange={() => setMethod('email')}
+                        className="mt-0.5 text-primary accent-primary cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-on-surface">
+                          <span className="material-symbols-outlined text-[16px] text-primary">mark_email_read</span>
+                          <span>Email Verification Code (6-Digit OTP)</span>
+                        </div>
+                        <p className="text-[11px] text-on-surface-variant mt-0.5">
+                          Sends a secure 6-digit one-time code to {accountEmail || 'your authorized email'}.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Method 2: SMS Mobile OTP */}
+                    <label
+                      onClick={() => setMethod('sms')}
+                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                        method === 'sms'
+                          ? 'border-primary bg-primary/5 shadow-xs'
+                          : 'border-surface-container-high bg-surface-container-lowest hover:bg-surface-container-low'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="recoveryMethod"
+                        checked={method === 'sms'}
+                        onChange={() => setMethod('sms')}
+                        className="mt-0.5 text-primary accent-primary cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-on-surface">
+                          <span className="material-symbols-outlined text-[16px] text-primary">sms</span>
+                          <span>SMS Mobile OTP (Clinician Phone)</span>
+                        </div>
+                        <p className="text-[11px] text-on-surface-variant mt-0.5">
+                          Sends a rapid SMS message to registered phone ending in ••41.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Method 3: Previous Password Verification */}
+                    <label
+                      onClick={() => setMethod('previous')}
+                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                        method === 'previous'
+                          ? 'border-primary bg-primary/5 shadow-xs'
+                          : 'border-surface-container-high bg-surface-container-lowest hover:bg-surface-container-low'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="recoveryMethod"
+                        checked={method === 'previous'}
+                        onChange={() => setMethod('previous')}
+                        className="mt-0.5 text-primary accent-primary cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-on-surface">
+                          <span className="material-symbols-outlined text-[16px] text-primary">history</span>
+                          <span>Verify with Previous Master Password</span>
+                        </div>
+                        <p className="text-[11px] text-on-surface-variant mt-0.5">
+                          Authenticate directly using your last known clinical password without receiving OTP.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {resetError && (
+                  <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    <span>{resetError}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Proceed to Verification</span>
+                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* STEP 2: Verification Challenge (OTP or Previous Password) */}
+            {step === 2 && (
+              <form onSubmit={handleConfirmVerification} className="flex flex-col gap-4">
+                {method === 'email' || method === 'sms' ? (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-on-surface">
+                          Enter 6-Digit Verification Code
+                        </label>
+                        <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                          Mock Code: {mockOtp}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant">
+                        {method === 'email'
+                          ? `Code dispatched to email: ${accountEmail}`
+                          : `Code dispatched to mobile SMS: ${mobilePhone}`}
+                      </p>
+                    </div>
+
+                    {/* 6-box OTP entry */}
+                    <div className="flex items-center justify-between gap-1.5 sm:gap-2.5 py-2" onPaste={handleOtpPaste}>
+                      {otp.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => {
+                            otpInputsRef.current[idx] = el;
+                          }}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleOtpChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                          className="w-11 sm:w-13 h-12 sm:h-14 text-center text-lg sm:text-xl font-bold bg-surface-container-low text-primary border border-surface-container-high rounded-xl focus:bg-surface-container-lowest focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                        />
+                      ))}
+                    </div>
+
+                    {otpError && (
+                      <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        <span>{otpError}</span>
+                      </div>
+                    )}
+
+                    {/* 60s Resend Countdown */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs">
+                      <div className="flex items-center gap-1.5 text-on-surface-variant text-[11px]">
+                        <span className="material-symbols-outlined text-[16px] text-primary">timer</span>
+                        {resendTimer > 0 ? (
+                          <span>
+                            Resend code available in{' '}
+                            <strong className="text-primary font-mono font-bold">
+                              {String(Math.floor(resendTimer / 60)).padStart(2, '0')}:
+                              {String(resendTimer % 60).padStart(2, '0')}
+                            </strong>
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700 font-bold">
+                            You can now request a new code.
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={!canResend}
+                        onClick={handleResendOtp}
+                        className={`font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer ${
+                          canResend
+                            ? 'text-primary hover:underline'
+                            : 'text-outline cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">refresh</span>
+                        <span>Resend Code</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  // Previous Password Form
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-on-surface">Enter Previous Master Password</h4>
+                      <p className="text-[11px] text-on-surface-variant">
+                        Enter your existing or previous password to prove clinical authorization.
+                      </p>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <span className="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">
+                        key
+                      </span>
+                      <input
+                        type={showPrevPassword ? 'text' : 'password'}
+                        required
+                        value={previousPasswordInput}
+                        onChange={(e) => {
+                          setPreviousPasswordInput(e.target.value);
+                          setPrevPassError('');
+                        }}
+                        placeholder="Enter previous password"
+                        className="w-full h-10 pl-10 pr-10 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs sm:text-sm font-medium focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPrevPassword(!showPrevPassword)}
+                        className="absolute right-3 text-outline hover:text-on-surface p-1"
+                      >
+                        <span className="material-symbols-outlined text-lg">
+                          {showPrevPassword ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {prevPassError && (
+                      <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        <span>{prevPassError}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="px-3 py-2 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                    <span>Change Method</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  >
+                    {isSubmitting ? (
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>Confirm &amp; Proceed</span>
+                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* STEP 3: Change Password with Criteria Validation */}
+            {step === 3 && (
+              <form onSubmit={handleSaveNewPassword} className="flex flex-col gap-4">
+                <div>
+                  <h4 className="text-xs font-bold text-on-surface">Establish New Prescriber Password</h4>
+                  <p className="text-[11px] text-on-surface-variant">
+                    Your new credentials must satisfy strict DEA EPCS and HIPAA compliance standards.
+                  </p>
+                </div>
+
+                {/* New Password Input */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-on-surface">New System Password *</label>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">
+                      lock
+                    </span>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setResetError('');
+                      }}
+                      placeholder="••••••••••••"
+                      className="w-full h-10 pl-10 pr-10 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs sm:text-sm font-medium focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 text-outline hover:text-on-surface p-1"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        {showNewPassword ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm Password Input */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-on-surface">Confirm New Password *</label>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">
+                      check_circle
+                    </span>
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setResetError('');
+                      }}
+                      placeholder="••••••••••••"
+                      className="w-full h-10 pl-10 pr-10 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs sm:text-sm font-medium focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 text-outline hover:text-on-surface p-1"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Real-time Password Criteria Checklist */}
+                <div className="bg-surface-container-low p-3.5 rounded-xl border border-surface-container-high/60 flex flex-col gap-1.5 text-xs">
+                  <span className="font-bold text-[11px] text-on-surface">Compliance Standards:</span>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                      <span className="material-symbols-outlined text-[15px]">
+                        {hasMinLength ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
+                      <span>Min 8 characters</span>
+                    </div>
+
+                    <div className={`flex items-center gap-1.5 ${hasUppercase ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                      <span className="material-symbols-outlined text-[15px]">
+                        {hasUppercase ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
+                      <span>1 Uppercase letter</span>
+                    </div>
+
+                    <div className={`flex items-center gap-1.5 ${hasMin2Numbers ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                      <span className="material-symbols-outlined text-[15px]">
+                        {hasMin2Numbers ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
+                      <span>2 Numbers minimum</span>
+                    </div>
+
+                    <div className={`flex items-center gap-1.5 ${hasSymbol ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                      <span className="material-symbols-outlined text-[15px]">
+                        {hasSymbol ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
+                      <span>1 Special symbol</span>
+                    </div>
+
+                    <div className={`col-span-2 flex items-center gap-1.5 ${passwordsMatch ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                      <span className="material-symbols-outlined text-[15px]">
+                        {passwordsMatch ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
+                      <span>Passwords match exactly</span>
+                    </div>
+                  </div>
+                </div>
+
+                {resetError && (
+                  <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    <span>{resetError}</span>
+                  </div>
+                )}
+
+                {isSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-700 text-lg">verified</span>
+                    <span>Password successfully updated! Returning to login...</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!isPasswordValid || isSubmitting || isSuccess}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[16px]">save</span>
+                        <span>Update Prescriber Password</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+}

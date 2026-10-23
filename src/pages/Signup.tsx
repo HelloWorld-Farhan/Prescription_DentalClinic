@@ -42,7 +42,7 @@ export default function Signup() {
   const [mockMobileOtp, setMockMobileOtp] = useState('482915');
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [resendCountdown, setResendCountdown] = useState(45);
+  const [resendCountdown, setResendCountdown] = useState(60);
 
   // Dynamic clinic logo
   const savedLogo = localStorage.getItem('dental_clinic_logo');
@@ -151,527 +151,528 @@ export default function Signup() {
       transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden"
     >
-      {/* Ambient Animated Gradient Orbs */}
-      <motion.div
-        animate={{
-          scale: [1, 1.1, 1],
-          opacity: [0.35, 0.5, 0.35],
-          x: [0, 20, 0],
-          y: [0, -15, 0]
-        }}
-        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute -top-24 left-1/3 -translate-x-1/2 w-[600px] h-[400px] bg-primary/10 rounded-full blur-3xl pointer-events-none -z-10"
-      />
-      <motion.div
-        animate={{
-          scale: [1, 1.15, 1],
-          opacity: [0.25, 0.45, 0.25],
-          x: [0, -25, 0],
-          y: [0, 20, 0]
-        }}
-        transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-        className="absolute bottom-10 right-1/4 w-[450px] h-[350px] bg-secondary/15 rounded-full blur-3xl pointer-events-none -z-10"
-      />
-
-      {/* Header Bar */}
-      <div className="w-full">
-        <header className="w-full bg-surface-container-lowest/80 backdrop-blur-xl shadow-xs border-b border-surface-container-high z-30">
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <Link to="/login" className="flex items-center gap-2.5 group">
-              <motion.div
-                whileHover={{ scale: 1.05, rotate: 2 }}
-                className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs overflow-hidden"
-              >
-                {savedLogo ? (
-                  <img src={savedLogo} alt="Clinic Logo" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="material-symbols-outlined text-[24px]">shield_with_heart</span>
-                )}
-              </motion.div>
-              <div className="flex flex-col">
-                <span className="font-bold text-lg text-primary tracking-tight leading-none">Smile Clinic</span>
-                <span className="text-[10px] text-outline font-medium tracking-wider uppercase">RxGuard Safety Engine</span>
-              </div>
-            </Link>
-
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-1.5 text-on-surface-variant text-xs font-medium bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-container-high">
-                <span className="material-symbols-outlined text-[16px] text-primary">badge</span>
-                <span>Clinician Licensing Registry</span>
-              </div>
-              <Link
-                to="/support"
-                className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors text-xs font-semibold"
-              >
-                <span className="material-symbols-outlined text-[16px]">help_outline</span>
-                <span>Help &amp; Support</span>
-              </Link>
-            </div>
-          </div>
-        </header>
-      </div>
-
-      {/* Main Form Viewport */}
-      <main className="w-full flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-4xl mx-auto py-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.99 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl shadow-xl shadow-primary/5 border border-surface-container-high/60 overflow-hidden"
-          >
-            {/* Header Strip */}
-            <div className="bg-gradient-to-r from-primary/10 via-primary-container/5 to-transparent p-6 sm:p-8 border-b border-surface-container-high/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary-container text-on-primary uppercase tracking-wider">
-                  Clinician Registration
-                </span>
-                <h1 className="text-2xl sm:text-3xl font-bold text-on-surface mt-2 tracking-tight">
-                  Enroll as Authorized Prescriber
-                </h1>
-                <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
-                  Connect your clinical license to run real-time drug-drug contraindication checks and attestation overrides.
-                </p>
-              </div>
-              <div className="text-left sm:text-right shrink-0">
-                <div className="text-xs text-outline font-medium">Already have authorized access?</div>
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-primary hover:underline mt-1"
-                >
-                  <span>Sign In to Prescriber Portal</span>
-                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleInitiateSignup} className="p-6 sm:p-8 lg:p-10 space-y-6">
-              {signupError && (
-                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs sm:text-sm text-rose-700 flex items-start gap-2.5 shadow-xs">
-                  <span className="material-symbols-outlined text-rose-600 shrink-0 text-base mt-0.5">error</span>
-                  <span>{signupError}</span>
-                </div>
+      {/* Global Clinical Header */}
+      <header className="h-16 w-full bg-surface-container-lowest/90 backdrop-blur-xl shadow-xs border-b border-surface-container-high z-30">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
+          <Link to="/login" className="flex items-center gap-2.5 group">
+            <motion.div
+              whileHover={{ scale: 1.05, rotate: 2 }}
+              className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs overflow-hidden"
+            >
+              {savedLogo ? (
+                <img src={savedLogo} alt="Clinic Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-[24px]">shield_with_heart</span>
               )}
+            </motion.div>
+            <div className="flex flex-col">
+              <span className="font-bold text-lg text-primary tracking-tight leading-none">Smile Clinic</span>
+              <span className="text-[10px] text-outline font-medium tracking-wider uppercase">RxGuard Safety Engine</span>
+            </div>
+          </Link>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Full Legal Name */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                    Full Legal Name &amp; Degree *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">
-                      person
-                    </span>
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Dr. Sarah Lin, PharmD"
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-outline"
-                    />
-                  </div>
-                </div>
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-1.5 text-on-surface-variant text-xs font-medium bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-container-high">
+              <span className="material-symbols-outlined text-[16px] text-primary">badge</span>
+              <span>Clinician Licensing Registry</span>
+            </div>
+            <Link
+              to="/support"
+              className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors text-xs font-semibold"
+            >
+              <span className="material-symbols-outlined text-[16px]">help_outline</span>
+              <span>Help &amp; Support</span>
+            </Link>
+          </div>
+        </div>
+      </header>
 
-                {/* Role Authorization */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                    Clinical Role Scope *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">
-                      badge
-                    </span>
-                    <select
-                      value={role}
-                      onChange={(e) => setRole(e.target.value as any)}
-                      className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-on-surface appearance-none"
-                    >
-                      <option value="Clinical Pharmacist">Clinical Pharmacist (Full Override &amp; Sign-off)</option>
-                      <option value="Prescribing Clinician">Prescribing Clinician / Doctor (Order &amp; Check)</option>
-                      <option value="Patient Safety Officer">Patient Safety Officer / Reviewer (QA Audit)</option>
-                      <option value="System Administrator">System Administrator (Governance &amp; Tenant)</option>
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-2.5 text-outline text-[18px] pointer-events-none">
-                      expand_more
-                    </span>
-                  </div>
-                </div>
+      {/* Main 2-Column Split Viewport: INVERTED (Left = Video Showcase, Right = Registration Form) */}
+      <main className="flex-1 flex items-center justify-center py-6 sm:py-10 px-4 relative z-10">
+        <div className="w-full max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            
+            {/* LEFT COLUMN: Pharmacology Video Showcase (5 cols on lg) - Swapped from Right! */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="lg:col-span-5 relative rounded-3xl overflow-hidden shadow-2xl border border-surface-container-high min-h-[560px] bg-slate-950 flex flex-col justify-between p-6 sm:p-8 text-white group"
+            >
+              {/* Background Video Loop (Different Video from Login: Laboratory / Microbiology / Molecule) */}
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover opacity-45 scale-105 group-hover:scale-100 transition-transform duration-1000"
+              >
+                <source
+                  src="https://assets.mixkit.co/videos/preview/mixkit-scientist-looking-at-a-sample-under-a-microscope-41614-large.mp4"
+                  type="video/mp4"
+                />
+              </video>
 
-                {/* NPI / License */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                    NPI or Medical / Pharmacy License # *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">
-                      verified
-                    </span>
-                    <input
-                      type="text"
-                      required
-                      value={npiLicense}
-                      onChange={(e) => setNpiLicense(e.target.value)}
-                      placeholder="e.g. NPI# 1092837482 / Lic# PH-98241"
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-outline"
-                    />
-                  </div>
-                </div>
+              {/* High-Tech Gradient Mask */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/40 pointer-events-none" />
 
-                {/* Clinical Department */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                    Hospital Facility / Department *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">
-                      local_hospital
-                    </span>
-                    <input
-                      type="text"
-                      required
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      placeholder="e.g. Central Pharmacy / Oral Surgery Unit 4"
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-outline"
-                    />
-                  </div>
-                </div>
+              {/* Ambient Radial Accent */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
 
-                {/* Official Email */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                    Official Hospital / Clinical Email *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">
-                      mail
-                    </span>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="clinician@smileclinic.com"
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-outline"
-                    />
-                  </div>
-                </div>
-
-                {/* Mobile Phone */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                    Mobile Phone (For 2FA OTP) *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">
-                      smartphone
-                    </span>
-                    <input
-                      type="tel"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+1 (555) 234-5678"
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-outline"
-                    />
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                      Create Password *
-                    </label>
-                  </div>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">
-                      lock
-                    </span>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Minimum 8 characters"
-                      className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-outline"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-2.5 text-outline hover:text-on-surface"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        {showPassword ? 'visibility_off' : 'visibility'}
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Password validation indicators */}
-                  <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
-                    <div className={`flex items-center gap-1 ${isMin8Chars ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[14px]">
-                        {isMin8Chars ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>8+ characters</span>
-                    </div>
-                    <div className={`flex items-center gap-1 ${hasCapital ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[14px]">
-                        {hasCapital ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>1 uppercase</span>
-                    </div>
-                    <div className={`flex items-center gap-1 ${hasMin2Numbers ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[14px]">
-                        {hasMin2Numbers ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>2 numbers</span>
-                    </div>
-                    <div className={`flex items-center gap-1 ${hasSpecial ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[14px]">
-                        {hasSpecial ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>1 special symbol</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Confirm Password */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                    Confirm Password *
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">
-                      lock_reset
-                    </span>
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      required
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Repeat password"
-                      className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-outline"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-2.5 text-outline hover:text-on-surface"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        {showConfirmPassword ? 'visibility_off' : 'visibility'}
-                      </span>
-                    </button>
-                  </div>
-                  {confirmPassword.length > 0 && (
-                    <div className="pt-1 text-[11px]">
-                      {passwordsMatch ? (
-                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                          Passwords match perfectly
-                        </span>
-                      ) : (
-                        <span className="text-rose-600 font-semibold flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">cancel</span>
-                          Passwords do not match
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Legal & Attestation Checkbox */}
-              <div className="pt-2 border-t border-surface-container-high/60">
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={agreedTerms}
-                    onChange={(e) => setAgreedTerms(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 text-primary rounded border-surface-container-highest focus:ring-primary cursor-pointer"
-                  />
-                  <span className="text-xs text-on-surface-variant leading-relaxed">
-                    I attest that I am a licensed healthcare prescriber or clinical staff member authorized to access patient drug therapy records. I agree to the{' '}
-                    <Link to="/terms-of-service" className="text-primary font-bold hover:underline">
-                      Clinical Terms of Service
-                    </Link>
-                    ,{' '}
-                    <Link to="/privacy-policy" className="text-primary font-bold hover:underline">
-                      HIPAA Privacy Policy
-                    </Link>
-                    , and understand that algorithmic CDS flags constitute decision support rather than independent prescribing authority.
+              {/* Top Video Header Overlay */}
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">
+                    Prescriber Credential Stream
                   </span>
-                </label>
+                </div>
+                <span className="text-[11px] font-mono text-cyan-300 font-bold bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/30">
+                  NPI Registry
+                </span>
               </div>
 
-              {/* Submit Button */}
-              <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-xs text-outline flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] text-primary">security</span>
-                  <span>Instant 2FA verification code sent to email &amp; SMS</span>
+              {/* Center Telemetry Card */}
+              <div className="relative z-10 my-auto py-6">
+                <div className="bg-white/10 backdrop-blur-xl p-5 rounded-2xl border border-white/15 shadow-2xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold">
+                        <span className="material-symbols-outlined text-[20px]">badge</span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Prescriber Privileges Gateway</h4>
+                        <span className="text-[10px] text-slate-300">Dual-Factor Notarized Identity</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-bold border border-cyan-500/30">
+                      Tier II Ready
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-black/30 border border-white/5">
+                      <span className="text-slate-300 text-[11px]">NPI National Registry Check</span>
+                      <span className="text-emerald-400 font-bold text-[10px] uppercase">Verified Auto</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-black/30 border border-white/5">
+                      <span className="text-slate-300 text-[11px]">DEA Schedule II-IV EPCS</span>
+                      <span className="text-cyan-300 font-bold text-[10px] uppercase">Compliant</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-black/30 border border-white/5">
+                      <span className="text-slate-300 text-[11px]">Hospital Inpatient Dental Privileges</span>
+                      <span className="text-teal-300 font-bold text-[10px] uppercase">Active Tier</span>
+                    </div>
+                  </div>
                 </div>
-                <motion.button
-                  type="submit"
-                  whileHover={{ scale: 1.02, y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full sm:w-auto px-8 py-3 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-bold text-xs sm:text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>Continue to 2FA Verification</span>
-                  <span className="material-symbols-outlined text-[18px]">lock_clock</span>
-                </motion.button>
               </div>
-            </form>
-          </motion.div>
+
+              {/* Bottom Video Telemetry Strip */}
+              <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Active Prescribers</span>
+                  <span className="text-lg font-black text-white font-mono">942 Enrolled</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Security Matrix</span>
+                  <span className="text-xs font-bold text-cyan-300">256-Bit TLS AES</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* RIGHT COLUMN: Clinician Registration Form (7 cols on lg) - Swapped from Left! */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+              className="lg:col-span-7 flex flex-col justify-between"
+            >
+              <div className="bg-surface-container-lowest rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-6 sm:p-9 flex flex-col gap-6">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-container text-on-primary uppercase tracking-wider">
+                      Prescriber Registration
+                    </span>
+                    <h1 className="text-xl sm:text-2xl font-bold text-on-surface mt-2 tracking-tight">
+                      Enroll as Prescriber / Pharmacist
+                    </h1>
+                    <p className="text-xs sm:text-sm text-on-surface-variant mt-1 leading-snug">
+                      Provision authorized access to real-time drug interaction and renal clearance screening.
+                    </p>
+                  </div>
+                  <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary shadow-xs">
+                    <span className="material-symbols-outlined text-[24px]">person_add</span>
+                  </div>
+                </div>
+
+                {signupError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2">
+                    <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
+                    <span>{signupError}</span>
+                  </div>
+                )}
+
+                {/* Form */}
+                <form onSubmit={handleInitiateSignup} className="space-y-4">
+                  {/* Row 1: Full Name & Role */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-on-surface mb-1">
+                        Full Legal Name &amp; Title *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Dr. Arthur Vance, MD"
+                        className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-on-surface mb-1">
+                        Clinical Role / Credential *
+                      </label>
+                      <select
+                        value={role}
+                        onChange={(e) => setRole(e.target.value as any)}
+                        className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all cursor-pointer font-medium"
+                      >
+                        <option value="Clinical Pharmacist">Clinical Pharmacist (PharmD)</option>
+                        <option value="Prescribing Clinician">Prescribing Clinician (MD / DDS)</option>
+                        <option value="Patient Safety Officer">Patient Safety Officer</option>
+                        <option value="System Administrator">System Administrator (CDS Admin)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Department & NPI */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-on-surface mb-1">
+                        Clinical Department / Unit *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={department}
+                        onChange={(e) => setDepartment(e.target.value)}
+                        placeholder="Inpatient Dental Surgery"
+                        className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-on-surface mb-1">
+                        NPI / State License # *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={npiLicense}
+                        onChange={(e) => setNpiLicense(e.target.value)}
+                        placeholder="NPI# 1928304918"
+                        className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Institutional Email & Phone */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-on-surface mb-1">
+                        Institutional Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="clinician@smileclinic.com"
+                        className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-on-surface mb-1">
+                        Mobile Phone (for 2FA OTP) *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="(555) 234-5678"
+                        className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 4: Password & Confirm Password */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-on-surface mb-1">
+                        Create System Password *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full pl-3.5 pr-10 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface p-0.5 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {showPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-on-surface mb-1">
+                        Confirm Password *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full pl-3.5 pr-10 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface p-0.5 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Password Safety Criteria Indicators */}
+                  <div className="bg-surface-container-low p-3.5 rounded-2xl border border-surface-container-high/60 space-y-1.5 text-xs">
+                    <span className="font-bold text-[11px] text-on-surface">Password Standards (EPCS):</span>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className={`flex items-center gap-1.5 ${isMin8Chars ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                        <span className="material-symbols-outlined text-[15px]">
+                          {isMin8Chars ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                        <span>8+ Characters</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${hasCapital ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                        <span className="material-symbols-outlined text-[15px]">
+                          {hasCapital ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                        <span>1 Uppercase Letter</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${hasMin2Numbers ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                        <span className="material-symbols-outlined text-[15px]">
+                          {hasMin2Numbers ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                        <span>2 Numbers</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${hasSpecial ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
+                        <span className="material-symbols-outlined text-[15px]">
+                          {hasSpecial ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                        <span>1 Special Symbol</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* HIPAA & EPCS Attestation */}
+                  <label className="flex items-start gap-3 p-3 bg-surface-container-low rounded-xl border border-surface-container-high/60 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={agreedTerms}
+                      onChange={(e) => setAgreedTerms(e.target.checked)}
+                      className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
+                    />
+                    <span className="text-xs text-on-surface-variant group-hover:text-on-surface transition-colors leading-relaxed">
+                      I certify that all licensing and institutional clinical credentials provided are authentic and active under 45 CFR §164 and State Pharmacy Board regulations.
+                    </span>
+                  </label>
+
+                  {/* Submit Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.015 }}
+                    whileTap={{ scale: 0.985 }}
+                    type="submit"
+                    className="w-full bg-primary hover:bg-primary-hover text-white py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                  >
+                    <span>Proceed to Dual OTP Verification</span>
+                    <span className="material-symbols-outlined text-[18px]">verified</span>
+                  </motion.button>
+
+                  <div className="text-center pt-2 text-xs text-outline">
+                    Already an authorized prescriber?{' '}
+                    <Link to="/login" className="font-bold text-primary hover:underline">
+                      Sign In &rarr;
+                    </Link>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </main>
 
-      {/* DUAL OTP MODAL */}
-      <AnimatePresence>
-        {showOtpModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 16 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 320 }}
-              className="w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="p-6 bg-surface-container-low border-b border-surface-container-high flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shadow-xs">
-                    <span className="material-symbols-outlined text-[22px]">phonelink_lock</span>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-on-surface">Dual-Channel 2FA Verification</h3>
-                    <p className="text-xs text-outline">Confirming identity for {email}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowOtpModal(false)}
-                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <form onSubmit={handleVerifyOtp} className="p-6 space-y-5">
-                {otpError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-rose-600 text-[18px]">error</span>
-                    <span>{otpError}</span>
-                  </div>
-                )}
-
-                {/* Email OTP Input */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px] text-primary">mail</span>
-                      Email Security Code
-                    </span>
-                    <span className="text-outline">Sent to {email}</span>
-                  </div>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={emailOtp}
-                    onChange={(e) => setEmailOtp(e.target.value)}
-                    placeholder="Enter 6-digit email code"
-                    className="w-full px-4 py-2.5 text-center text-lg font-mono tracking-widest rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface"
-                  />
-                  <div className="text-[11px] text-outline flex justify-between items-center px-1">
-                    <span>Demo Mock Code: <strong className="text-primary font-mono">{mockEmailOtp}</strong></span>
-                  </div>
-                </div>
-
-                {/* Mobile SMS OTP Input */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px] text-primary">smartphone</span>
-                      SMS Security Code
-                    </span>
-                    <span className="text-outline">Sent to {phone}</span>
-                  </div>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={mobileOtp}
-                    onChange={(e) => setMobileOtp(e.target.value)}
-                    placeholder="Enter 6-digit SMS code"
-                    className="w-full px-4 py-2.5 text-center text-lg font-mono tracking-widest rounded-xl border border-surface-container-high bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface"
-                  />
-                  <div className="text-[11px] text-outline flex justify-between items-center px-1">
-                    <span>Demo Mock Code: <strong className="text-primary font-mono">{mockMobileOtp}</strong></span>
-                  </div>
-                </div>
-
-                {/* Quick Auto-Fill Helper */}
-                <div className="p-3 bg-primary/5 rounded-xl border border-primary/20 flex items-center justify-between">
-                  <div className="text-xs text-on-surface">
-                    <span className="font-semibold text-primary">Instant Demo Verification:</span> Click to auto-fill both test OTP codes.
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAutoFillOtp}
-                    className="px-3 py-1.5 rounded-lg bg-primary-container text-on-primary text-xs font-bold hover:bg-primary transition-colors cursor-pointer shrink-0"
-                  >
-                    Auto-Fill Codes
-                  </button>
-                </div>
-
-                {/* Actions */}
-                <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowOtpModal(false)}
-                    className="w-full sm:w-1/3 py-2.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <motion.button
-                    type="submit"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    disabled={isVerifying}
-                    className="w-full sm:w-2/3 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isVerifying ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        <span>Verifying &amp; Authorizing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                        <span>Verify &amp; Create Account</span>
-                      </>
-                    )}
-                  </motion.button>
-                </div>
-              </form>
-            </motion.div>
+      {/* Standard Legal Footer */}
+      <footer className="w-full bg-surface-container-low py-4 border-t border-surface-container-high shadow-xs z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-on-surface-variant text-xs text-center sm:text-left">
+          <div className="flex items-center justify-center sm:justify-start gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-tertiary">shield_with_heart</span>
+            <span>© 2026 Smile Clinic Healthcare Technologies. RxGuard CDS Regulatory System.</span>
           </div>
-        )}
-      </AnimatePresence>
-
-      {/* Footer */}
-      <footer className="w-full bg-surface-container-lowest border-t border-surface-container-high py-4">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between text-outline text-xs gap-2">
-          <div>© 2026 Smile Clinic Healthcare Technologies. RxGuard CDS Regulatory System.</div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6 text-[11px] font-medium">
             <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
             <Link to="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
             <Link to="/patient-rights" className="hover:text-primary transition-colors">Patient Rights</Link>
           </div>
         </div>
       </footer>
+
+      {/* Dual OTP Verification Modal */}
+      <AnimatePresence>
+        {showOtpModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowOtpModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-6 sm:p-8 z-10 space-y-6"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs">
+                    <span className="material-symbols-outlined text-[24px]">phonelink_lock</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-on-surface">Dual-Factor Verification</h3>
+                    <p className="text-xs text-on-surface-variant">Verify ownership of both email and clinical mobile phone</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowOtpModal(false)}
+                  className="text-outline hover:text-on-surface p-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              {otpError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2">
+                  <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
+                  <span>{otpError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                {/* Email OTP */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-on-surface">Email Security Code</label>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                      Mock Code: {mockEmailOtp}
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={emailOtp}
+                    onChange={(e) => setEmailOtp(e.target.value)}
+                    placeholder="Enter 6-digit code"
+                    className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-center text-sm font-mono tracking-widest font-bold text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                {/* Mobile SMS OTP */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-on-surface">SMS Mobile OTP</label>
+                    <span className="text-[10px] text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full font-bold">
+                      Mock Code: {mockMobileOtp}
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={mobileOtp}
+                    onChange={(e) => setMobileOtp(e.target.value)}
+                    placeholder="Enter 6-digit code"
+                    className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-center text-sm font-mono tracking-widest font-bold text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAutoFillOtp}
+                    className="text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">bolt</span>
+                    <span>1-Click Test Code Auto-Fill</span>
+                  </button>
+
+                  <span className="text-outline text-[11px]">
+                    Expires in {resendCountdown}s
+                  </span>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowOtpModal(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isVerifying}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  >
+                    {isVerifying ? (
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[16px]">check</span>
+                        <span>Verify &amp; Activate Account</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
