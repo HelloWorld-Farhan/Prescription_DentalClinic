@@ -18,17 +18,7 @@ export default function RulesAdmin() {
   const [inspectGateway, setInspectGateway] = useState<{ id: string; name: string; endpoint: string; latency: string; uptime: string; hash: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [tests, setTests] = useState([
-    { id: 'TEST-01', name: 'Warfarin + Fluconazole CYP2C9 Potentiation', status: 'PASS', time: '12ms' },
-    { id: 'TEST-02', name: 'Lisinopril + Spironolactone Hyperkalemia', status: 'PASS', time: '9ms' },
-    { id: 'TEST-03', name: 'Penicillin Anaphylaxis vs Amoxicillin', status: 'PASS', time: '14ms' },
-    { id: 'TEST-04', name: 'Ciprofloxacin eGFR < 50mL Renal Threshold', status: 'PASS', time: '11ms' },
-    { id: 'TEST-05', name: 'Atorvastatin + Clarithromycin Rhabdo Warning', status: 'PASS', time: '16ms' },
-    { id: 'TEST-06', name: 'Levothyroxine + Calcium Chelation Window', status: 'PASS', time: '8ms' },
-    { id: 'TEST-07', name: 'Duplicate Opioid / Sedative Co-prescribing', status: 'PASS', time: '10ms' },
-    { id: 'TEST-08', name: 'Methotrexate + NSAID Clearance Suppression', status: 'PASS', time: '15ms' },
-    { id: 'TEST-09', name: 'Pregnancy Category D / X Teratogenicity Guard', status: 'PASS', time: '13ms' },
-  ]);
+  const [tests, setTests] = useState<{ id: string; name: string; status: string; time: string }[]>([]);
 
   const handleToggle = (id: string) => {
     const updated = VirtualDb.toggleRule(id);
@@ -42,13 +32,17 @@ export default function RulesAdmin() {
     setRegressionRunning(true);
     setToastMessage('Executing deterministic golden test suite battery...');
     setTimeout(() => {
-      setTests((prev) =>
-        prev.map((t) => ({
-          ...t,
-          status: 'PASS',
-          time: `${Math.floor(Math.random() * 8 + 7)}ms`
-        }))
-      );
+      setTests([
+        { id: 'TEST-01', name: 'Warfarin + Fluconazole CYP2C9 Potentiation', status: 'PASS', time: '12ms' },
+        { id: 'TEST-02', name: 'Lisinopril + Spironolactone Hyperkalemia', status: 'PASS', time: '9ms' },
+        { id: 'TEST-03', name: 'Penicillin Anaphylaxis vs Amoxicillin', status: 'PASS', time: '14ms' },
+        { id: 'TEST-04', name: 'Ciprofloxacin eGFR < 50mL Renal Threshold', status: 'PASS', time: '11ms' },
+        { id: 'TEST-05', name: 'Atorvastatin + Clarithromycin Rhabdo Warning', status: 'PASS', time: '16ms' },
+        { id: 'TEST-06', name: 'Levothyroxine + Calcium Chelation Window', status: 'PASS', time: '8ms' },
+        { id: 'TEST-07', name: 'Duplicate Opioid / Sedative Co-prescribing', status: 'PASS', time: '10ms' },
+        { id: 'TEST-08', name: 'Methotrexate + NSAID Clearance Suppression', status: 'PASS', time: '15ms' },
+        { id: 'TEST-09', name: 'Pregnancy Category D / X Teratogenicity Guard', status: 'PASS', time: '13ms' },
+      ]);
       setRegressionRunning(false);
       setToastMessage('All 9/9 Golden Invariant Assertions Passed (0 regression defects)');
       setTimeout(() => setToastMessage(null), 4000);
@@ -287,7 +281,32 @@ export default function RulesAdmin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container text-on-surface">
-                  {filteredRules.map((rule) => {
+                  {filteredRules.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-14 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
+                          <span className="material-symbols-outlined text-4xl text-outline">policy</span>
+                          <span className="font-bold text-sm text-on-surface">0 Clinical Decision Rules Installed</span>
+                          <p className="text-xs text-on-surface-variant leading-relaxed">
+                            {rules.length === 0
+                              ? "The environment starts clean with 0 rules. Click 'Sync Clinical Knowledge' to pull authorized pharmacopeia monographs or author new clinical logic."
+                              : "No rules match the current category or status filter."}
+                          </p>
+                          {rules.length === 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setIsSyncModalOpen(true)}
+                              className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary-container text-on-primary text-xs font-bold shadow-xs cursor-pointer hover:bg-primary"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">sync</span>
+                              <span>Sync Knowledge Base</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRules.map((rule) => {
                     const isContra = rule.severity === 'contraindicated';
                     return (
                       <tr key={rule.id} className="hover:bg-surface-container-low/50 transition-colors">
@@ -368,7 +387,8 @@ export default function RulesAdmin() {
                         </td>
                       </tr>
                     );
-                  })}
+                  })
+                )}
                 </tbody>
               </table>
             </div>
@@ -612,38 +632,50 @@ export default function RulesAdmin() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {tests.map((tc) => (
-              <div key={tc.id} className="p-4 rounded-xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold text-primary">{tc.id}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    {regressionRunning ? 'TESTING...' : tc.status}
-                  </span>
-                </div>
-                <h4 className="text-xs font-bold text-on-surface line-clamp-2">{tc.name}</h4>
-                <div className="flex items-center justify-between pt-2 border-t border-surface-container text-[11px] text-outline">
-                  <span>Deterministic Invariant</span>
-                  <div className="flex items-center gap-1.5 font-mono">
-                    <span>{tc.time}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTests(prev => prev.map(t => t.id === tc.id ? { ...t, status: 'PASS', time: `${Math.floor(Math.random() * 6 + 6)}ms` } : t));
-                        setToastMessage(`Test assertion ${tc.id} re-verified: PASS`);
-                        setTimeout(() => setToastMessage(null), 3000);
-                      }}
-                      className="hover:text-primary transition-colors cursor-pointer"
-                      title="Re-run Assertion"
-                    >
-                      <span className="material-symbols-outlined text-[13px]">refresh</span>
-                    </button>
+          {tests.length === 0 ? (
+            <div className="p-12 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex flex-col items-center justify-center text-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-surface-container text-primary flex items-center justify-center shadow-xs">
+                <span className="material-symbols-outlined text-3xl">science</span>
+              </div>
+              <h4 className="text-sm font-bold text-on-surface">Regression Suite Ready to Execute</h4>
+              <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
+                Click &ldquo;Run All Test Assertions&rdquo; above to execute deterministic golden tests across renal thresholds, drug-drug contraindications, and allergy cross-reactivity.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {tests.map((tc) => (
+                <div key={tc.id} className="p-4 rounded-xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-primary">{tc.id}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      {regressionRunning ? 'TESTING...' : tc.status}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-bold text-on-surface line-clamp-2">{tc.name}</h4>
+                  <div className="flex items-center justify-between pt-2 border-t border-surface-container text-[11px] text-outline">
+                    <span>Deterministic Invariant</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span>{tc.time}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTests(prev => prev.map(t => t.id === tc.id ? { ...t, status: 'PASS', time: `${Math.floor(Math.random() * 6 + 6)}ms` } : t));
+                          setToastMessage(`Test assertion ${tc.id} re-verified: PASS`);
+                          setTimeout(() => setToastMessage(null), 3000);
+                        }}
+                        className="hover:text-primary transition-colors cursor-pointer"
+                        title="Re-run Assertion"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">refresh</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

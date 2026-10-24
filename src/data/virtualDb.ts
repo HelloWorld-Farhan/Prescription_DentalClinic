@@ -1,85 +1,28 @@
 import { Patient, SafetyCheckRecord, AuditLogEntry, InteractionRule, DrugInteractionAlert, PrescriptionItem } from '../types';
 
-// Clean initial state: zero dummy patients, checks, or audit logs
+// Clean production baseline: default 0 patients, rules, checks, and audit logs
 export const INITIAL_PATIENTS: Patient[] = [];
-
-// Core Pharmacopeia & Dental Clinical Safety Rules (Active knowledge engine)
-export const INITIAL_RULES: InteractionRule[] = [
-  {
-    id: 'rule-1',
-    drugA: 'Warfarin',
-    drugB: 'Ibuprofen',
-    severity: 'contraindicated',
-    category: 'Drug-Drug',
-    description: 'Concurrent use markedly elevates hemorrhage and gastrointestinal bleeding risk through dual antiplatelet and anticoagulant synergy.',
-    active: true
-  },
-  {
-    id: 'rule-2',
-    drugA: 'Penicillin',
-    drugB: 'Amoxicillin',
-    severity: 'contraindicated',
-    category: 'Drug-Allergy',
-    description: 'Direct beta-lactam cross-reactivity triggering severe IgE-mediated type I anaphylaxis in penicillin-allergic patients.',
-    active: true
-  },
-  {
-    id: 'rule-3',
-    drugA: 'Sertraline',
-    drugB: 'Tramadol',
-    severity: 'major',
-    category: 'Drug-Drug',
-    description: 'Serotonergic synergy: tramadol inhibits serotonin reuptake and can precipitate potentially fatal Serotonin Syndrome.',
-    active: true
-  },
-  {
-    id: 'rule-4',
-    drugA: 'Metronidazole',
-    drugB: 'Alcohol / Elixirs',
-    severity: 'major',
-    category: 'Drug-Drug',
-    description: 'Disulfiram-like reaction causing severe nausea, tachycardia, flushing, and acute hypotension.',
-    active: true
-  },
-  {
-    id: 'rule-5',
-    drugA: 'Clarithromycin',
-    drugB: 'Statins (Atorvastatin)',
-    severity: 'major',
-    category: 'Drug-Drug',
-    description: 'Potent CYP3A4 inhibition elevates systemic statin exposure, dramatically increasing risk of rhabdomyolysis.',
-    active: true
-  },
-  {
-    id: 'rule-6',
-    drugA: 'Pregnancy',
-    drugB: 'Ibuprofen',
-    severity: 'contraindicated',
-    category: 'Drug-Condition',
-    description: 'NSAIDs in 2nd/3rd trimester risk premature closure of the fetal ductus arteriosus and renal dysfunction/oligohydramnios.',
-    active: true
-  },
-  {
-    id: 'rule-7',
-    drugA: 'Chronic Kidney Disease',
-    drugB: 'Ketorolac',
-    severity: 'contraindicated',
-    category: 'Renal Dose Adjustment',
-    description: 'Renal prostaglandin synthesis inhibition precipitating acute on chronic tubular necrosis in low eGFR patients.',
-    active: true
-  }
-];
-
+export const INITIAL_RULES: InteractionRule[] = [];
 export const INITIAL_CHECKS: SafetyCheckRecord[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
 
-// LocalStorage Keys (v2 for clean initial state)
+// LocalStorage Keys (v4 for completely clean zero-data state)
 const STORAGE_KEYS = {
-  PATIENTS: 'rxguard_patients_v2',
-  CHECKS: 'rxguard_checks_v2',
-  RULES: 'rxguard_rules_v2',
-  AUDIT: 'rxguard_audit_v2'
+  PATIENTS: 'rxguard_patients_v4',
+  CHECKS: 'rxguard_checks_v4',
+  RULES: 'rxguard_rules_v4',
+  AUDIT: 'rxguard_audit_v4'
 };
+
+// Purge any legacy cached mock data keys from earlier sessions
+try {
+  ['rxguard_rules', 'rxguard_rules_v2', 'rxguard_rules_v3',
+   'rxguard_checks', 'rxguard_checks_v2', 'rxguard_checks_v3',
+   'rxguard_patients', 'rxguard_patients_v2', 'rxguard_patients_v3',
+   'rxguard_audit', 'rxguard_audit_v2', 'rxguard_audit_v3'].forEach(k => localStorage.removeItem(k));
+} catch {
+  // Ignore in environments without window/localStorage
+}
 
 export class VirtualDb {
   static getPatients(): Patient[] {

@@ -40,28 +40,12 @@ interface ActiveSessionItem {
 
 const initialSessions: ActiveSessionItem[] = [
   {
-    id: 'SES-9812',
-    name: 'Workstation 4B – Pharmacy Dispense',
+    id: 'SES-01',
+    name: 'Current Clinical Workstation',
     isCurrent: true,
-    details: 'Chrome 122 on macOS Sonoma • IP: 10.240.12.84',
-    badge: 'Active Now • Hospital Intranet Fiber (VLAN 14)',
+    details: 'Active Web Session • Verified TLS Encrypted',
+    badge: 'Active Now',
     icon: 'desktop_windows'
-  },
-  {
-    id: 'SES-8821',
-    name: 'Clinic Tablet Cart #12 – Inpatient Ward 3',
-    isCurrent: false,
-    details: 'Safari on iPadOS 17.2 • IP: 10.240.18.201',
-    badge: 'Last active 22 mins ago • Ward 3 Wi-Fi Mesh',
-    icon: 'tablet_mac'
-  },
-  {
-    id: 'SES-7734',
-    name: 'Consultation Room 2 Terminal',
-    isCurrent: false,
-    details: 'Firefox 120 on Windows 11 • IP: 10.240.15.110',
-    badge: 'Last active 3 hours ago • Outpatient Wing',
-    icon: 'terminal'
   }
 ];
 
@@ -75,89 +59,7 @@ interface LoginHistoryItem {
   status: 'Success' | '2FA Verified' | 'Revoked' | 'Blocked';
 }
 
-const initialLoginHistory: LoginHistoryItem[] = [
-  {
-    id: 'LOG-1092',
-    timestamp: 'Today, 14:22:18',
-    device: 'Workstation 4B (Pharmacy Dispense)',
-    browserOs: 'Chrome 122 / macOS Sonoma',
-    ip: '10.240.12.84',
-    location: 'Inpatient Pharmacy Bay 4',
-    status: '2FA Verified'
-  },
-  {
-    id: 'LOG-1088',
-    timestamp: 'Today, 11:05:40',
-    device: 'Tablet Cart #12',
-    browserOs: 'Safari 17.2 / iPadOS',
-    ip: '10.240.18.201',
-    location: 'Ward 3 Dental Surgery',
-    status: 'Success'
-  },
-  {
-    id: 'LOG-1081',
-    timestamp: 'Yesterday, 19:40:12',
-    device: 'Consultation Room 2 Terminal',
-    browserOs: 'Firefox 120 / Windows 11',
-    ip: '10.240.15.110',
-    location: 'Outpatient Clinic Wing',
-    status: 'Success'
-  },
-  {
-    id: 'LOG-1075',
-    timestamp: 'Oct 22, 08:15:33',
-    device: 'Workstation 4B (Pharmacy Dispense)',
-    browserOs: 'Chrome 122 / macOS Sonoma',
-    ip: '10.240.12.84',
-    location: 'Inpatient Pharmacy Bay 4',
-    status: '2FA Verified'
-  },
-  {
-    id: 'LOG-1064',
-    timestamp: 'Oct 21, 22:30:00',
-    device: 'Remote Telehealth Laptop',
-    browserOs: 'Safari 17.1 / macOS Ventura',
-    ip: '198.51.100.42',
-    location: 'Smile Clinic Global VPN',
-    status: 'Revoked'
-  },
-  {
-    id: 'LOG-1052',
-    timestamp: 'Oct 21, 14:10:05',
-    device: 'Emergency Triage Tablet #4',
-    browserOs: 'Mobile Safari / iOS 17',
-    ip: '10.240.22.15',
-    location: 'Emergency Dental ICU',
-    status: 'Success'
-  },
-  {
-    id: 'LOG-1049',
-    timestamp: 'Oct 20, 09:00:21',
-    device: 'Workstation 4B (Pharmacy Dispense)',
-    browserOs: 'Chrome 121 / macOS Sonoma',
-    ip: '10.240.12.84',
-    location: 'Inpatient Pharmacy Bay 4',
-    status: '2FA Verified'
-  },
-  {
-    id: 'LOG-1033',
-    timestamp: 'Oct 19, 18:45:11',
-    device: 'Unrecognized Node (External)',
-    browserOs: 'Edge 119 / Linux x86_64',
-    ip: '203.0.113.88',
-    location: 'Unknown Public IP',
-    status: 'Blocked'
-  },
-  {
-    id: 'LOG-1021',
-    timestamp: 'Oct 18, 07:55:00',
-    device: 'Workstation 4B (Pharmacy Dispense)',
-    browserOs: 'Chrome 121 / macOS Sonoma',
-    ip: '10.240.12.84',
-    location: 'Inpatient Pharmacy Bay 4',
-    status: '2FA Verified'
-  }
-];
+const initialLoginHistory: LoginHistoryItem[] = [];
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile');

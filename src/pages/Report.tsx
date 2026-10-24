@@ -109,6 +109,39 @@ export default function Report() {
     URL.revokeObjectURL(url);
   };
 
+  if (!currentCheck) {
+    return (
+      <div className="flex flex-col w-full bg-background min-h-screen">
+        <header className="sticky top-0 z-30 w-full bg-surface-container-lowest px-4 sm:px-6 py-3 shadow-sm border-b border-surface-container-high/60 flex items-center justify-between">
+          <Link to="/dashboard" className="flex items-center gap-2 text-xs font-bold text-primary hover:underline">
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            <span>Back to Clinical Dashboard</span>
+          </Link>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-surface-container-lowest rounded-2xl border border-surface-container-high/60 p-8 shadow-xs text-center flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-surface-container text-primary flex items-center justify-center shadow-xs">
+              <span className="material-symbols-outlined text-3xl">description</span>
+            </div>
+            <h2 className="text-base font-bold text-on-surface">No Clinical Safety Report Selected</h2>
+            <p className="text-xs text-on-surface-variant leading-relaxed">
+              There are no active screening reports evaluated yet. Initiate a clinical drug screening check to generate an authenticated verification report.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/check')}
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary-hover transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              <span>Start New Safety Check</span>
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
