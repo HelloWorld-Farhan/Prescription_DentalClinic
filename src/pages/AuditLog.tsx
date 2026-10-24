@@ -124,7 +124,22 @@ export default function AuditLog() {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container-low">
-              {filteredLogs.map((log) => {
+              {filteredLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2.5 max-w-sm mx-auto">
+                      <div className="w-12 h-12 rounded-2xl bg-surface-container-low text-primary flex items-center justify-center shadow-2xs">
+                        <span className="material-symbols-outlined text-[26px]">verified</span>
+                      </div>
+                      <h3 className="font-bold text-sm text-on-surface">No Audit Trail Records</h3>
+                      <p className="text-xs text-on-surface-variant leading-relaxed">
+                        No notarized clinician actions, overrides, or CDS screenings found for this filter. All future actions will be permanently logged here.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredLogs.map((log) => {
                 const isContra = log.severity === 'contraindicated';
                 const isMajor = log.severity === 'major';
                 const isSafe = log.severity === 'safe';
@@ -177,7 +192,7 @@ export default function AuditLog() {
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

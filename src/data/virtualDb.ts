@@ -1,78 +1,9 @@
 import { Patient, SafetyCheckRecord, AuditLogEntry, InteractionRule, DrugInteractionAlert, PrescriptionItem } from '../types';
 
-export const INITIAL_PATIENTS: Patient[] = [
-  {
-    id: 'pt-1',
-    mrn: 'MRN-849201',
-    name: 'Eleanor Vance',
-    age: 68,
-    gender: 'Female',
-    weightKg: 64.5,
-    egfr: 42, // Moderate Renal Impairment
-    pregnancyStatus: 'No',
-    conditions: ['Atrial Fibrillation', 'Chronic Kidney Disease Stage 3', 'Hypertension'],
-    allergies: ['Penicillin (Anaphylaxis)', 'Sulfa drugs (Hives)'],
-    activeMedications: ['Warfarin 5mg QD', 'Lisinopril 10mg QD', 'Metoprolol 50mg BID'],
-    roomOrUnit: 'Dental Surgery Bay 2'
-  },
-  {
-    id: 'pt-2',
-    mrn: 'MRN-720194',
-    name: 'Marcus Chen',
-    age: 45,
-    gender: 'Male',
-    weightKg: 82.0,
-    egfr: 94,
-    pregnancyStatus: 'No',
-    conditions: ['Depression', 'Gastroesophageal Reflux (GERD)'],
-    allergies: ['Codeine (Nausea/Vomiting)'],
-    activeMedications: ['Sertraline 100mg QD', 'Omeprazole 20mg QD'],
-    roomOrUnit: 'Operatory 01'
-  },
-  {
-    id: 'pt-3',
-    mrn: 'MRN-551029',
-    name: 'Sophia Rodriguez',
-    age: 29,
-    gender: 'Female',
-    weightKg: 58.0,
-    egfr: 110,
-    pregnancyStatus: 'Second Trimester',
-    conditions: ['Pregnancy (22 weeks)', 'Gestational Gingivitis'],
-    allergies: ['No Known Drug Allergies (NKDA)'],
-    activeMedications: ['Prenatal Multivitamin', 'Ferrous Sulfate 325mg'],
-    roomOrUnit: 'Dental Clinic Suite 4'
-  },
-  {
-    id: 'pt-4',
-    mrn: 'MRN-339811',
-    name: 'Arthur Pendelton',
-    age: 74,
-    gender: 'Male',
-    weightKg: 78.5,
-    egfr: 52,
-    conditions: ['Type 2 Diabetes', 'Coronary Artery Disease', 'Osteoporosis'],
-    pregnancyStatus: 'No',
-    allergies: ['Aspirin (Bronchospasm)'],
-    activeMedications: ['Clopidogrel 75mg QD', 'Metformin 1000mg BID', 'Alendronate 70mg Weekly'],
-    roomOrUnit: 'Periodontal Bay 1'
-  },
-  {
-    id: 'pt-5',
-    mrn: 'MRN-902414',
-    name: 'Maya Lin',
-    age: 38,
-    gender: 'Female',
-    weightKg: 62.0,
-    egfr: 105,
-    conditions: ['Mild Asthma'],
-    pregnancyStatus: 'No',
-    allergies: ['Ibuprofen (Facial Swelling)'],
-    activeMedications: ['Albuterol inhaler PRN'],
-    roomOrUnit: 'Hygiene Room 3'
-  }
-];
+// Clean initial state: zero dummy patients, checks, or audit logs
+export const INITIAL_PATIENTS: Patient[] = [];
 
+// Core Pharmacopeia & Dental Clinical Safety Rules (Active knowledge engine)
 export const INITIAL_RULES: InteractionRule[] = [
   {
     id: 'rule-1',
@@ -139,183 +70,15 @@ export const INITIAL_RULES: InteractionRule[] = [
   }
 ];
 
-export const INITIAL_CHECKS: SafetyCheckRecord[] = [
-  {
-    id: 'chk-1092',
-    checkNumber: 'RXG-2026-1092',
-    timestamp: '10 mins ago',
-    patientId: 'pt-1',
-    patientName: 'Eleanor Vance',
-    mrn: 'MRN-849201',
-    unit: 'Dental Surgery Bay 2',
-    prescriptions: [
-      {
-        id: 'rx-1',
-        drugName: 'Ibuprofen 600mg',
-        genericName: 'Ibuprofen',
-        dosage: '600mg',
-        frequency: 'Every 6 hours PRN',
-        route: 'Oral',
-        duration: '5 days',
-        indication: 'Post-Surgical Dental Pain'
-      },
-      {
-        id: 'rx-2',
-        drugName: 'Amoxicillin 500mg',
-        genericName: 'Amoxicillin',
-        dosage: '500mg',
-        frequency: 'Every 8 hours',
-        route: 'Oral',
-        duration: '7 days',
-        indication: 'Prophylactic Odontogenic Infection'
-      }
-    ],
-    alerts: [
-      {
-        id: 'alt-1',
-        title: 'Drug-Allergy Anaphylaxis Risk: Amoxicillin with Documented Penicillin Allergy',
-        severity: 'contraindicated',
-        interactingDrugs: ['Amoxicillin', 'Penicillin Allergy'],
-        mechanism: 'Beta-lactam core cross-sensitivity triggers acute IgE-mediated mast cell degranulation and bronchospasm.',
-        clinicalImpact: 'Life-threatening anaphylactic shock.',
-        evidenceGrade: 'Class I (Definitive)',
-        recommendation: 'Discontinue Amoxicillin immediately. Prescribe Clindamycin 300mg Q8H or Azithromycin 500mg as safe non-beta-lactam alternatives.',
-        alternatives: ['Clindamycin 300mg Oral', 'Azithromycin 500mg Oral', 'Cephalexin (caution if severe)'],
-        timestamp: '10 mins ago'
-      },
-      {
-        id: 'alt-2',
-        title: 'Major Hemorrhage Interaction: Ibuprofen + Warfarin',
-        severity: 'contraindicated',
-        interactingDrugs: ['Ibuprofen 600mg', 'Warfarin 5mg'],
-        mechanism: 'NSAIDs displace warfarin from albumin and inhibit platelet aggregation via COX-1, while damaging gastric mucosa.',
-        clinicalImpact: 'Catastrophic post-operative bleeding, oral hematoma, and gastrointestinal ulceration.',
-        evidenceGrade: 'Class I (Definitive)',
-        recommendation: 'Switch analgesic to Acetaminophen (Paracetamol) 500mg-1000mg maximum 3g/day, or consider local ice and mild opioid if refractory.',
-        alternatives: ['Acetaminophen 500mg Q6H', 'Tramadol low-dose (non-NSAID)', 'Cold Compress protocol'],
-        timestamp: '10 mins ago'
-      }
-    ],
-    overallStatus: 'Contraindicated',
-    prescriberName: 'Dr. Sarah Lin, PharmD',
-    prescriberNpi: 'NPI-9834210',
-    fhirSynced: true
-  },
-  {
-    id: 'chk-1091',
-    checkNumber: 'RXG-2026-1091',
-    timestamp: '42 mins ago',
-    patientId: 'pt-2',
-    patientName: 'Marcus Chen',
-    mrn: 'MRN-720194',
-    unit: 'Operatory 01',
-    prescriptions: [
-      {
-        id: 'rx-3',
-        drugName: 'Tramadol 50mg',
-        genericName: 'Tramadol HCl',
-        dosage: '50mg',
-        frequency: 'Every 6-8 hours PRN',
-        route: 'Oral',
-        duration: '3 days',
-        indication: 'Impaction Surgery Severe Pain'
-      }
-    ],
-    alerts: [
-      {
-        id: 'alt-3',
-        title: 'Serotonin Syndrome Potential: Tramadol with Active Sertraline',
-        severity: 'major',
-        interactingDrugs: ['Tramadol 50mg', 'Sertraline 100mg'],
-        mechanism: 'Tramadol inhibits neuronal serotonin reuptake while stimulating serotonin release, synergizing with SSRI reuptake inhibition.',
-        clinicalImpact: 'Risk of tremor, hyperreflexia, agitation, autonomic instability, and hyperthermia.',
-        evidenceGrade: 'Class II (Probable)',
-        recommendation: 'Monitor for mental status changes or substitute with Acetaminophen/Codeine or scheduled Ibuprofen 600mg.',
-        alternatives: ['Acetaminophen 650mg + Ibuprofen 400mg', 'Oxycodone low-dose without serotonergic activity'],
-        overridden: true,
-        overrideReason: 'Patient tolerated tramadol previously. Advised on early signs of tremor or diaphoresis. Limited 3-day supply only.',
-        overrideAuthor: 'Dr. Sarah Lin, PharmD',
-        timestamp: '35 mins ago'
-      }
-    ],
-    overallStatus: 'Overridden',
-    prescriberName: 'Dr. Sarah Lin, PharmD',
-    prescriberNpi: 'NPI-9834210',
-    fhirSynced: true
-  },
-  {
-    id: 'chk-1090',
-    checkNumber: 'RXG-2026-1090',
-    timestamp: '2 hours ago',
-    patientId: 'pt-4',
-    patientName: 'Arthur Pendelton',
-    mrn: 'MRN-339811',
-    unit: 'Periodontal Bay 1',
-    prescriptions: [
-      {
-        id: 'rx-4',
-        drugName: 'Chlorhexidine 0.12% Oral Rinse',
-        genericName: 'Chlorhexidine Gluconate',
-        dosage: '15mL',
-        frequency: 'Twice daily after brushing',
-        route: 'Topical Oral',
-        duration: '14 days',
-        indication: 'Periodontal Pocket Disinfection'
-      }
-    ],
-    alerts: [],
-    overallStatus: 'Safe to Dispense',
-    prescriberName: 'Dr. Priya Patel, DDS',
-    prescriberNpi: 'NPI-4491028',
-    fhirSynced: true
-  }
-];
+export const INITIAL_CHECKS: SafetyCheckRecord[] = [];
+export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
 
-export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
-  {
-    id: 'aud-1',
-    timestamp: 'Today at 05:22 PM',
-    clinicianName: 'Dr. Sarah Lin, PharmD',
-    action: 'Safety Screen Initiated',
-    patientMrn: 'MRN-849201',
-    details: 'Screened Amoxicillin 500mg and Ibuprofen 600mg for Eleanor Vance. 2 Contraindicated alerts triggered.',
-    severity: 'contraindicated'
-  },
-  {
-    id: 'aud-2',
-    timestamp: 'Today at 04:55 PM',
-    clinicianName: 'Dr. Sarah Lin, PharmD',
-    action: 'Alert Overridden',
-    patientMrn: 'MRN-720194',
-    details: 'Overrode Major alert (Tramadol + Sertraline). Reason: "Patient tolerated previously. 3-day short course with close observation."',
-    severity: 'major'
-  },
-  {
-    id: 'aud-3',
-    timestamp: 'Today at 03:40 PM',
-    clinicianName: 'Dr. Priya Patel, DDS',
-    action: 'Report Printed',
-    patientMrn: 'MRN-339811',
-    details: 'Generated and signed PDF Clinical Interaction Review Report #RXG-2026-1090 for Arthur Pendelton.',
-    severity: 'safe'
-  },
-  {
-    id: 'aud-4',
-    timestamp: 'Today at 01:15 PM',
-    clinicianName: 'System Clinical Gateway',
-    action: 'FHIR Synced',
-    patientMrn: 'All Records',
-    details: 'SMART on FHIR v4.0.1 batch sync reconciled with St. Jude Health System EMR.',
-    severity: 'safe'
-  }
-];
-
-// LocalStorage Keys
+// LocalStorage Keys (v2 for clean initial state)
 const STORAGE_KEYS = {
-  PATIENTS: 'rxguard_patients_v1',
-  CHECKS: 'rxguard_checks_v1',
-  RULES: 'rxguard_rules_v1',
-  AUDIT: 'rxguard_audit_v1'
+  PATIENTS: 'rxguard_patients_v2',
+  CHECKS: 'rxguard_checks_v2',
+  RULES: 'rxguard_rules_v2',
+  AUDIT: 'rxguard_audit_v2'
 };
 
 export class VirtualDb {
@@ -330,6 +93,17 @@ export class VirtualDb {
 
   static getPatientById(id: string): Patient | undefined {
     return this.getPatients().find(p => p.id === id || p.mrn.toLowerCase() === id.toLowerCase());
+  }
+
+  static addPatient(patient: Patient) {
+    const patients = this.getPatients();
+    const existingIndex = patients.findIndex(p => p.id === patient.id || p.mrn.toLowerCase() === patient.mrn.toLowerCase());
+    if (existingIndex >= 0) {
+      patients[existingIndex] = patient;
+    } else {
+      patients.unshift(patient);
+    }
+    localStorage.setItem(STORAGE_KEYS.PATIENTS, JSON.stringify(patients));
   }
 
   static getChecks(): SafetyCheckRecord[] {
@@ -433,6 +207,13 @@ export class VirtualDb {
     const logs = this.getAuditLogs();
     logs.unshift(entry);
     localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(logs));
+  }
+
+  static resetDatabase() {
+    localStorage.removeItem(STORAGE_KEYS.PATIENTS);
+    localStorage.removeItem(STORAGE_KEYS.CHECKS);
+    localStorage.removeItem(STORAGE_KEYS.AUDIT);
+    localStorage.removeItem(STORAGE_KEYS.RULES);
   }
 
   // Clinical Rule Engine Screen Evaluator

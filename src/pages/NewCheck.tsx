@@ -26,8 +26,8 @@ export default function NewCheck() {
   const [inputMethod, setInputMethod] = useState<InputMethod>('upload');
 
   // File Upload State
-  const [uploadedFileName, setUploadedFileName] = useState<string>('dental_surgery_rx_order_vance.pdf');
-  const [uploadedFileSize, setUploadedFileSize] = useState<string>('1.8 MB');
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [uploadedFileSize, setUploadedFileSize] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -36,28 +36,33 @@ export default function NewCheck() {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  // Patient Context Selection
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(() => patients[0]?.id || 'pt-1');
-  const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || patients[0] || INITIAL_PATIENTS[0];
-  const [ptKey, setPtKey] = useState<string>('MRN-HASH-9042-XF');
-  const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? 64.5);
-  const [customEgfr, setCustomEgfr] = useState<number>(() => selectedPatient?.egfr ?? 42);
-  const [activeMeds, setActiveMeds] = useState<string[]>(() => selectedPatient?.activeMedications ?? ['Warfarin 5mg QD']);
-  const [allergies, setAllergies] = useState<string[]>(() => selectedPatient?.allergies ?? ['Penicillin (Anaphylaxis)']);
+  // Clean Default Patient Reference
+  const defaultPatient: Patient = {
+    id: 'pt-screening-01',
+    name: 'New Screening Candidate',
+    mrn: 'NEW-001',
+    age: 40,
+    gender: 'Female',
+    weightKg: 65,
+    egfr: 90,
+    pregnancyStatus: 'No',
+    allergies: [],
+    activeMedications: [],
+    conditions: [],
+    roomOrUnit: 'Dental Operatory'
+  };
 
-  // Prescriptions List
-  const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([
-    {
-      id: 'rx-p1',
-      drugName: 'Ciprofloxacin 500mg',
-      genericName: 'Ciprofloxacin Hydrochloride',
-      dosage: '500mg Film-Coated Tablet',
-      frequency: 'Every 12 hours (BID)',
-      route: 'Oral (PO)',
-      duration: '7 days',
-      indication: 'Severe Odontogenic / Maxillary Infection'
-    }
-  ]);
+  // Patient Context Selection
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(() => patients[0]?.id || 'pt-screening-01');
+  const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || patients[0] || defaultPatient;
+  const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn ? `PT-${selectedPatient.mrn}` : 'PT-NEW-01');
+  const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? 65);
+  const [customEgfr, setCustomEgfr] = useState<number>(() => selectedPatient?.egfr ?? 90);
+  const [activeMeds, setActiveMeds] = useState<string[]>(() => selectedPatient?.activeMedications ?? []);
+  const [allergies, setAllergies] = useState<string[]>(() => selectedPatient?.allergies ?? []);
+
+  // Prescriptions List (Clean empty initial phase)
+  const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([]);
 
   // Manual Medicine Input Fields
   const [manualDrugName, setManualDrugName] = useState('');
@@ -124,10 +129,18 @@ export default function NewCheck() {
     setPrescriptions(prescriptions.filter(p => p.id !== id));
   };
 
-  // Quick preset loader helper
+  // Quick preset loader helper for clinical verification
   const handleLoadPresetRx = (preset: 'cipro_warfarin' | 'amox_penicillin' | 'clean_clinda') => {
     if (preset === 'cipro_warfarin') {
-      handlePatientSelect(patients[0].id); // Eleanor Vance (Warfarin, Fluconazole, eGFR 42)
+      if (patients && patients.length > 0) {
+        handlePatientSelect(patients[0].id);
+      } else {
+        setPtKey('PT-DEMO-9042');
+        setCustomWeight(68);
+        setCustomEgfr(42);
+        setActiveMeds(['Warfarin 5mg QD', 'Fluconazole 100mg']);
+        setAllergies([]);
+      }
       setPrescriptions([
         {
           id: 'rx-p1',
@@ -143,7 +156,15 @@ export default function NewCheck() {
       setUploadedFileName('dental_surgery_rx_slip_cipro.pdf');
       setUploadedFileSize('1.8 MB');
     } else if (preset === 'amox_penicillin') {
-      handlePatientSelect(patients[0].id); // Has Penicillin Anaphylaxis allergy
+      if (patients && patients.length > 0) {
+        handlePatientSelect(patients[0].id);
+      } else {
+        setPtKey('PT-DEMO-3811');
+        setCustomWeight(72);
+        setCustomEgfr(85);
+        setActiveMeds(['Lisinopril 10mg']);
+        setAllergies(['Penicillin (Anaphylaxis)']);
+      }
       setPrescriptions([
         {
           id: 'rx-p2',
@@ -160,7 +181,17 @@ export default function NewCheck() {
       setUploadedFileSize('2.4 MB');
     } else {
       // Clean Dental Antibiotic
-      handlePatientSelect(patients[1]?.id || patients[0].id);
+      if (patients && patients.length > 1) {
+        handlePatientSelect(patients[1].id);
+      } else if (patients && patients.length > 0) {
+        handlePatientSelect(patients[0].id);
+      } else {
+        setPtKey('PT-DEMO-1104');
+        setCustomWeight(60);
+        setCustomEgfr(95);
+        setActiveMeds(['Multivitamins']);
+        setAllergies(['Penicillin (Anaphylaxis)']);
+      }
       setPrescriptions([
         {
           id: 'rx-p3',
@@ -477,16 +508,20 @@ export default function NewCheck() {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-bold text-on-surface">{ptKey}</span>
             <span className="text-outline">•</span>
-            <span className="text-on-surface-variant">{selectedPatient.name} ({selectedPatient.age}y {selectedPatient.gender})</span>
+            <span className="text-on-surface-variant">
+              {selectedPatient?.name || 'Screening Candidate'} {selectedPatient?.age ? `(${selectedPatient.age}y ${selectedPatient.gender})` : ''}
+            </span>
             <span className="text-outline">•</span>
             <span className="inline-flex items-center gap-1 text-on-surface">
               <span className={`w-2 h-2 rounded-full ${customEgfr < 50 ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
               eGFR: <strong className={customEgfr < 50 ? 'text-rose-600' : 'text-slate-900'}>{customEgfr} mL/min</strong>
             </span>
             <span className="text-outline">•</span>
-            <span className="inline-flex items-center gap-1 font-bold text-rose-600">
-              <span className="material-symbols-outlined text-[14px]">emergency</span>
-              Allergy: {allergies[0] || 'Penicillin'}
+            <span className={`inline-flex items-center gap-1 font-bold ${allergies.length > 0 ? 'text-rose-600' : 'text-on-surface-variant'}`}>
+              <span className="material-symbols-outlined text-[14px]">
+                {allergies.length > 0 ? 'emergency' : 'verified'}
+              </span>
+              Allergy: {allergies[0] || 'None documented'}
             </span>
           </div>
         </div>

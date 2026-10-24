@@ -15,41 +15,7 @@ interface NotificationItem {
   textClass: string;
 }
 
-const initialNotifications: NotificationItem[] = [
-  {
-    id: '1',
-    title: 'Contraindicated Interaction Blocked',
-    desc: 'Eleanor Vance (MRN-849201): Amoxicillin blocked due to documented Penicillin anaphylaxis.',
-    time: '12m ago',
-    category: 'Safety Alert',
-    icon: 'dangerous',
-    unread: true,
-    bgClass: 'bg-rose-500/10',
-    textClass: 'text-rose-600'
-  },
-  {
-    id: '2',
-    title: 'Clinician Override Documented',
-    desc: 'Dr. Sarah Lin documented clinical rationale for Tramadol + Sertraline for Marcus Chen.',
-    time: '45m ago',
-    category: 'Audit',
-    icon: 'gavel',
-    unread: true,
-    bgClass: 'bg-amber-500/10',
-    textClass: 'text-amber-600'
-  },
-  {
-    id: '3',
-    title: 'SMART on FHIR v4.0.1 Synced',
-    desc: 'Smile Clinic Health System EMR reconciled 1,284 active prescription orders.',
-    time: '2h ago',
-    category: 'System',
-    icon: 'sync',
-    unread: false,
-    bgClass: 'bg-teal-500/10',
-    textClass: 'text-teal-600'
-  }
-];
+const initialNotifications: NotificationItem[] = [];
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -320,18 +286,26 @@ export default function Layout() {
                       </div>
 
                       <div className="divide-y divide-surface-container-low max-h-80 overflow-y-auto">
-                        {notifications.map((n) => (
-                          <div key={n.id} className="p-3.5 hover:bg-surface-container-low transition-colors flex items-start gap-3">
-                            <div className={`p-2 rounded-xl shrink-0 ${n.bgClass} ${n.textClass}`}>
-                              <span className="material-symbols-outlined text-[18px]">{n.icon}</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h5 className="font-bold text-xs text-on-surface">{n.title}</h5>
-                              <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">{n.desc}</p>
-                              <span className="text-[10px] text-outline mt-1 block">{n.time}</span>
-                            </div>
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center text-xs text-on-surface-variant flex flex-col items-center justify-center gap-2">
+                            <span className="material-symbols-outlined text-[28px] text-outline">notifications_paused</span>
+                            <span className="font-medium">No pending clinical notifications</span>
+                            <span className="text-[11px] text-outline">All screening events are up to date</span>
                           </div>
-                        ))}
+                        ) : (
+                          notifications.map((n) => (
+                            <div key={n.id} className="p-3.5 hover:bg-surface-container-low transition-colors flex items-start gap-3">
+                              <div className={`p-2 rounded-xl shrink-0 ${n.bgClass} ${n.textClass}`}>
+                                <span className="material-symbols-outlined text-[18px]">{n.icon}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-bold text-xs text-on-surface">{n.title}</h5>
+                                <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">{n.desc}</p>
+                                <span className="text-[10px] text-outline mt-1 block">{n.time}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </motion.div>
                   </>
@@ -449,9 +423,9 @@ export default function Layout() {
           <ErrorBoundary fallbackTitle="Unable to load this clinical safety view">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
               className="w-full"
             >
               <Outlet />

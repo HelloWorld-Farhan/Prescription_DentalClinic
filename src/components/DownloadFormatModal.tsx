@@ -69,12 +69,12 @@ export default function DownloadFormatModal({
   };
 
   const executeFileExport = (format: ExportFormat) => {
-    const checkNumber = check.checkNumber || 'CHK-2026-9042';
-    const patientName = check.patientName || 'Eleanor Vance';
-    const patientKey = check.patientKey || check.mrn || 'MRN-HASH-9042-XF';
-    const candidateDrugs = check.prescriptions
+    const checkNumber = check.checkNumber || 'CHK-2026-0001';
+    const patientName = check.patientName || 'Anonymous Patient';
+    const patientKey = check.patientKey || check.mrn || 'N/A';
+    const candidateDrugs = check.prescriptions && check.prescriptions.length > 0
       ? check.prescriptions.map((p) => `${p.drugName} (${p.dosage || 'Standard'}, ${p.frequency || 'BID'})`).join('; ')
-      : check.prescribedDrugs?.join(', ') || 'Ciprofloxacin 500mg';
+      : check.prescribedDrugs?.join(', ') || 'No Prescriptions Specified';
 
     if (format === 'pdf') {
       if (onPrintFallback) {
