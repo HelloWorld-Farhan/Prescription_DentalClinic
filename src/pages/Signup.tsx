@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
+import OtpVerificationInput from '../components/OtpVerificationInput';
 
 export interface RegisteredPrescriber {
   fullName: string;
@@ -34,18 +35,31 @@ export default function Signup() {
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
 
-  // Dual OTP Modal State
+  // Dual OTP Modal State (6-box OTP with circle-to-tick morph animation)
   const [showOtpModal, setShowOtpModal] = useState(false);
-  const [emailOtp, setEmailOtp] = useState('');
-  const [mobileOtp, setMobileOtp] = useState('');
+  const [otpStage, setOtpStage] = useState<'email' | 'mobile'>('email');
+  const [emailOtp, setEmailOtp] = useState<string[]>(Array(6).fill(''));
+  const [mobileOtp, setMobileOtp] = useState<string[]>(Array(6).fill(''));
   const [mockEmailOtp, setMockEmailOtp] = useState('749210');
   const [mockMobileOtp, setMockMobileOtp] = useState('482915');
+  const [otpStatus, setOtpStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(60);
 
   // Dynamic clinic logo
   const savedLogo = localStorage.getItem('dental_clinic_logo');
+
+  // Resend Countdown Timer
+  useEffect(() => {
+    let timer: any;
+    if (showOtpModal && resendCountdown > 0) {
+      timer = setInterval(() => {
+        setResendCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [showOtpModal, resendCountdown]);
 
   // Password criteria check
   const isMin8Chars = password.length >= 8;
@@ -86,62 +100,100 @@ export default function Signup() {
     const newMobileCode = Math.floor(100000 + Math.random() * 900000).toString();
     setMockEmailOtp(newEmailCode);
     setMockMobileOtp(newMobileCode);
-    setEmailOtp('');
-    setMobileOtp('');
+    setEmailOtp(Array(6).fill(''));
+    setMobileOtp(Array(6).fill(''));
+    setOtpStage('email');
+    setOtpStatus('idle');
     setOtpError(null);
     setShowOtpModal(true);
     setResendCountdown(60);
   };
 
   const handleAutoFillOtp = () => {
-    setEmailOtp(mockEmailOtp);
-    setMobileOtp(mockMobileOtp);
+    if (otpStage === 'email') {
+      setEmailOtp(mockEmailOtp.split(''));
+    } else {
+      setMobileOtp(mockMobileOtp.split(''));
+    }
     setOtpError(null);
+    setOtpStatus('idle');
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerifyOtp = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setOtpError(null);
 
-    if (emailOtp.trim() !== mockEmailOtp) {
-      setOtpError('Invalid Email OTP code. Check your code or click Auto-fill.');
-      return;
+    if (otpStage === 'email') {
+      const entered = emailOtp.join('');
+      if (entered.length < 6) {
+        setOtpError('Please enter all 6 digits of the Email security code.');
+        setOtpStatus('error');
+        setTimeout(() => setOtpStatus('idle'), 1500);
+        return;
+      }
+      if (entered !== mockEmailOtp) {
+        setOtpError('Invalid Email security code. Please check code or auto-fill test code.');
+        setOtpStatus('error');
+        setTimeout(() => setOtpStatus('idle'), 1500);
+        return;
+      }
+
+      // Morph 6 boxes into green tick on success
+      setOtpStatus('success');
+      setIsVerifying(true);
+      setTimeout(() => {
+        setIsVerifying(false);
+        setOtpStage('mobile');
+        setOtpStatus('idle');
+      }, 1200);
+    } else {
+      // Mobile stage
+      const entered = mobileOtp.join('');
+      if (entered.length < 6) {
+        setOtpError('Please enter all 6 digits of the Mobile SMS code.');
+        setOtpStatus('error');
+        setTimeout(() => setOtpStatus('idle'), 1500);
+        return;
+      }
+      if (entered !== mockMobileOtp) {
+        setOtpError('Invalid Mobile SMS code. Please check code or auto-fill test code.');
+        setOtpStatus('error');
+        setTimeout(() => setOtpStatus('idle'), 1500);
+        return;
+      }
+
+      // Final Morph into Green Tick
+      setOtpStatus('success');
+      setIsVerifying(true);
+
+      setTimeout(() => {
+        // Save new prescriber to localStorage
+        const existingPrescribers: RegisteredPrescriber[] = JSON.parse(
+          localStorage.getItem('smileclinic_registered_prescribers') || '[]'
+        );
+
+        // Check if email already registered
+        const filtered = existingPrescribers.filter(p => p.email.toLowerCase() !== email.trim().toLowerCase());
+        const newPrescriber: RegisteredPrescriber = {
+          fullName: fullName.trim(),
+          role,
+          npiLicense: npiLicense.trim(),
+          department: department.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+          password,
+          registeredAt: new Date().toISOString()
+        };
+
+        filtered.push(newPrescriber);
+        localStorage.setItem('smileclinic_registered_prescribers', JSON.stringify(filtered));
+
+        // Set flash notification in sessionStorage
+        sessionStorage.setItem('smileclinic_prescriber_registered_flash', `Registration successful! You may now sign in as ${newPrescriber.fullName}.`);
+
+        navigate('/login');
+      }, 1200);
     }
-
-    if (mobileOtp.trim() !== mockMobileOtp) {
-      setOtpError('Invalid Mobile OTP code. Check your code or click Auto-fill.');
-      return;
-    }
-
-    setIsVerifying(true);
-
-    setTimeout(() => {
-      // Save new prescriber to localStorage
-      const existingPrescribers: RegisteredPrescriber[] = JSON.parse(
-        localStorage.getItem('smileclinic_registered_prescribers') || '[]'
-      );
-
-      // Check if email already registered
-      const filtered = existingPrescribers.filter(p => p.email.toLowerCase() !== email.trim().toLowerCase());
-      const newPrescriber: RegisteredPrescriber = {
-        fullName: fullName.trim(),
-        role,
-        npiLicense: npiLicense.trim(),
-        department: department.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim(),
-        password,
-        registeredAt: new Date().toISOString()
-      };
-
-      filtered.push(newPrescriber);
-      localStorage.setItem('smileclinic_registered_prescribers', JSON.stringify(filtered));
-
-      // Also set flash notification in sessionStorage
-      sessionStorage.setItem('smileclinic_prescriber_registered_flash', `Registration successful! You may now sign in as ${newPrescriber.fullName}.`);
-
-      navigate('/login');
-    }, 700);
   };
 
   return (
@@ -192,20 +244,20 @@ export default function Signup() {
         <div className="w-full max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
             
-            {/* LEFT COLUMN: Pharmacology Video Showcase (5 cols on lg) - Swapped from Right! */}
+            {/* LEFT COLUMN: Modern Clinical Credential Stream & Privileges Gateway (5 cols on lg) */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="lg:col-span-5 relative rounded-3xl overflow-hidden shadow-2xl border border-surface-container-high min-h-[560px] bg-slate-950 flex flex-col justify-between p-6 sm:p-8 text-white group"
+              className="lg:col-span-5 relative rounded-3xl overflow-hidden shadow-2xl border border-white/10 min-h-[580px] bg-gradient-to-br from-[#02131b] via-[#05212d] to-[#010c12] flex flex-col justify-between p-6 sm:p-8 text-white group"
             >
-              {/* Background Video Loop (Different Video from Login: Laboratory / Microbiology / Molecule) */}
+              {/* Refined Background Video with Glassmorphic Blend */}
               <video
                 autoPlay
                 loop
                 muted
                 playsInline
-                className="absolute inset-0 w-full h-full object-cover opacity-45 scale-105 group-hover:scale-100 transition-transform duration-1000"
+                className="absolute inset-0 w-full h-full object-cover opacity-25 mix-blend-screen scale-105 group-hover:scale-100 transition-transform duration-1000 pointer-events-none"
               >
                 <source
                   src="https://assets.mixkit.co/videos/preview/mixkit-scientist-looking-at-a-sample-under-a-microscope-41614-large.mp4"
@@ -213,70 +265,96 @@ export default function Signup() {
                 />
               </video>
 
-              {/* High-Tech Gradient Mask */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/40 pointer-events-none" />
-
-              {/* Ambient Radial Accent */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
+              {/* Ambient Glowing Radial Beams */}
+              <div className="absolute -top-12 -right-12 w-72 h-72 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
+              <div className="absolute -bottom-12 -left-12 w-72 h-72 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
 
               {/* Top Video Header Overlay */}
               <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                   <span className="text-xs font-bold text-white tracking-wide uppercase">
                     Prescriber Credential Stream
                   </span>
                 </div>
-                <span className="text-[11px] font-mono text-cyan-300 font-bold bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/30">
-                  NPI Registry
+                <span className="text-[11px] font-mono text-cyan-300 font-bold bg-cyan-950/80 px-2.5 py-1 rounded-lg border border-cyan-500/40 shadow-xs">
+                  NPI Registry v4.1
                 </span>
               </div>
 
               {/* Center Telemetry Card */}
               <div className="relative z-10 my-auto py-6">
-                <div className="bg-white/10 backdrop-blur-xl p-5 rounded-2xl border border-white/15 shadow-2xl space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold">
-                        <span className="material-symbols-outlined text-[20px]">badge</span>
+                <div className="bg-white/[0.07] backdrop-blur-2xl p-6 rounded-2xl border border-white/15 shadow-2xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/25 to-emerald-500/25 border border-cyan-400/30 text-cyan-300 flex items-center justify-center shadow-xs">
+                        <span className="material-symbols-outlined text-[22px]">badge</span>
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold text-white">Prescriber Privileges Gateway</h4>
-                        <span className="text-[10px] text-slate-300">Dual-Factor Notarized Identity</span>
+                        <h4 className="text-sm font-bold text-white tracking-tight">Prescriber Privileges Gateway</h4>
+                        <span className="text-[11px] text-slate-300">Dual-Factor Notarized Identity</span>
                       </div>
                     </div>
-                    <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-bold border border-cyan-500/30">
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full font-bold border border-emerald-500/30">
                       Tier II Ready
                     </span>
                   </div>
 
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-black/30 border border-white/5">
-                      <span className="text-slate-300 text-[11px]">NPI National Registry Check</span>
-                      <span className="text-emerald-400 font-bold text-[10px] uppercase">Verified Auto</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-black/30 border border-white/5">
-                      <span className="text-slate-300 text-[11px]">DEA Schedule II-IV EPCS</span>
-                      <span className="text-cyan-300 font-bold text-[10px] uppercase">Compliant</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-black/30 border border-white/5">
-                      <span className="text-slate-300 text-[11px]">Hospital Inpatient Dental Privileges</span>
-                      <span className="text-teal-300 font-bold text-[10px] uppercase">Active Tier</span>
-                    </div>
+                  <div className="space-y-2.5 text-xs">
+                    <motion.div
+                      whileHover={{ y: -2, scale: 1.01 }}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        <span className="text-slate-200 text-xs font-medium">HHS NPI National Registry</span>
+                      </div>
+                      <span className="text-emerald-400 font-bold text-[10px] uppercase bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                        Verified Live
+                      </span>
+                    </motion.div>
+
+                    <motion.div
+                      whileHover={{ y: -2, scale: 1.01 }}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                        <span className="text-slate-200 text-xs font-medium">DEA Schedule II-IV EPCS</span>
+                      </div>
+                      <span className="text-cyan-300 font-bold text-[10px] uppercase bg-cyan-950/70 border border-cyan-500/30 px-2 py-0.5 rounded-md">
+                        2FA Biometric Ready
+                      </span>
+                    </motion.div>
+
+                    <motion.div
+                      whileHover={{ y: -2, scale: 1.01 }}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-teal-400" />
+                        <span className="text-slate-200 text-xs font-medium">Hospital Inpatient Dental Privileges</span>
+                      </div>
+                      <span className="text-teal-300 font-bold text-[10px] uppercase bg-teal-950/70 border border-teal-500/30 px-2 py-0.5 rounded-md">
+                        Active Tier I
+                      </span>
+                    </motion.div>
                   </div>
                 </div>
               </div>
 
-              {/* Bottom Video Telemetry Strip */}
+              {/* Bottom Telemetry Strip */}
               <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
                 <div>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Active Prescribers</span>
-                  <span className="text-lg font-black text-white font-mono">942 Enrolled</span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Security Architecture</span>
+                  <span className="text-xs font-bold text-emerald-300 font-mono flex items-center gap-1.5 mt-0.5">
+                    <span className="material-symbols-outlined text-[14px]">lock</span>
+                    <span>256-Bit TLS AES · Zero-Knowledge</span>
+                  </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Security Matrix</span>
-                  <span className="text-xs font-bold text-cyan-300">256-Bit TLS AES</span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Regulatory Standard</span>
+                  <span className="text-xs font-bold text-cyan-300">21 CFR §1311 EPCS</span>
                 </div>
               </div>
             </motion.div>
@@ -584,6 +662,45 @@ export default function Signup() {
                 </button>
               </div>
 
+              {/* STEP PROGRESS TABS */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-surface-container-low rounded-xl border border-surface-container-high/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (otpStatus !== 'verifying' && otpStatus !== 'success') {
+                      setOtpStage('email');
+                      setOtpError(null);
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    otpStage === 'email'
+                      ? 'bg-surface-container-lowest text-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">mail</span>
+                  <span>1. Email Code</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (otpStatus !== 'verifying' && otpStatus !== 'success') {
+                      setOtpStage('mobile');
+                      setOtpError(null);
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    otpStage === 'mobile'
+                      ? 'bg-surface-container-lowest text-primary shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">sms</span>
+                  <span>2. Mobile SMS OTP</span>
+                </button>
+              </div>
+
               {otpError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2">
                   <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
@@ -592,55 +709,82 @@ export default function Signup() {
               )}
 
               <form onSubmit={handleVerifyOtp} className="space-y-4">
-                {/* Email OTP */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-on-surface">Email Security Code</label>
-                    <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                      Mock Code: {mockEmailOtp}
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={emailOtp}
-                    onChange={(e) => setEmailOtp(e.target.value)}
-                    placeholder="Enter 6-digit code"
-                    className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-center text-sm font-mono tracking-widest font-bold text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
-                  />
-                </div>
+                {otpStage === 'email' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <label className="text-xs font-bold text-on-surface">
+                          Email Security Verification Code
+                        </label>
+                        <span className="text-[11px] text-on-surface-variant">
+                          Dispatched to: <strong className="text-on-surface font-mono">{email}</strong>
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-bold">
+                        Mock Code: {mockEmailOtp}
+                      </span>
+                    </div>
 
-                {/* Mobile SMS OTP */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-on-surface">SMS Mobile OTP</label>
-                    <span className="text-[10px] text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full font-bold">
-                      Mock Code: {mockMobileOtp}
-                    </span>
+                    {/* 6-box OTP Component with Circle Morph & Green Tick */}
+                    <div className="py-2">
+                      <OtpVerificationInput
+                        value={emailOtp}
+                        onChange={(val) => {
+                          setEmailOtp(val);
+                          if (otpError) setOtpError(null);
+                          if (otpStatus === 'error') setOtpStatus('idle');
+                        }}
+                        status={otpStatus}
+                        errorMessage={otpError || undefined}
+                        disabled={isVerifying || otpStatus === 'success'}
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={mobileOtp}
-                    onChange={(e) => setMobileOtp(e.target.value)}
-                    placeholder="Enter 6-digit code"
-                    className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-center text-sm font-mono tracking-widest font-bold text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
-                  />
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <label className="text-xs font-bold text-on-surface">
+                          SMS Mobile Authentication OTP
+                        </label>
+                        <span className="text-[11px] text-on-surface-variant">
+                          Dispatched to: <strong className="text-on-surface font-mono">{phone}</strong>
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-cyan-700 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-full font-bold">
+                        Mock Code: {mockMobileOtp}
+                      </span>
+                    </div>
 
-                <div className="flex items-center justify-between text-xs pt-1">
+                    {/* 6-box OTP Component with Circle Morph & Green Tick */}
+                    <div className="py-2">
+                      <OtpVerificationInput
+                        value={mobileOtp}
+                        onChange={(val) => {
+                          setMobileOtp(val);
+                          if (otpError) setOtpError(null);
+                          if (otpStatus === 'error') setOtpStatus('idle');
+                        }}
+                        status={otpStatus}
+                        errorMessage={otpError || undefined}
+                        disabled={isVerifying || otpStatus === 'success'}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Auto-Fill and Timer */}
+                <div className="flex items-center justify-between text-xs pt-1 p-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60">
                   <button
                     type="button"
                     onClick={handleAutoFillOtp}
                     className="text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">bolt</span>
+                    <span className="material-symbols-outlined text-[16px]">bolt</span>
                     <span>1-Click Test Code Auto-Fill</span>
                   </button>
 
-                  <span className="text-outline text-[11px]">
+                  <span className="text-outline text-[11px] font-mono">
                     Expires in {resendCountdown}s
                   </span>
                 </div>
@@ -655,15 +799,21 @@ export default function Signup() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isVerifying}
+                    disabled={isVerifying || otpStatus === 'success'}
                     className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
                   >
                     {isVerifying ? (
                       <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <>
-                        <span className="material-symbols-outlined text-[16px]">check</span>
-                        <span>Verify &amp; Activate Account</span>
+                        <span className="material-symbols-outlined text-[16px]">
+                          {otpStage === 'email' ? 'arrow_forward' : 'verified_user'}
+                        </span>
+                        <span>
+                          {otpStage === 'email'
+                            ? 'Verify Email & Proceed to SMS'
+                            : 'Confirm SMS & Activate Account'}
+                        </span>
                       </>
                     )}
                   </button>

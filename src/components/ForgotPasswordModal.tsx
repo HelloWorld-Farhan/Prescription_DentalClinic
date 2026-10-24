@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OFFICIAL_PRESCRIBER_CREDENTIALS } from '../pages/Login';
+import OtpVerificationInput from './OtpVerificationInput';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -23,11 +24,11 @@ export default function ForgotPasswordModal({
   // OTP state
   const [otp, setOtp] = useState(['4', '8', '2', '9', '1', '0']);
   const [mockOtp, setMockOtp] = useState('482910');
+  const [otpStatus, setOtpStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
   const [otpError, setOtpError] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [resendCount, setResendCount] = useState(0);
-  const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   // Previous password verification state
   const [previousPasswordInput, setPreviousPasswordInput] = useState('');
@@ -87,40 +88,6 @@ export default function ForgotPasswordModal({
     return () => clearInterval(interval);
   }, [isOpen, step, method, resendTimer]);
 
-  // OTP inputs handler
-  const handleOtpChange = (index: number, val: string) => {
-    const cleaned = val.replace(/\D/g, '');
-    const newOtp = [...otp];
-    newOtp[index] = cleaned.slice(-1);
-    setOtp(newOtp);
-    setOtpError('');
-
-    if (cleaned && index < 5) {
-      otpInputsRef.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpInputsRef.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (!pasted) return;
-    const newOtp = [...otp];
-    for (let i = 0; i < 6; i++) {
-      newOtp[i] = pasted[i] || '';
-    }
-    setOtp(newOtp);
-    setOtpError('');
-    if (pasted.length === 6) {
-      otpInputsRef.current[5]?.focus();
-    }
-  };
-
   // Step 1 -> Step 2
   const handleProceedToVerify = (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,13 +129,24 @@ export default function ForgotPasswordModal({
       const entered = otp.join('');
       if (entered.length < 6) {
         setOtpError('Please enter all 6 digits of the security verification code.');
+        setOtpStatus('error');
+        setTimeout(() => setOtpStatus('idle'), 1500);
         return;
       }
+      if (entered !== mockOtp) {
+        setOtpError('Invalid verification code. Please check code or click Resend.');
+        setOtpStatus('error');
+        setTimeout(() => setOtpStatus('idle'), 1500);
+        return;
+      }
+      setOtpError('');
+      setOtpStatus('success');
       setIsSubmitting(true);
       setTimeout(() => {
         setIsSubmitting(false);
         setStep(3);
-      }, 400);
+        setOtpStatus('idle');
+      }, 1200);
     } else {
       // Validate previous password
       const input = previousPasswordInput.trim();
@@ -463,31 +441,20 @@ export default function ForgotPasswordModal({
                       </p>
                     </div>
 
-                    {/* 6-box OTP entry */}
-                    <div className="flex items-center justify-between gap-1.5 sm:gap-2.5 py-2" onPaste={handleOtpPaste}>
-                      {otp.map((digit, idx) => (
-                        <input
-                          key={idx}
-                          ref={(el) => {
-                            otpInputsRef.current[idx] = el;
-                          }}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(e) => handleOtpChange(idx, e.target.value)}
-                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                          className="w-11 sm:w-13 h-12 sm:h-14 text-center text-lg sm:text-xl font-bold bg-surface-container-low text-primary border border-surface-container-high rounded-xl focus:bg-surface-container-lowest focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                        />
-                      ))}
+                    {/* 6-box OTP entry with Morphing Animation */}
+                    <div className="py-2">
+                      <OtpVerificationInput
+                        value={otp}
+                        onChange={(newOtp) => {
+                          setOtp(newOtp);
+                          if (otpError) setOtpError('');
+                          if (otpStatus === 'error') setOtpStatus('idle');
+                        }}
+                        status={otpStatus}
+                        errorMessage={otpError}
+                        disabled={isSubmitting || otpStatus === 'success'}
+                      />
                     </div>
-
-                    {otpError && (
-                      <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm">error</span>
-                        <span>{otpError}</span>
-                      </div>
-                    )}
 
                     {/* 60s Resend Countdown */}
                     <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs">
