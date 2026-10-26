@@ -27,7 +27,6 @@ interface FirstTimeOnboardingModalProps {
 }
 
 export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: FirstTimeOnboardingModalProps) {
-  // Parsing existing phone
   const parsePhone = (raw?: string) => {
     if (!raw) return { country: COUNTRIES[0], digits: '' };
     for (const c of COUNTRIES) {
@@ -38,21 +37,21 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
     return { country: COUNTRIES[0], digits: raw.replace(/^\+\d+\s*/, '').trim() };
   };
 
-  const initialPhone = parsePhone(user.phone);
+  const initialPhone = parsePhone(user?.phone);
 
-  const [fullName, setFullName] = useState(user.fullName || '');
+  const [fullName, setFullName] = useState(user?.fullName || '');
   const [selectedCountry, setSelectedCountry] = useState(initialPhone.country);
   const [phoneDigits, setPhoneDigits] = useState(initialPhone.digits);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
-  const [age, setAge] = useState<string>(user.age ? String(user.age) : '');
-  const [gender, setGender] = useState<string>(user.gender || 'Prefer not to say');
-  const [height, setHeight] = useState<string>(user.height || '');
-  const [weight, setWeight] = useState<string>(user.weight || '');
+  const [age, setAge] = useState<string>(user?.age ? String(user.age) : '');
+  const [gender, setGender] = useState<string>(user?.gender || 'Prefer not to say');
+  const [height, setHeight] = useState<string>(user?.height || '');
+  const [weight, setWeight] = useState<string>(user?.weight || '');
 
-  const [hasAllergies, setHasAllergies] = useState<boolean>(Boolean(user.hasAllergies));
-  const [allergiesDescription, setAllergiesDescription] = useState<string>(user.allergiesDescription || '');
+  const [hasAllergies, setHasAllergies] = useState<boolean>(Boolean(user?.hasAllergies));
+  const [allergiesDescription, setAllergiesDescription] = useState<string>(user?.allergiesDescription || '');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -72,7 +71,6 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
     }
   }, [user]);
 
-  // Validation
   const validatePhone = (digits: string, country: typeof COUNTRIES[0]) => {
     const clean = digits.replace(/\D/g, '');
     if (!clean) return 'Mobile phone number is required.';
@@ -127,297 +125,362 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
     }
   };
 
-  // Determine greeting name
-  const displayName = fullName.trim() || user.fullName || '';
+  const displayName = fullName.trim() || user?.fullName || '';
   const isGenericUser = !displayName || displayName.toLowerCase() === 'user' || displayName.toLowerCase() === 'clinician';
-  const greeting = isGenericUser ? 'Hello, User!' : `Welcome, ${displayName}!`;
+  const greeting = isGenericUser ? 'Welcome to Smile Clinic!' : `Welcome, ${displayName}!`;
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-md overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto">
           <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 24 }}
+            initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 24 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-            className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto"
+            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+            className="w-full max-w-4xl lg:max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto grid grid-cols-1 md:grid-cols-12 min-h-[540px]"
           >
-            {/* Modal Header */}
-            <div className="relative bg-gradient-to-br from-emerald-600 via-teal-700 to-cyan-800 p-6 sm:p-8 text-white overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-2xl transform translate-x-20 -translate-y-20 pointer-events-none"></div>
-              
-              <div className="relative flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white shrink-0 shadow-lg">
-                  <span className="material-symbols-outlined text-[28px]">health_and_safety</span>
-                </div>
-                <div className="flex-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-emerald-100 text-[11px] font-bold uppercase tracking-wider mb-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
-                    First-Time Account Setup
+            {/* LEFT COLUMN: Clean Minimal Clinical Branding & Required Notice (5 Cols) */}
+            <div className="md:col-span-5 bg-gradient-to-br from-slate-950 via-teal-950 to-slate-900 text-white p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden">
+              {/* Subtle background glow */}
+              <div className="absolute -top-16 -left-16 w-48 h-48 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 space-y-5">
+                {/* Brand & Setup Badge */}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-teal-300 shadow-md">
+                    <span className="material-symbols-outlined text-[24px]">clinical_notes</span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-black tracking-tight">{greeting}</h2>
-                  <p className="text-xs sm:text-sm text-emerald-100/90 mt-1 leading-relaxed">
-                    Please take a moment to complete your clinical health profile. This information directly customizes cross-checks and clinical safety screenings.
+                  <div>
+                    <span className="text-xs font-black tracking-wider uppercase text-teal-400 block">Smile Clinic</span>
+                    <span className="text-[11px] text-slate-400">Clinical Safety Portal</span>
+                  </div>
+                </div>
+
+                {/* Greeting & Subtitle */}
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-snug">
+                    {greeting}
+                  </h2>
+                  <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                    Please take a moment to configure your clinical health profile. This data directly governs safety cross-checks and rule calibrations.
                   </p>
                 </div>
+
+                {/* PROMINENT MANDATORY RED WARNING BADGE */}
+                <div className="p-3.5 rounded-2xl bg-rose-500/15 border-2 border-rose-500/50 text-rose-100 shadow-sm space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-rose-400 text-[20px] animate-pulse">error</span>
+                    <span className="text-xs font-black uppercase tracking-wider text-rose-300">
+                      Action Required to Move Forward
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-rose-100/90 leading-relaxed pl-7">
+                    You must complete all required profile fields marked with <strong className="text-rose-400 font-extrabold text-xs">(*) in red</strong> below to enter the prescription portal.
+                  </p>
+                </div>
+
+                {/* Checklist of why this is needed */}
+                <div className="space-y-2 pt-2 border-t border-white/10 text-xs">
+                  <div className="flex items-center gap-2 text-slate-300 text-[11px]">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">check_circle</span>
+                    <span>Calibrates renal eGFR &amp; safe dosage limits</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-300 text-[11px]">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">check_circle</span>
+                    <span>Checks contraindications against known allergies</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-300 text-[11px]">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">check_circle</span>
+                    <span>Secures 2FA verification for clinical sessions</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Security Note */}
+              <div className="relative z-10 pt-6 mt-4 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-teal-400">lock</span>
+                  <span>256-Bit Encrypted</span>
+                </span>
+                <span>HIPAA Safe Harbor</span>
               </div>
             </div>
 
-            {/* Modal Body Form */}
-            <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5 max-h-[75vh] overflow-y-auto">
-              {formError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                  <span className="material-symbols-outlined text-rose-500 text-[18px]">error</span>
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* Name & Read-Only Email Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Full Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                    <span>Full Name / Clinical Prescriber *</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Dr. Farhan Khalid"
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-medium text-slate-800"
-                  />
-                  <p className="text-[11px] text-slate-500">Edit or confirm how your name displays on prescriptions</p>
-                </div>
-
-                {/* Read-Only Email */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span>Registered Clinical Email</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-medium">Read-Only</span>
-                  </label>
-                  <div className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-mono flex items-center justify-between">
-                    <span className="truncate">{user.email}</span>
-                    <span className="material-symbols-outlined text-slate-400 text-[18px]">lock</span>
+            {/* RIGHT COLUMN: Clean Minimal Input Form (7 Cols) */}
+            <div className="md:col-span-7 bg-white p-6 sm:p-8 flex flex-col justify-between max-h-[85vh] overflow-y-auto">
+              <div>
+                {/* Form Header */}
+                <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                      Complete Clinical Profile
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Fill required fields marked with <span className="text-rose-600 font-black text-xs">*</span> to unlock the dashboard
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-400">Account login address cannot be changed</p>
+                  <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold uppercase tracking-wider">
+                    Step 1 of 1
+                  </span>
                 </div>
-              </div>
 
-              {/* Phone with Country Picker */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                  <span>Direct Mobile Phone (for 2FA &amp; Alerts) *</span>
-                </label>
-                <div className="relative flex rounded-xl border border-slate-300 bg-white focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
-                  {/* Country Picker Trigger */}
-                  <button
-                    type="button"
-                    onClick={() => setShowCountryPicker(!showCountryPicker)}
-                    className="flex items-center gap-1.5 px-3 py-2.5 border-r border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors text-xs font-bold cursor-pointer rounded-l-xl shrink-0"
-                  >
-                    <span className="text-base">{selectedCountry.flag}</span>
-                    <span>{selectedCountry.dial}</span>
-                    <span className="material-symbols-outlined text-[16px] text-slate-400">arrow_drop_down</span>
-                  </button>
-
-                  {/* Phone Input */}
-                  <input
-                    type="tel"
-                    required
-                    value={phoneDigits}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, '');
-                      setPhoneDigits(digits);
-                      if (phoneError) setPhoneError(null);
-                    }}
-                    placeholder={`e.g. ${selectedCountry.min === 10 ? '9876543210' : 'Digits only'}`}
-                    className="flex-1 px-3.5 py-2.5 text-sm bg-transparent focus:outline-none font-medium text-slate-800"
-                  />
-
-                  {/* Country Picker Dropdown */}
-                  {showCountryPicker && (
-                    <div className="absolute left-0 top-full mt-1.5 w-64 max-h-56 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-200 z-50 divide-y divide-slate-100 py-1">
-                      {COUNTRIES.map((c) => (
-                        <button
-                          key={c.code}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCountry(c);
-                            setShowCountryPicker(false);
-                            if (phoneDigits) {
-                              setPhoneError(validatePhone(phoneDigits, c));
-                            }
-                          }}
-                          className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-emerald-50 transition-colors ${
-                            selectedCountry.code === c.code ? 'bg-emerald-50 font-bold text-emerald-800' : 'text-slate-700'
-                          }`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <span className="text-base">{c.flag}</span>
-                            <span>{c.name}</span>
-                          </span>
-                          <span className="font-mono text-slate-400">{c.dial}</span>
-                        </button>
-                      ))}
+                <form id="onboardingForm" onSubmit={handleSubmit} className="space-y-4 pt-4">
+                  {formError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 font-medium">
+                      <span className="material-symbols-outlined text-rose-500 text-[18px]">error</span>
+                      <span>{formError}</span>
                     </div>
                   )}
-                </div>
-                {phoneError ? (
-                  <p className="text-[11px] text-rose-600 font-medium">{phoneError}</p>
-                ) : (
-                  <p className="text-[11px] text-slate-500">Formatted for instant OTP and security alerts</p>
-                )}
-              </div>
 
-              {/* Age & Gender Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Age */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800">Age (Years) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="125"
-                    required
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="e.g. 32"
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-medium text-slate-800"
-                  />
-                </div>
+                  {/* Row 1: Full Name & Read-Only Email */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                        <span>Full Name</span>
+                        <span className="text-rose-600 font-extrabold text-sm">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="e.g. Dr. Farhan Khalid"
+                        className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 font-medium text-slate-800"
+                      />
+                    </div>
 
-                {/* Gender */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800">Gender *</label>
-                  <select
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-medium text-slate-800 cursor-pointer"
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Non-Binary">Non-Binary</option>
-                    <option value="Prefer not to say">Prefer not to say</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Height & Weight Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Height */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800">Height</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={height}
-                      onChange={(e) => setHeight(e.target.value)}
-                      placeholder="e.g. 175 cm or 5 ft 9 in"
-                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-medium text-slate-800"
-                    />
-                    <span className="absolute right-3.5 top-2.5 text-slate-400 material-symbols-outlined text-[18px]">height</span>
-                  </div>
-                </div>
-
-                {/* Weight */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800">Weight</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={weight}
-                      onChange={(e) => setWeight(e.target.value)}
-                      placeholder="e.g. 70 kg or 154 lbs"
-                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-medium text-slate-800"
-                    />
-                    <span className="absolute right-3.5 top-2.5 text-slate-400 material-symbols-outlined text-[18px]">fitness_center</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Allergies Section */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-amber-600 text-[20px]">warning</span>
-                    <span className="text-xs font-bold text-slate-900">Any Known Drug / Medical Allergies? *</span>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                        <span>Registered Email</span>
+                        <span className="text-[10px] text-slate-400 font-medium">Read-Only</span>
+                      </label>
+                      <div className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-mono flex items-center justify-between">
+                        <span className="truncate">{user?.email}</span>
+                        <span className="material-symbols-outlined text-slate-400 text-[16px]">lock</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex items-center rounded-xl bg-slate-200/80 p-0.5 border border-slate-300">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setHasAllergies(false);
-                        setAllergiesDescription('');
-                      }}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                        !hasAllergies ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      No (NKDA)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setHasAllergies(true)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                        hasAllergies ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Yes
-                    </button>
-                  </div>
-                </div>
-
-                {hasAllergies ? (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-1.5 pt-1"
-                  >
-                    <label className="text-[11px] font-bold text-amber-900">
-                      Specify Allergens (e.g. Penicillin, Amoxicillin, Latex, NSAIDs) *
+                  {/* Row 2: Phone with Country Code */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>Direct Mobile Phone (for 2FA &amp; Alerts)</span>
+                      <span className="text-rose-600 font-extrabold text-sm">*</span>
                     </label>
-                    <textarea
-                      rows={2}
-                      required
-                      value={allergiesDescription}
-                      onChange={(e) => setAllergiesDescription(e.target.value)}
-                      placeholder="Enter drug or substance allergy details..."
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-amber-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-800"
-                    />
-                  </motion.div>
-                ) : (
-                  <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
-                    No Known Drug Allergies (NKDA) recorded for this profile.
-                  </p>
-                )}
+                    <div className="relative flex rounded-xl border border-slate-300 bg-white focus-within:ring-2 focus-within:ring-teal-600 focus-within:border-teal-600 transition-all">
+                      <button
+                        type="button"
+                        onClick={() => setShowCountryPicker(!showCountryPicker)}
+                        className="flex items-center gap-1 px-2.5 py-2 border-r border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer rounded-l-xl shrink-0"
+                      >
+                        <span className="text-sm">{selectedCountry.flag}</span>
+                        <span>{selectedCountry.dial}</span>
+                        <span className="material-symbols-outlined text-[14px] text-slate-400">arrow_drop_down</span>
+                      </button>
+
+                      <input
+                        type="tel"
+                        required
+                        value={phoneDigits}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '');
+                          setPhoneDigits(digits);
+                          if (phoneError) setPhoneError(null);
+                        }}
+                        placeholder={`e.g. ${selectedCountry.min === 10 ? '9876543210' : 'Mobile number'}`}
+                        className="flex-1 px-3 py-2 text-xs sm:text-sm bg-transparent focus:outline-none font-medium text-slate-800"
+                      />
+
+                      {showCountryPicker && (
+                        <div className="absolute left-0 top-full mt-1 w-64 max-h-48 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-200 z-50 divide-y divide-slate-100 py-1">
+                          {COUNTRIES.map((c) => (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCountry(c);
+                                setShowCountryPicker(false);
+                                if (phoneDigits) {
+                                  setPhoneError(validatePhone(phoneDigits, c));
+                                }
+                              }}
+                              className={`w-full px-3 py-1.5 text-left text-xs flex items-center justify-between hover:bg-teal-50 transition-colors ${
+                                selectedCountry.code === c.code ? 'bg-teal-50 font-bold text-teal-800' : 'text-slate-700'
+                              }`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>{c.flag}</span>
+                                <span>{c.name}</span>
+                              </span>
+                              <span className="font-mono text-slate-400">{c.dial}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {phoneError && (
+                      <p className="text-[11px] text-rose-600 font-semibold">{phoneError}</p>
+                    )}
+                  </div>
+
+                  {/* Row 3: Age & Gender */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                        <span>Age (Years)</span>
+                        <span className="text-rose-600 font-extrabold text-sm">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="125"
+                        required
+                        value={age}
+                        onChange={(e) => setAge(e.target.value)}
+                        placeholder="e.g. 32"
+                        className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 font-medium text-slate-800"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                        <span>Gender</span>
+                        <span className="text-rose-600 font-extrabold text-sm">*</span>
+                      </label>
+                      <select
+                        value={gender}
+                        onChange={(e) => setGender(e.target.value)}
+                        className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 font-medium text-slate-800 cursor-pointer"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Non-Binary">Non-Binary</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Height & Weight */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-800">Height (Optional)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={height}
+                          onChange={(e) => setHeight(e.target.value)}
+                          placeholder="e.g. 175 cm or 5'9&quot;"
+                          className="w-full px-3 py-2 pr-8 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600 font-medium text-slate-800"
+                        />
+                        <span className="absolute right-2.5 top-2 text-slate-400 material-symbols-outlined text-[18px]">height</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-800">Weight (Optional)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={weight}
+                          onChange={(e) => setWeight(e.target.value)}
+                          placeholder="e.g. 70 kg or 154 lbs"
+                          className="w-full px-3 py-2 pr-8 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600 font-medium text-slate-800"
+                        />
+                        <span className="absolute right-2.5 top-2 text-slate-400 material-symbols-outlined text-[18px]">fitness_center</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 5: Allergies Section */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-amber-600 text-[18px]">warning</span>
+                        <span className="text-xs font-bold text-slate-900">
+                          Known Drug Allergies?
+                        </span>
+                        <span className="text-rose-600 font-extrabold text-sm">*</span>
+                      </div>
+
+                      <div className="flex items-center rounded-xl bg-slate-200 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHasAllergies(false);
+                            setAllergiesDescription('');
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                            !hasAllergies ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          No (NKDA)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHasAllergies(true)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                            hasAllergies ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Yes
+                        </button>
+                      </div>
+                    </div>
+
+                    {hasAllergies ? (
+                      <div className="space-y-1 pt-1">
+                        <label className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                          <span>List Allergic Drugs (e.g. Penicillin, NSAIDs)</span>
+                          <span className="text-rose-600 font-bold">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={allergiesDescription}
+                          onChange={(e) => setAllergiesDescription(e.target.value)}
+                          placeholder="e.g. Penicillin, Amoxicillin, Latex"
+                          className="w-full px-3 py-1.5 text-xs rounded-xl border border-amber-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-800"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-teal-700 font-medium flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[15px] text-teal-600">verified</span>
+                        No Known Drug Allergies (NKDA) confirmed for this profile.
+                      </p>
+                    )}
+                  </div>
+                </form>
               </div>
 
-              {/* Submit Button */}
-              <div className="pt-2">
+              {/* Form Actions Footer */}
+              <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px] text-rose-500">priority_high</span>
+                  <span>Required to access portal</span>
+                </span>
+
                 <button
                   type="submit"
+                  form="onboardingForm"
                   disabled={isSubmitting}
-                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white font-bold text-sm shadow-lg shadow-teal-700/20 hover:shadow-xl hover:from-emerald-500 hover:to-cyan-600 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-700 via-teal-800 to-slate-900 hover:from-teal-600 hover:to-slate-800 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
                 >
                   {isSubmitting ? (
                     <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                      <span>Saving Clinical Profile...</span>
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      <span>Saving Profile...</span>
                     </>
                   ) : (
                     <>
-                      <span>Save Clinical Profile &amp; Enter Portal</span>
+                      <span>Save Profile &amp; Move Forward</span>
                       <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                     </>
                   )}
                 </button>
               </div>
-            </form>
+            </div>
           </motion.div>
         </div>
       )}
