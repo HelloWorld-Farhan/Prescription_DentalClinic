@@ -246,6 +246,41 @@ export const authApi = {
   },
 
   /**
+   * Authenticate or register via Google OAuth credential
+   */
+  async googleAuth(
+    email: string,
+    fullName: string,
+    idToken?: string,
+    photoUrl?: string,
+    deviceId?: string
+  ): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          full_name: fullName.trim(),
+          id_token: idToken || '',
+          photo_url: photoUrl || '',
+          device_id: deviceId || ''
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Google authentication failed.');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
    * Persist session JWT and clinician profile
    */
   saveSession(token: string, user: UserProfile): void {
