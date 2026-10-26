@@ -8,8 +8,6 @@ import PrintableReportModal from '../components/PrintableReportModal';
 
 export default function NewCheck() {
   const navigate = useNavigate();
-  const rawPatients = VirtualDb.getPatients();
-  const patients = rawPatients && rawPatients.length > 0 ? rawPatients : INITIAL_PATIENTS;
 
   // Workflow Phases: 1. Input -> 2. Animated Analysis -> 3. Final Report & Record
   type FlowPhase = 'input' | 'analyzing' | 'report';
@@ -67,11 +65,11 @@ export default function NewCheck() {
     ? storedUser.role.charAt(0).toUpperCase() + storedUser.role.slice(1)
     : 'Active Prescriber';
 
-  // Dynamic Patient Reference
+  // Dynamic Patient Reference (Current Profile)
   const defaultPatient: Patient = {
     id: 'pt-screening-01',
     name: userFullName,
-    mrn: 'NEW-001',
+    mrn: 'PT-NEW-001',
     age: userAge,
     gender: userGender,
     height: userHeight,
@@ -80,13 +78,21 @@ export default function NewCheck() {
     pregnancyStatus: 'No',
     allergies: userAllergies,
     activeMedications: [],
-    conditions: [],
+    conditions: ['Routine Dental Care'],
     roomOrUnit: 'Dental Operatory'
   };
 
+  // Ensure patients list is never empty: current patient profile + clinical testing records
+  const rawPatients = VirtualDb.getPatients();
+  const availablePatients = rawPatients && rawPatients.length > 0 ? rawPatients : INITIAL_PATIENTS;
+  const patients: Patient[] = [
+    defaultPatient,
+    ...availablePatients.filter(p => p.id !== defaultPatient.id && p.name !== userFullName)
+  ];
+
   // Patient Context Selection
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(() => patients[0]?.id || 'pt-screening-01');
-  const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || patients[0] || defaultPatient;
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(() => defaultPatient.id);
+  const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || defaultPatient;
   const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn ? `PT-${selectedPatient.mrn}` : 'PT-NEW-001');
   const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? userWeightNum);
   const [customEgfr, setCustomEgfr] = useState<number>(() => selectedPatient?.egfr ?? 90);
