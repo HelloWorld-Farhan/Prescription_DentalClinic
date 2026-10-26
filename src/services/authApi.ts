@@ -231,9 +231,8 @@ export const authApi = {
     sessionStorage.setItem('rxguard_prescriber_name', user.fullName);
     sessionStorage.setItem('rxguard_prescriber_email', user.email);
     sessionStorage.setItem('rxguard_prescriber_role', user.role);
-    if (user.licenseNumber) {
-      sessionStorage.setItem('rxguard_prescriber_npi', user.licenseNumber);
-    }
+    sessionStorage.setItem('rxguard_prescriber_id', user.id);
+    sessionStorage.setItem('rxguard_prescriber_npi', user.licenseNumber || user.id || 'NPI-PENDING');
     localStorage.setItem('smileclinic_jwt_token', token);
     localStorage.setItem('smileclinic_auth_user', JSON.stringify(user));
   },
@@ -248,6 +247,7 @@ export const authApi = {
     sessionStorage.removeItem('rxguard_prescriber_name');
     sessionStorage.removeItem('rxguard_prescriber_email');
     sessionStorage.removeItem('rxguard_prescriber_role');
+    sessionStorage.removeItem('rxguard_prescriber_id');
     sessionStorage.removeItem('rxguard_prescriber_npi');
     localStorage.removeItem('smileclinic_jwt_token');
     localStorage.removeItem('smileclinic_auth_user');
