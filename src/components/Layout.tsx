@@ -168,9 +168,6 @@ export default function Layout() {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
         setProfileOpen(false);
       }
-      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
-        setIsSearchOpen(false);
-      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -181,17 +178,22 @@ export default function Layout() {
     function handleGlobalKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        searchInputRef.current?.focus();
         setIsSearchOpen(true);
       }
       if (e.key === 'Escape') {
         setIsSearchOpen(false);
-        searchInputRef.current?.blur();
       }
     }
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      const t = setTimeout(() => searchInputRef.current?.focus(), 60);
+      return () => clearTimeout(t);
+    }
+  }, [isSearchOpen]);
 
   useEffect(() => {
     const isAuth =
@@ -339,8 +341,33 @@ export default function Layout() {
             </div>
           </div>
 
+          {/* Navigation Clinical Search Bar */}
+          <div className="px-3 pt-3 pb-1">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSearchOpen(true);
+                setSidebarOpen(false);
+              }}
+              className="w-full h-9 px-3 rounded-xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high text-xs text-outline flex items-center justify-between transition-all cursor-pointer group shadow-2xs"
+              title="Search clinical records or actions (⌘K)"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-[17px] text-outline group-hover:text-primary transition-colors">
+                  search
+                </span>
+                <span className="truncate font-medium text-outline group-hover:text-on-surface">
+                  {searchQuery.trim() ? searchQuery : 'Search records...'}
+                </span>
+              </div>
+              <kbd className="text-[10px] bg-surface-container-high text-outline px-1.5 py-0.5 rounded border border-surface-container-highest font-mono shrink-0">
+                ⌘K
+              </kbd>
+            </button>
+          </div>
+
           {/* Navigation Links */}
-          <nav className="p-3 space-y-1 mt-2">
+          <nav className="p-3 space-y-1 mt-1">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
               return (
@@ -429,145 +456,30 @@ export default function Layout() {
             </div>
           </div>
 
-          {/* Center: Global Medication & Clinical Command Search Bar */}
-          <div className="flex-1 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg relative" ref={searchContainerRef}>
-            <div className="relative flex items-center">
-              <span className="material-symbols-outlined absolute left-3 text-outline text-[18px] pointer-events-none">
-                search
+          {/* Center: Prescription AI Status Badge (Prominent across all screen sizes) */}
+          <div className="flex items-center justify-center min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
+              <span className="material-symbols-outlined text-[17px] sm:text-[18px] text-primary">psychology</span>
+              <span className="font-bold text-on-surface tracking-tight text-xs sm:text-sm">Prescription AI</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] sm:text-[10px] font-bold">
+                v1.0
               </span>
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setIsSearchOpen(true);
-                }}
-                onFocus={() => setIsSearchOpen(true)}
-                placeholder="Search medications, contraindications, or checks..."
-                className="w-full h-9 pl-9 pr-12 rounded-xl bg-surface-container-low border border-surface-container-high focus:bg-surface-container-lowest focus:border-primary focus:ring-2 focus:ring-primary/20 text-xs text-on-surface placeholder:text-outline font-medium transition-all"
-              />
-              <div className="absolute right-2.5 hidden sm:flex items-center pointer-events-none">
-                <kbd className="text-[10px] bg-surface-container-high text-outline px-1.5 py-0.5 rounded border border-surface-container-highest font-mono">
-                  ⌘K
-                </kbd>
-              </div>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" title="Prescription AI Online"></span>
             </div>
-
-            {/* Interactive Search Dropdown */}
-            <AnimatePresence>
-              {isSearchOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute top-11 left-0 right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-50 divide-y divide-surface-container-low"
-                >
-                  <div className="p-2.5 px-3 bg-surface-container-low flex items-center justify-between text-[11px] font-bold text-outline">
-                    <span>
-                      {searchQuery.trim()
-                        ? `Search Results (${filteredSearchItems.length})`
-                        : filteredSearchItems.length > 0
-                        ? `Recent Clinical Checks (${filteredSearchItems.length})`
-                        : 'Clinical Records Search'}
-                    </span>
-                    <span className="text-[10px] font-normal">Press Esc to exit</span>
-                  </div>
-
-                  <div className="max-h-72 overflow-y-auto divide-y divide-surface-container-low/60">
-                    {filteredSearchItems.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-outline flex flex-col items-center justify-center gap-2">
-                        <span className="material-symbols-outlined text-3xl text-outline/40">
-                          {searchQuery.trim() ? 'search_off' : 'inbox'}
-                        </span>
-                        <span className="font-bold text-on-surface text-xs">No data</span>
-                        <span className="text-[11px] text-outline max-w-xs">
-                          {searchQuery.trim()
-                            ? `No clinical records or actions matching "${searchQuery}"`
-                            : 'No clinical safety checks on record yet. Start a new check to populate records.'}
-                        </span>
-                      </div>
-                    ) : (
-                      filteredSearchItems.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            navigate(item.path);
-                            setIsSearchOpen(false);
-                            setSearchQuery('');
-                          }}
-                          className="w-full p-2.5 px-3 text-left hover:bg-surface-container-low flex items-center justify-between gap-3 transition-colors cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                              item.type === 'action'
-                                ? 'bg-primary/10 text-primary'
-                                : item.badge === 'Flagged' || item.badge === 'High Risk'
-                                ? 'bg-rose-50 text-rose-600'
-                                : 'bg-emerald-50 text-emerald-700'
-                            }`}>
-                              <span className="material-symbols-outlined text-[16px]">{item.icon}</span>
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-xs font-bold text-on-surface block truncate">
-                                {item.name}
-                              </span>
-                              <span className="text-[10px] text-outline block truncate">
-                                {item.subtitle || item.category}
-                              </span>
-                            </div>
-                          </div>
-
-                          {item.badge && (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                              item.badgeStyle ||
-                              (item.badge === 'Flagged' || item.badge === 'High Risk'
-                                ? 'bg-rose-100 text-rose-800'
-                                : item.badge === 'Action'
-                                ? 'bg-primary/10 text-primary'
-                                : 'bg-emerald-100 text-emerald-800')
-                            }`}>
-                              {item.badge}
-                            </span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="p-2.5 px-3.5 bg-surface-container-low text-[10px] text-outline flex items-center justify-between border-t border-surface-container-high/60">
-                    <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[14px] text-primary">psychology</span>
-                      <span>Prescription AI v1.0 • Clinical Safety Guard</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigate('/check');
-                        setIsSearchOpen(false);
-                      }}
-                      className="font-bold text-primary hover:underline flex items-center gap-1"
-                    >
-                      <span>New Safety Check</span>
-                      <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           {/* Right Header Actions */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Prescription AI Status Badge (Desktop only) */}
-            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-[11px] font-semibold text-on-surface-variant shadow-2xs">
-              <span className="material-symbols-outlined text-[16px] text-primary">psychology</span>
-              <span className="font-bold text-on-surface">Prescription AI</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[10px] font-bold">v1.0</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" title="Prescription AI Online"></span>
-            </div>
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Quick Search Button (Available on all screens) */}
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-all cursor-pointer flex items-center justify-center shadow-2xs"
+              title="Search clinical records or actions (⌘K)"
+              aria-label="Search records"
+            >
+              <span className="material-symbols-outlined text-[19px] sm:text-[20px] text-outline hover:text-primary">search</span>
+            </button>
 
             {/* Quick Action Button: New Check */}
             <button
@@ -576,7 +488,7 @@ export default function Layout() {
               title="Start New Prescription Safety Check"
             >
               <span className="material-symbols-outlined text-[17px] sm:text-[18px] shrink-0">add_circle</span>
-              <span className="text-xs font-bold whitespace-nowrap">New Check</span>
+              <span className="text-xs font-bold whitespace-nowrap hidden sm:inline">New Check</span>
             </button>
 
             {/* Notifications Dropdown */}
@@ -795,6 +707,162 @@ export default function Layout() {
           onComplete={handleOnboardingComplete}
         />
       )}
+
+      {/* Universal Responsive Clinical Search Command Palette */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 sm:pt-20 px-3 sm:px-4">
+            {/* Backdrop Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={() => setIsSearchOpen(false)}
+              className="fixed inset-0 bg-black/45 backdrop-blur-xs"
+            />
+
+            {/* Modal Dialog Window */}
+            <motion.div
+              ref={searchContainerRef}
+              initial={{ opacity: 0, y: -16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -16, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col max-h-[82vh] divide-y divide-surface-container-low"
+            >
+              {/* Search Bar Input */}
+              <div className="p-3 sm:p-3.5 bg-surface-container-low flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-outline text-[20px] shrink-0">
+                  search
+                </span>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search medications, patients, check IDs, or actions..."
+                  className="w-full bg-transparent border-none text-xs sm:text-sm text-on-surface placeholder:text-outline font-medium outline-none"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high cursor-pointer"
+                    title="Clear search"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                )}
+                <kbd className="text-[10px] bg-surface-container-high text-outline px-1.5 py-0.5 rounded border border-surface-container-highest font-mono shrink-0 hidden sm:inline">
+                  ESC
+                </kbd>
+              </div>
+
+              {/* Status Header */}
+              <div className="px-4 py-2 bg-surface-container-lowest flex items-center justify-between text-[11px] font-bold text-outline border-b border-surface-container-low">
+                <span>
+                  {searchQuery.trim()
+                    ? `Matching Results (${filteredSearchItems.length})`
+                    : filteredSearchItems.length > 0
+                    ? `Recent Clinical Checks (${filteredSearchItems.length})`
+                    : 'Clinical Records & Safety Actions'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSearchOpen(false)}
+                  className="text-[11px] text-outline hover:text-on-surface sm:hidden font-medium cursor-pointer"
+                >
+                  Close ✕
+                </button>
+              </div>
+
+              {/* Results List */}
+              <div className="overflow-y-auto divide-y divide-surface-container-low/60 flex-1 max-h-[55vh]">
+                {filteredSearchItems.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-outline flex flex-col items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-3xl text-outline/40">
+                      {searchQuery.trim() ? 'search_off' : 'inbox'}
+                    </span>
+                    <span className="font-bold text-on-surface text-xs">No data</span>
+                    <span className="text-[11px] text-outline max-w-xs">
+                      {searchQuery.trim()
+                        ? `No clinical records or actions matching "${searchQuery}"`
+                        : 'No clinical safety checks on record yet. Start a new check to populate records.'}
+                    </span>
+                  </div>
+                ) : (
+                  filteredSearchItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        navigate(item.path);
+                        setIsSearchOpen(false);
+                        setSearchQuery('');
+                      }}
+                      className="w-full p-3 text-left hover:bg-surface-container-low flex items-center justify-between gap-3 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          item.type === 'action'
+                            ? 'bg-primary/10 text-primary'
+                            : item.badge === 'Flagged' || item.badge === 'High Risk'
+                            ? 'bg-rose-50 text-rose-600'
+                            : 'bg-emerald-50 text-emerald-700'
+                        }`}>
+                          <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs sm:text-sm font-bold text-on-surface block truncate">
+                            {item.name}
+                          </span>
+                          <span className="text-[11px] text-outline block truncate">
+                            {item.subtitle || item.category}
+                          </span>
+                        </div>
+                      </div>
+
+                      {item.badge && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                          item.badgeStyle ||
+                          (item.badge === 'Flagged' || item.badge === 'High Risk'
+                            ? 'bg-rose-100 text-rose-800'
+                            : item.badge === 'Action'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-emerald-100 text-emerald-800')
+                        }`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 px-4 bg-surface-container-low text-[11px] text-outline flex items-center justify-between border-t border-surface-container-high/60">
+                <span className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-primary">psychology</span>
+                  <span>Prescription AI v1.0 • Clinical Safety Guard</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate('/check');
+                    setIsSearchOpen(false);
+                  }}
+                  className="font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>New Safety Check</span>
+                  <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
