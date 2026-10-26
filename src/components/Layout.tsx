@@ -57,7 +57,7 @@ export default function Layout() {
   const rawNpi =
     sessionStorage.getItem('rxguard_prescriber_npi') ||
     localStorage.getItem('rxguard_prescriber_npi') ||
-    storedUser.licenseNumber ||
+    storedUser.id ||
     '1982740928';
   const prescriberNpi =
     rawNpi && rawNpi !== 'NPI Verified' && rawNpi !== 'NPI-PENDING'

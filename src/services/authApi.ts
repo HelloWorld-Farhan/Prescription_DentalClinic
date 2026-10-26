@@ -15,8 +15,6 @@ export interface SignupPayload {
   phone?: string;
   country_code?: string;
   role?: string;
-  license_number?: string;
-  clinic_id?: string;
 }
 
 export interface UserProfile {
@@ -24,8 +22,6 @@ export interface UserProfile {
   email: string;
   fullName: string;
   role: string;
-  licenseNumber?: string;
-  clinicId?: string;
   twoFactorEnabled?: boolean;
 }
 
@@ -374,7 +370,7 @@ export const authApi = {
     sessionStorage.setItem('rxguard_prescriber_email', user.email);
     sessionStorage.setItem('rxguard_prescriber_role', user.role);
     sessionStorage.setItem('rxguard_prescriber_id', user.id);
-    sessionStorage.setItem('rxguard_prescriber_npi', user.licenseNumber || user.id || 'NPI-PENDING');
+    sessionStorage.setItem('rxguard_prescriber_npi', user.id);
     if (user.twoFactorEnabled !== undefined) {
       sessionStorage.setItem('rxguard_two_factor_enabled', String(user.twoFactorEnabled));
     }

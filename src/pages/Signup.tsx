@@ -213,8 +213,7 @@ export default function Signup() {
         password,
         phone: selectedCountry.dial + ' ' + phone.trim(),
         country_code: selectedCountry.code,
-        role: 'PHARMACIST',
-        clinic_id: 'CLINIC-MAIN'
+        role: 'USER'
       });
       if (res.dev_otp) {
         console.log('[SmileClinic Dev] One-Time Passcode:', res.dev_otp);

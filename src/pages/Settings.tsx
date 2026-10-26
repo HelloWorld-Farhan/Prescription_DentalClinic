@@ -56,7 +56,6 @@ function loadRealUserProfile(): ClinicalProfile {
   const rawNpi =
     sessionStorage.getItem('rxguard_prescriber_npi') ||
     localStorage.getItem('rxguard_prescriber_npi') ||
-    storedUser.licenseNumber ||
     storedUser.id ||
     '1982740928';
   const npi =
@@ -77,10 +76,10 @@ function loadRealUserProfile(): ClinicalProfile {
     fullName: name,
     role: role,
     authority: 'Clinical Prescriber Sign-Off Authority',
-    license: storedUser.licenseNumber ? `NPI #${storedUser.licenseNumber}` : `NPI #${npi}`,
+    license: `NPI #${npi}`,
     npi: npi,
     hospital: 'Smile Clinic Health System',
-    department: storedUser.clinicId || 'Clinical Operatory & Dispensary',
+    department: 'Clinical Operatory & Dispensary',
     email: email,
     phone: storedUser.phone || '+1 (555) 948-2819',
     avatarInitials: initials,
