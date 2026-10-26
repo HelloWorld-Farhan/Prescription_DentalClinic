@@ -124,7 +124,7 @@ export default function Login() {
 
       if (res.token && res.user) {
         authApi.saveSession(res.token, res.user);
-        recordLoginEvent('Success', `Authorized session established (${res.user.fullName})`);
+        recordLoginEvent('Success', `Authorized session established (${res.user.fullName})`, res.user.email);
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
           localStorage.setItem('smileclinic_remembered_email', inputEmail);
@@ -138,10 +138,10 @@ export default function Login() {
     } catch (apiErr: any) {
       const errMsg = apiErr.message || 'Invalid credentials. No registered clinician account matches these credentials.';
       setErrorMessage(errMsg);
-      recordLoginEvent('Blocked', errMsg);
 
-      // If account is locked due to 3 failed attempts, automatically pop open the Reset Password modal on Step 2 (OTP code)
+      // If account is locked due to 3 failed attempts, record audit event and pop open Reset Password modal
       if (errMsg.toLowerCase().includes('account locked') || errMsg.toLowerCase().includes('3 failed login attempts')) {
+        recordLoginEvent('Blocked', errMsg, inputEmail);
         setTimeout(() => {
           setShowForgotPasswordModal(true);
         }, 1100);
@@ -180,7 +180,7 @@ export default function Login() {
       if (res.token && res.user) {
         setLoginOtpStatus('success');
         authApi.saveSession(res.token, res.user);
-        recordLoginEvent('2FA Verified', `Two-Factor sign-in OTP challenge verified (${res.user.fullName})`);
+        recordLoginEvent('2FA Verified', `Two-Factor sign-in OTP challenge verified (${res.user.fullName})`, res.user.email);
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
           localStorage.setItem('smileclinic_remembered_email', clinicalId.trim().toLowerCase());
@@ -252,7 +252,7 @@ export default function Login() {
 
       if (res.token && res.user) {
         authApi.saveSession(res.token, res.user);
-        recordLoginEvent('Success', `Authenticated via 1-Click Google OAuth (${googleUser.email})`);
+        recordLoginEvent('Success', `Authenticated via 1-Click Google OAuth (${googleUser.email})`, googleUser.email);
         navigate('/dashboard');
       }
     } catch (err: any) {

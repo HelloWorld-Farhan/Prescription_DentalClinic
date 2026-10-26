@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authApi } from '../services/authApi';
 import {
@@ -154,17 +154,35 @@ export default function Settings() {
   });
   const [isToggling2Fa, setIsToggling2Fa] = useState(false);
 
-  // Active Sessions
-  const [sessions, setSessions] = useState<ActiveSessionItem[]>(() => getActiveSessions());
+  // Detect whether current session is authenticated via Google OAuth
+  const isGoogleUser = useMemo(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+      return u.authProvider === 'google' || u.role?.toLowerCase() === 'google';
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Active Sessions scoped per email
+  const [sessions, setSessions] = useState<ActiveSessionItem[]>(() => getActiveSessions(profile.email));
   const [showTerminateAllModal, setShowTerminateAllModal] = useState(false);
   const [sessionToRevoke, setSessionToRevoke] = useState<ActiveSessionItem | null>(null);
 
-  // Login History State
-  const [loginHistory, setLoginHistory] = useState<LoginHistoryItem[]>(() => getLoginHistory(profile.fullName));
+  // Login History State scoped per email
+  const [loginHistory, setLoginHistory] = useState<LoginHistoryItem[]>(() => getLoginHistory(profile.email, profile.fullName));
   const [historySearch, setHistorySearch] = useState('');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'All' | 'Success' | '2FA Verified' | 'Revoked' | 'Blocked'>('All');
   const [historyPage, setHistoryPage] = useState(1);
   const pageSize = 4;
+
+  // Keep sessions and audit history synced whenever clinician email changes
+  useEffect(() => {
+    if (profile.email) {
+      setSessions(getActiveSessions(profile.email));
+      setLoginHistory(getLoginHistory(profile.email, profile.fullName));
+    }
+  }, [profile.email, profile.fullName]);
 
   // General Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -382,7 +400,8 @@ export default function Settings() {
       setCurrentPasswordInput('');
       const ev = recordLoginEvent(
         'Success',
-        `Clinical password updated in database (${profile.email})`
+        `Clinical password updated in database (${profile.email})`,
+        profile.email
       );
       setLoginHistory((prev) => [ev, ...prev]);
       showToast('Clinical password updated successfully in the database.');
@@ -397,11 +416,12 @@ export default function Settings() {
   const handleConfirmTerminateAllRemote = () => {
     const remaining = sessions.filter((s) => s.isCurrent);
     setSessions(remaining);
-    saveActiveSessions(remaining);
+    saveActiveSessions(remaining, profile.email);
     setShowTerminateAllModal(false);
     const revokedRecord = recordLoginEvent(
       'Revoked',
-      'All remote clinical terminals terminated via governance console'
+      'All remote clinical terminals terminated via governance console',
+      profile.email
     );
     setLoginHistory((prev) => [revokedRecord, ...prev]);
     showToast('All remote active sessions terminated immediately.');
@@ -411,10 +431,11 @@ export default function Settings() {
     if (!sessionToRevoke) return;
     const remaining = sessions.filter((s) => s.id !== sessionToRevoke.id);
     setSessions(remaining);
-    saveActiveSessions(remaining);
+    saveActiveSessions(remaining, profile.email);
     const revokedRecord = recordLoginEvent(
       'Revoked',
-      `Remote terminal #${sessionToRevoke.id} revoked (${sessionToRevoke.name})`
+      `Remote terminal #${sessionToRevoke.id} revoked (${sessionToRevoke.name})`,
+      profile.email
     );
     setLoginHistory((prev) => [revokedRecord, ...prev]);
     showToast(`Session #${sessionToRevoke.id} (${sessionToRevoke.name}) has been revoked.`);
@@ -725,6 +746,18 @@ export default function Settings() {
               {!isVerificationUnlocked ? (
                 /* STEP 1: Choose Verification Method */
                 <form onSubmit={handleInitiatePasswordVerification} className="flex flex-col gap-4">
+                  {isGoogleUser && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2.5 text-xs text-blue-900">
+                      <span className="material-symbols-outlined text-blue-600 text-[20px] shrink-0">info</span>
+                      <div>
+                        <span className="font-bold block">Google-Authenticated Clinician Account</span>
+                        <span className="text-[11px] text-blue-800 leading-relaxed block mt-0.5">
+                          You authenticated using Google Sign-In. To establish or update your clinical password, select <strong>Email Passcode</strong> to verify via a 6-digit OTP sent to your Google email address ({profile.email}).
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-xs font-bold text-on-surface block mb-2">
                       Select Verification Method to Authorize Password Change:
@@ -791,7 +824,9 @@ export default function Settings() {
                         </div>
                         <div>
                           <span className="text-xs font-bold text-on-surface block">Previous / Current Psw</span>
-                          <span className="text-[10px] text-outline line-clamp-1">Direct Verify • No OTP Needed</span>
+                          <span className="text-[10px] text-outline line-clamp-1">
+                            {isGoogleUser ? 'Requires existing password' : 'Direct Verify • No OTP'}
+                          </span>
                         </div>
                       </label>
                     </div>

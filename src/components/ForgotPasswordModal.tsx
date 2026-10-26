@@ -239,7 +239,8 @@ export default function ForgotPasswordModal({
 
       recordLoginEvent(
         'Success',
-        `Prescriber password reset authorized (${accountEmail.trim().toLowerCase()})`
+        `Prescriber password reset authorized (${accountEmail.trim().toLowerCase()})`,
+        accountEmail.trim().toLowerCase()
       );
 
       setIsSuccess(true);

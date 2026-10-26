@@ -24,8 +24,39 @@ export interface LoginHistoryItem {
   details?: string;
 }
 
-const STORAGE_KEY_SESSIONS = 'smileclinic_active_sessions';
-const STORAGE_KEY_HISTORY = 'smileclinic_session_history';
+// Clean up deprecated legacy global mock keys once on bootstrap
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('smileclinic_active_sessions');
+    localStorage.removeItem('smileclinic_session_history');
+  } catch {}
+}
+
+/**
+ * Resolve the email address for storage key scoping
+ */
+export function resolveUserEmail(email?: string): string {
+  if (email && email.trim()) return email.trim().toLowerCase();
+  if (typeof window !== 'undefined') {
+    try {
+      const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+      if (u && u.email) return u.email.trim().toLowerCase();
+    } catch {}
+    const stored =
+      sessionStorage.getItem('rxguard_prescriber_email') ||
+      localStorage.getItem('smileclinic_remembered_email');
+    if (stored) return stored.trim().toLowerCase();
+  }
+  return 'clinician_primary';
+}
+
+function getStorageKeys(email?: string) {
+  const normalized = resolveUserEmail(email);
+  return {
+    sessions: `smileclinic_sessions_${normalized}`,
+    history: `smileclinic_history_${normalized}`
+  };
+}
 
 /**
  * Detect client browser, OS, and network metadata
@@ -72,26 +103,27 @@ export function detectClientEnvironment(): { device: string; browserOs: string; 
 }
 
 /**
- * Retrieve active sessions with automatic current device detection
+ * Retrieve real active sessions scoped to the specific clinician email
  */
-export function getActiveSessions(): ActiveSessionItem[] {
+export function getActiveSessions(email?: string): ActiveSessionItem[] {
   if (typeof window === 'undefined') return [];
   const env = detectClientEnvironment();
+  const { sessions: key } = getStorageKeys(email);
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_SESSIONS);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed: ActiveSessionItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Ensure the current session reflects real device info
-        return parsed.map((s) => (s.isCurrent ? { ...s, name: env.device, details: `${env.browserOs} • Verified TLS Encrypted` } : s));
+        return parsed.map((s) =>
+          s.isCurrent ? { ...s, name: env.device, details: `${env.browserOs} • Verified TLS Encrypted` } : s
+        );
       }
     }
-  } catch {
-    // Fall back to seeded sessions
-  }
+  } catch {}
 
-  const initial: ActiveSessionItem[] = [
+  // Real initial session: strictly 1 active session for this workstation
+  const realCurrentSession: ActiveSessionItem[] = [
     {
       id: 'SES-01',
       name: env.device,
@@ -99,115 +131,76 @@ export function getActiveSessions(): ActiveSessionItem[] {
       details: `${env.browserOs} • Verified TLS Encrypted`,
       badge: 'Active Now',
       icon: env.device.includes('Mobile') ? 'smartphone' : 'desktop_windows'
-    },
-    {
-      id: 'SES-02',
-      name: 'Operatory Chairside Tablet (iPad Pro)',
-      isCurrent: false,
-      details: 'Safari • iPadOS 17 • IP: 10.240.31.09',
-      badge: 'Last active 2 hrs ago • Operatory 3',
-      icon: 'tablet_mac'
     }
   ];
 
-  localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(initial));
-  return initial;
+  try {
+    localStorage.setItem(key, JSON.stringify(realCurrentSession));
+  } catch {}
+
+  return realCurrentSession;
 }
 
 /**
- * Save active sessions
+ * Save active sessions for a specific clinician email
  */
-export function saveActiveSessions(sessions: ActiveSessionItem[]): void {
+export function saveActiveSessions(sessions: ActiveSessionItem[], email?: string): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+  const { sessions: key } = getStorageKeys(email);
+  try {
+    localStorage.setItem(key, JSON.stringify(sessions));
+  } catch {}
 }
 
 /**
- * Retrieve login and security audit history, seeded with realistic entries if empty
+ * Retrieve login and security audit history scoped to the specific clinician email
  */
-export function getLoginHistory(clinicianName: string = 'Authorized Prescriber'): LoginHistoryItem[] {
+export function getLoginHistory(email?: string, clinicianName?: string): LoginHistoryItem[] {
   if (typeof window === 'undefined') return [];
   const env = detectClientEnvironment();
+  const { history: key } = getStorageKeys(email);
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_HISTORY);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed: LoginHistoryItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
-  } catch {
-    // Fall back to seed
-  }
+  } catch {}
 
   const now = new Date();
   const formatTime = (d: Date) =>
     d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-  const seeded: LoginHistoryItem[] = [
+  const initialRealHistory: LoginHistoryItem[] = [
     {
-      id: 'AUTH-9420',
+      id: `AUTH-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: `Today at ${formatTime(now)}`,
       device: env.device,
       browserOs: env.browserOs,
       ip: env.ip,
       location: env.location,
       status: 'Success',
-      details: `Interactive clinical session initiated by ${clinicianName}`
-    },
-    {
-      id: 'AUTH-8914',
-      timestamp: `Today at ${formatTime(new Date(now.getTime() - 25 * 60 * 1000))}`,
-      device: env.device,
-      browserOs: env.browserOs,
-      ip: env.ip,
-      location: env.location,
-      status: '2FA Verified',
-      details: 'Two-Factor Authentication OTP code verified on sign-in'
-    },
-    {
-      id: 'SEC-7201',
-      timestamp: 'Yesterday at 05:42 PM',
-      device: 'External Terminal / Unrecognized Gateway',
-      browserOs: 'Firefox • Linux x86_64',
-      ip: '198.51.100.84',
-      location: 'Remote WAN Gateway (Untrusted)',
-      status: 'Blocked',
-      details: 'Rate limit enforced: 3 consecutive invalid password attempts locked for 60s'
-    },
-    {
-      id: 'SES-REV-41',
-      timestamp: '2 days ago at 02:15 PM',
-      device: 'Operatory Chairside Tablet (iPad Pro)',
-      browserOs: 'Safari • iPadOS 17',
-      ip: '10.240.31.09',
-      location: 'Smile Clinic Operatory Subnet',
-      status: 'Revoked',
-      details: 'Remote session terminated by clinician from security settings'
-    },
-    {
-      id: 'AUTH-6302',
-      timestamp: '3 days ago at 08:30 AM',
-      device: env.device,
-      browserOs: env.browserOs,
-      ip: env.ip,
-      location: env.location,
-      status: 'Success',
-      details: 'Clinician authenticated via remembered biometric workstation token'
+      details: `Interactive clinical session initiated by ${clinicianName || 'Authorized Prescriber'}`
     }
   ];
 
-  localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(seeded));
-  return seeded;
+  try {
+    localStorage.setItem(key, JSON.stringify(initialRealHistory));
+  } catch {}
+
+  return initialRealHistory;
 }
 
 /**
- * Prepend a new event to the audit history and persist
+ * Prepend a real event to the email's audit history and persist
  */
 export function recordLoginEvent(
   status: 'Success' | '2FA Verified' | 'Revoked' | 'Blocked',
   details?: string,
+  email?: string,
   customDevice?: string,
   customIp?: string
 ): LoginHistoryItem {
@@ -229,9 +222,10 @@ export function recordLoginEvent(
 
   if (typeof window !== 'undefined') {
     try {
-      const existing = getLoginHistory();
-      const updated = [newItem, ...existing.filter((item) => item.id !== newItem.id)].slice(0, 50);
-      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(updated));
+      const { history: key } = getStorageKeys(email);
+      const existing = getLoginHistory(email);
+      const updated = [newItem, ...existing.filter((item) => item.id !== newItem.id)].slice(0, 30);
+      localStorage.setItem(key, JSON.stringify(updated));
     } catch {
       // Ignore write errors
     }
