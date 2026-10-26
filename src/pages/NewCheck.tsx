@@ -129,85 +129,7 @@ export default function NewCheck() {
     setPrescriptions(prescriptions.filter(p => p.id !== id));
   };
 
-  // Quick preset loader helper for clinical verification
-  const handleLoadPresetRx = (preset: 'cipro_warfarin' | 'amox_penicillin' | 'clean_clinda') => {
-    if (preset === 'cipro_warfarin') {
-      if (patients && patients.length > 0) {
-        handlePatientSelect(patients[0].id);
-      } else {
-        setPtKey('PT-DEMO-9042');
-        setCustomWeight(68);
-        setCustomEgfr(42);
-        setActiveMeds(['Warfarin 5mg QD', 'Fluconazole 100mg']);
-        setAllergies([]);
-      }
-      setPrescriptions([
-        {
-          id: 'rx-p1',
-          drugName: 'Ciprofloxacin 500mg',
-          genericName: 'Ciprofloxacin Hydrochloride',
-          dosage: '500mg Film-Coated Tablet',
-          frequency: 'Every 12 hours (BID)',
-          route: 'Oral (PO)',
-          duration: '7 days',
-          indication: 'Acute Odontogenic / Maxillary Infection'
-        }
-      ]);
-      setUploadedFileName('dental_surgery_rx_slip_cipro.pdf');
-      setUploadedFileSize('1.8 MB');
-    } else if (preset === 'amox_penicillin') {
-      if (patients && patients.length > 0) {
-        handlePatientSelect(patients[0].id);
-      } else {
-        setPtKey('PT-DEMO-3811');
-        setCustomWeight(72);
-        setCustomEgfr(85);
-        setActiveMeds(['Lisinopril 10mg']);
-        setAllergies(['Penicillin (Anaphylaxis)']);
-      }
-      setPrescriptions([
-        {
-          id: 'rx-p2',
-          drugName: 'Amoxicillin 500mg',
-          genericName: 'Amoxicillin Trihydrate',
-          dosage: '500mg Capsule',
-          frequency: 'Every 8 hours (TID)',
-          route: 'Oral (PO)',
-          duration: '5 days',
-          indication: 'Periapical Dental Abscess Drainage'
-        }
-      ]);
-      setUploadedFileName('periapical_abscess_amoxicillin_rx.jpg');
-      setUploadedFileSize('2.4 MB');
-    } else {
-      // Clean Dental Antibiotic
-      if (patients && patients.length > 1) {
-        handlePatientSelect(patients[1].id);
-      } else if (patients && patients.length > 0) {
-        handlePatientSelect(patients[0].id);
-      } else {
-        setPtKey('PT-DEMO-1104');
-        setCustomWeight(60);
-        setCustomEgfr(95);
-        setActiveMeds(['Multivitamins']);
-        setAllergies(['Penicillin (Anaphylaxis)']);
-      }
-      setPrescriptions([
-        {
-          id: 'rx-p3',
-          drugName: 'Clindamycin 300mg',
-          genericName: 'Clindamycin Hydrochloride',
-          dosage: '300mg Capsule',
-          frequency: 'Every 8 hours',
-          route: 'Oral (PO)',
-          duration: '7 days',
-          indication: 'Penicillin-Allergic Dental Surgery Prophylaxis'
-        }
-      ]);
-      setUploadedFileName('clindamycin_prophylaxis_rx.png');
-      setUploadedFileSize('950 KB');
-    }
-  };
+
 
   // Camera Snap Handler
   const handleTakePhoto = () => {
@@ -557,23 +479,7 @@ export default function NewCheck() {
                     Submit prescription slip via image upload, camera photo capture, or manual medication entry.
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-outline font-medium">Quick Demo Test:</span>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadPresetRx('cipro_warfarin')}
-                    className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-colors cursor-pointer"
-                  >
-                    Cipro + Warfarin Flag
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadPresetRx('amox_penicillin')}
-                    className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition-colors cursor-pointer"
-                  >
-                    Amoxicillin Allergy Flag
-                  </button>
-                </div>
+
               </div>
 
               {/* 3 Input Mode Tabs */}

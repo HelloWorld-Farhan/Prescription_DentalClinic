@@ -22,7 +22,6 @@ export default function Layout() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
-  const [searchQuery, setSearchQuery] = useState('');
 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -84,12 +83,6 @@ export default function Layout() {
     { name: 'Rules & Data', path: '/rules', icon: 'database' },
   ];
 
-  const handleGlobalSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/alerts?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
 
   const handleLogout = () => {
     sessionStorage.removeItem('rxguard_authenticated');
@@ -198,29 +191,10 @@ export default function Layout() {
             <span className="material-symbols-outlined text-2xl">menu</span>
           </button>
 
-          {/* Search Bar */}
-          <form onSubmit={handleGlobalSearch} className="flex-1 max-w-md hidden sm:block">
-            <div className="relative flex items-center bg-surface-container-lowest rounded-xl px-3 py-2 border border-surface-container-high shadow-xs">
-              <span className="material-symbols-outlined text-outline text-[18px] mr-2">search</span>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search patient name, MRN, Rx order..."
-                className="w-full bg-transparent text-xs text-on-surface placeholder:text-outline outline-none"
-              />
-              <kbd className="text-[10px] bg-surface-container-high text-on-surface-variant px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
-            </div>
-          </form>
 
-          {/* Right Header Badges & Actions */}
+
+          {/* Right Header Actions */}
           <div className="flex items-center gap-1.5 sm:gap-3 ml-auto shrink-0">
-            {/* EMR Integrated Pill */}
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-surface-container-low border border-surface-container-high rounded-full">
-              <span className="material-symbols-outlined text-secondary text-[16px]">verified_user</span>
-              <span className="text-[11px] font-bold text-secondary">EMR Integrated</span>
-            </div>
-
             {/* Quick Action Button: New Check */}
             <button
               onClick={() => navigate('/check')}

@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [activeDrawerCheckId, setActiveDrawerCheckId] = useState<string>('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncTimer, setSyncTimer] = useState(5);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
@@ -44,7 +45,29 @@ export default function Dashboard() {
     return matchesUnit && matchesSearch;
   });
 
-  const units = ['All Units', 'Dental Surgery', 'Emergency / ICU', 'Periodontics', 'General Operatory'];
+  const units = ['All Units', ...Array.from(new Set(checks.map(c => c.unit).filter(Boolean)))];
+
+  useEffect(() => {
+    if (!units.includes(selectedUnit)) {
+      setSelectedUnit('All Units');
+    }
+  }, [units, selectedUnit]);
+
+  // 5-second auto-sync interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSyncTimer(prev => {
+        if (prev <= 1) {
+          setIsSyncing(true);
+          setChecks(VirtualDb.getChecks());
+          setTimeout(() => setIsSyncing(false), 900);
+          return 5;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleInspect = (check: SafetyCheckRecord) => {
     if (check.alerts.length > 0) {
@@ -89,9 +112,10 @@ export default function Dashboard() {
             <h1 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">
               Prescription Safety Dashboard
             </h1>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-              <span>Auto-synced via FHIR R4: {isSyncing ? 'Syncing...' : 'Just now'}</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs border border-surface-container-high/60 transition-all">
+              <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-primary animate-pulse'}`}></span>
+              <span className={`material-symbols-outlined text-[15px] text-primary transition-transform ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
+              <span className="font-medium">Auto-synced via FHIR R4: {isSyncing ? 'Syncing...' : `Just now (${syncTimer}s)`}</span>
             </div>
           </div>
           <p className="text-xs sm:text-sm text-on-surface-variant">
