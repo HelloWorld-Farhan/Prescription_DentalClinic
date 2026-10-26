@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { authApi } from '../services/authApi';
 
 export interface ClinicalProfile {
   fullName: string;
@@ -137,6 +138,9 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [isVerificationUnlocked, setIsVerificationUnlocked] = useState(false);
   const [unlockedMethodLabel, setUnlockedMethodLabel] = useState('');
+  const [verifiedResetOtp, setVerifiedResetOtp] = useState('');
+  const [isSendingPasswordOtp, setIsSendingPasswordOtp] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   // Password reset fields
   const [newPassword, setNewPassword] = useState('');
@@ -156,8 +160,16 @@ export default function Settings() {
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // 2FA Reconfiguration Status
-  const [twoFactorConfigured, setTwoFactorConfigured] = useState(true);
-  const [twoFactorDeviceLabel, setTwoFactorDeviceLabel] = useState('YubiKey 5C NFC + 1 Phone Authenticator');
+  const [twoFactorConfigured, setTwoFactorConfigured] = useState<boolean>(() => {
+    const stored = sessionStorage.getItem('rxguard_two_factor_enabled');
+    if (stored !== null) return stored === 'true';
+    try {
+      const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+      if (u.twoFactorEnabled !== undefined) return Boolean(u.twoFactorEnabled);
+    } catch {}
+    return true;
+  });
+  const [isToggling2Fa, setIsToggling2Fa] = useState(false);
 
   // Active Sessions
   const [sessions, setSessions] = useState<ActiveSessionItem[]>(initialSessions);
@@ -197,19 +209,53 @@ export default function Settings() {
     showToast('Clinical Profile updated successfully across the portal.');
   };
 
+  // --- Toggle 2FA in Database ---
+  const handleToggle2FA = async (enable: boolean) => {
+    setIsToggling2Fa(true);
+    try {
+      await authApi.toggle2FA(profile.email, enable);
+      setTwoFactorConfigured(enable);
+      sessionStorage.setItem('rxguard_two_factor_enabled', String(enable));
+      try {
+        const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+        u.twoFactorEnabled = enable;
+        localStorage.setItem('smileclinic_auth_user', JSON.stringify(u));
+      } catch {}
+      showToast(`Two-Factor Authentication ${enable ? 'activated' : 'deactivated'} successfully.`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update Two-Factor Authentication.');
+    } finally {
+      setIsToggling2Fa(false);
+    }
+  };
+
   // --- Password Flow Trigger ---
-  const handleInitiatePasswordVerification = (e: React.FormEvent) => {
+  const handleInitiatePasswordVerification = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (verificationMethod === 'sms') {
+      showToast('SMS verification is coming soon. Please use Email Passcode.');
+      return;
+    }
     if (verificationMethod === 'password_otp' && !currentPasswordInput.trim()) {
       showToast('Please enter your current clinical password first.');
       return;
     }
-    setOtpPurpose('password_change');
-    setOtpDigits(['', '', '', '', '', '']);
-    setIsOtpSuccess(false);
-    setIsOtpError(false);
-    setOtpErrorMessage('');
-    setShowOtpModal(true);
+
+    setIsSendingPasswordOtp(true);
+    try {
+      await authApi.forgotPassword(profile.email);
+      showToast(`6-Digit security passcode dispatched to ${profile.email}`);
+      setOtpPurpose('password_change');
+      setOtpDigits(['', '', '', '', '', '']);
+      setIsOtpSuccess(false);
+      setIsOtpError(false);
+      setOtpErrorMessage('');
+      setShowOtpModal(true);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to send verification passcode. Please try again.');
+    } finally {
+      setIsSendingPasswordOtp(false);
+    }
   };
 
   // --- 2FA Reconfigure Trigger ---
@@ -278,33 +324,28 @@ export default function Settings() {
           setIsOtpSuccess(false);
 
           if (otpPurpose === 'password_change') {
+            setVerifiedResetOtp(entered);
             setIsVerificationUnlocked(true);
-            const methodNames: Record<VerificationMethod, string> = {
-              email: `Email OTP (${profile.email})`,
-              sms: `SMS Code (${profile.phone})`,
-              password_otp: 'Current Password + 2FA Token'
-            };
-            setUnlockedMethodLabel(methodNames[verificationMethod]);
+            setUnlockedMethodLabel(`Verified Email Code (${profile.email})`);
             showToast('Identity verified successfully! You may now set your new clinical password.');
           } else {
             setTwoFactorConfigured(true);
-            setTwoFactorDeviceLabel('Primary Authenticator App & Mobile Push Re-verified');
             showToast('Two-Factor Authentication reconfigured and verified successfully.');
           }
-        }, 1100);
+        }, 800);
       } else {
         // ERROR SHAKE ANIMATION TRIGGER
         setIsOtpError(true);
-        setOtpErrorMessage('Invalid verification passcode. Check your code or click Auto-Fill Demo Code.');
+        setOtpErrorMessage('Invalid verification passcode. Check your code or request a new one.');
       }
-    }, 600);
+    }, 400);
   };
 
-  // --- Save New Password ---
-  const handleSaveNewPassword = (e: React.FormEvent) => {
+  // --- Save New Password in Database ---
+  const handleSaveNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 10) {
-      showToast('Password must be at least 10 characters long.');
+    if (newPassword.length < 8) {
+      showToast('Password must be at least 8 characters long.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -312,13 +353,20 @@ export default function Settings() {
       return;
     }
 
-    // Persist new password locally
-    localStorage.setItem('smileclinic_prescriber_password', newPassword);
-    setIsVerificationUnlocked(false);
-    setNewPassword('');
-    setConfirmPassword('');
-    setCurrentPasswordInput('');
-    showToast('Clinical password updated successfully. Active tokens renewed.');
+    setIsSavingPassword(true);
+    try {
+      await authApi.resetPassword(profile.email, verifiedResetOtp, newPassword);
+      setIsVerificationUnlocked(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      setVerifiedResetOtp('');
+      setCurrentPasswordInput('');
+      showToast('Clinical password updated successfully in the database.');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update password. Code may have expired.');
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
   // --- Session Termination & Revocation ---
@@ -681,29 +729,22 @@ export default function Settings() {
                         </div>
                       </label>
 
-                      {/* Option 2: SMS OTP */}
-                      <label
-                        className={`p-3 rounded-xl border flex flex-col justify-between gap-2 cursor-pointer transition-all ${
-                          verificationMethod === 'sms'
-                            ? 'bg-primary/5 border-primary shadow-xs'
-                            : 'bg-surface-container-low border-surface-container-high hover:border-outline'
-                        }`}
+                      {/* Option 2: SMS OTP (Coming Soon) */}
+                      <div
+                        className="p-3 rounded-xl border border-surface-container-high bg-surface-container-low/50 opacity-60 flex flex-col justify-between gap-2 cursor-not-allowed select-none"
+                        title="SMS Mobile Code verification is coming soon. Please use Email Passcode."
                       >
                         <div className="flex items-center justify-between">
-                          <span className="material-symbols-outlined text-primary text-[20px]">sms</span>
-                          <input
-                            type="radio"
-                            name="verificationMethod"
-                            checked={verificationMethod === 'sms'}
-                            onChange={() => setVerificationMethod('sms')}
-                            className="accent-primary"
-                          />
+                          <span className="material-symbols-outlined text-outline text-[20px]">sms</span>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 uppercase tracking-wide">
+                            Coming Soon
+                          </span>
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-on-surface block">SMS Mobile Code</span>
-                          <span className="text-[10px] text-outline line-clamp-1">{profile.phone}</span>
+                          <span className="text-xs font-bold text-outline block">SMS Mobile Code</span>
+                          <span className="text-[10px] text-outline line-clamp-1">SMS gateway integration coming soon</span>
                         </div>
-                      </label>
+                      </div>
 
                       {/* Option 3: Current Password + OTP */}
                       <label
@@ -762,18 +803,26 @@ export default function Settings() {
 
                   <motion.button
                     type="submit"
+                    disabled={isSendingPasswordOtp}
                     whileHover={{ scale: 1.015 }}
                     whileTap={{ scale: 0.985 }}
-                    className="w-full h-11 rounded-xl bg-primary-container text-on-primary hover:bg-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                    className="w-full h-11 rounded-xl bg-primary-container text-on-primary hover:bg-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    <span className="material-symbols-outlined text-[18px]">verified</span>
-                    <span>
-                      {verificationMethod === 'email'
-                        ? 'Send Email 6-Digit Passcode'
-                        : verificationMethod === 'sms'
-                        ? 'Send SMS 6-Digit Passcode'
-                        : 'Verify Current Password & Enter OTP'}
-                    </span>
+                    {isSendingPasswordOtp ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span>Dispatching Security Passcode...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[18px]">verified</span>
+                        <span>
+                          {verificationMethod === 'email'
+                            ? 'Send Email 6-Digit Passcode'
+                            : 'Verify Current Password & Enter OTP'}
+                        </span>
+                      </>
+                    )}
                   </motion.button>
                 </form>
               ) : (
@@ -864,63 +913,100 @@ export default function Settings() {
                   <div className="pt-2 flex gap-3">
                     <button
                       type="button"
+                      disabled={isSavingPassword}
                       onClick={() => setIsVerificationUnlocked(false)}
-                      className="w-1/3 h-10 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container"
+                      className="w-1/3 h-10 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <motion.button
                       type="submit"
+                      disabled={isSavingPassword}
                       whileHover={{ scale: 1.015 }}
                       whileTap={{ scale: 0.985 }}
-                      className="w-2/3 h-10 rounded-xl bg-primary-container hover:bg-primary text-on-primary text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                      className="w-2/3 h-10 rounded-xl bg-primary-container hover:bg-primary text-on-primary text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      Save &amp; Update Password
+                      {isSavingPassword ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          <span>Updating Password in Database...</span>
+                        </>
+                      ) : (
+                        <span>Save &amp; Update Password</span>
+                      )}
                     </motion.button>
                   </div>
                 </form>
               )}
             </div>
 
-            {/* Right (5 cols): Two-Factor Authentication Card */}
+            {/* Right (5 cols): Two-Factor Authentication Card with Interactive Toggle Switch */}
             <div className="lg:col-span-5 bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-primary">
                   <span className="material-symbols-outlined text-[20px]">security</span>
                   <h3 className="text-base font-bold text-on-surface">Two-Factor Authentication</h3>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                  FIPS 140-3 Compliant
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                  twoFactorConfigured
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                }`}>
+                  {twoFactorConfigured ? '2FA Enforced' : '2FA Optional'}
                 </span>
               </div>
               <p className="text-xs text-outline">
-                Requires 6-digit TOTP code or WebAuthn hardware key at every clinical sign-in.
+                When active, every sign-in requires entering a 6-digit verification code sent to your registered email ({profile.email}).
               </p>
-              <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between">
+
+              {/* Interactive Toggle Switch */}
+              <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary-container/10 text-primary flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[22px]">phonelink_lock</span>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                    twoFactorConfigured
+                      ? 'bg-emerald-500/10 text-emerald-700'
+                      : 'bg-surface-container-high text-outline'
+                  }`}>
+                    <span className="material-symbols-outlined text-[22px]">
+                      {twoFactorConfigured ? 'lock' : 'lock_open'}
+                    </span>
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-on-surface">TOTP Authenticator &amp; YubiKey</div>
-                    <div className="text-[11px] text-outline">{twoFactorDeviceLabel}</div>
+                    <div className="text-xs font-bold text-on-surface">
+                      {twoFactorConfigured ? 'Require OTP on Sign-In' : 'Direct Password Login'}
+                    </div>
+                    <div className="text-[11px] text-outline">
+                      {twoFactorConfigured ? 'High security: OTP mandatory on login' : 'Faster sign-in: OTP bypassed'}
+                    </div>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-emerald-600 text-[22px]">check_circle</span>
+
+                {/* Switch Toggle Button */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={twoFactorConfigured}
+                  disabled={isToggling2Fa}
+                  onClick={() => handleToggle2FA(!twoFactorConfigured)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    twoFactorConfigured ? 'bg-primary' : 'bg-slate-300'
+                  } ${isToggling2Fa ? 'opacity-50 cursor-wait' : ''}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      twoFactorConfigured ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
-              <motion.button
-                type="button"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleInitiate2FaReconfig}
-                className="w-full h-10 rounded-xl border border-primary text-primary hover:bg-primary/5 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[18px]">sync_lock</span>
-                <span>Reconfigure Authenticator App</span>
-              </motion.button>
+
               <div className="p-3 rounded-xl bg-surface-container-low text-[11px] text-outline flex items-start gap-2">
-                <span className="material-symbols-outlined text-primary text-[18px] shrink-0">info</span>
-                <span>Supported authenticators: Google Authenticator, Microsoft Authenticator, YubiKey 5 Series NFC.</span>
+                <span className="material-symbols-outlined text-primary text-[18px] shrink-0">verified_user</span>
+                <span>
+                  {twoFactorConfigured
+                    ? 'Your account is protected. Every clinical session requires step-up verification code dispatched via Google Apps Script.'
+                    : 'Two-factor requirement is currently off. You can log in directly using your email and password.'}
+                </span>
               </div>
             </div>
           </div>

@@ -28,6 +28,7 @@ export interface UserProfile {
   role: string;
   licenseNumber?: string;
   clinicId?: string;
+  twoFactorEnabled?: boolean;
 }
 
 export interface AuthApiResponse {
@@ -222,6 +223,29 @@ export const authApi = {
   },
 
   /**
+   * Toggle Two-Factor Authentication on/off in the database
+   */
+  async toggle2FA(email: string, enabled: boolean): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/toggle-2fa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, enabled })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Failed to update Two-Factor Authentication status.');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
    * Persist session JWT and clinician profile
    */
   saveSession(token: string, user: UserProfile): void {
@@ -233,6 +257,9 @@ export const authApi = {
     sessionStorage.setItem('rxguard_prescriber_role', user.role);
     sessionStorage.setItem('rxguard_prescriber_id', user.id);
     sessionStorage.setItem('rxguard_prescriber_npi', user.licenseNumber || user.id || 'NPI-PENDING');
+    if (user.twoFactorEnabled !== undefined) {
+      sessionStorage.setItem('rxguard_two_factor_enabled', String(user.twoFactorEnabled));
+    }
     localStorage.setItem('smileclinic_jwt_token', token);
     localStorage.setItem('smileclinic_auth_user', JSON.stringify(user));
   },
@@ -249,6 +276,7 @@ export const authApi = {
     sessionStorage.removeItem('rxguard_prescriber_role');
     sessionStorage.removeItem('rxguard_prescriber_id');
     sessionStorage.removeItem('rxguard_prescriber_npi');
+    sessionStorage.removeItem('rxguard_two_factor_enabled');
     localStorage.removeItem('smileclinic_jwt_token');
     localStorage.removeItem('smileclinic_auth_user');
   }
