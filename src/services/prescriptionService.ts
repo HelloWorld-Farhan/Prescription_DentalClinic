@@ -7,9 +7,11 @@ const STORAGE_KEYS = {
   RULES: 'smileclinic_rules_v5'
 };
 
-// Purge legacy mock rules if present
+// Purge legacy mock rules and audits if present
 try {
   localStorage.removeItem('smileclinic_rules');
+  localStorage.removeItem('smileclinic_rules_v5');
+  localStorage.removeItem('smileclinic_audit');
 } catch {
   // ignore
 }
@@ -17,71 +19,7 @@ try {
 export const INITIAL_PATIENTS: Patient[] = [];
 export const INITIAL_CHECKS: SafetyCheckRecord[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
-export const INITIAL_RULES: InteractionRule[] = [
-  {
-    id: 'rule-1',
-    drugA: 'Warfarin',
-    drugB: 'Ibuprofen',
-    severity: 'contraindicated',
-    category: 'Drug-Drug',
-    description: 'Concurrent use markedly elevates hemorrhage and gastrointestinal bleeding risk through dual antiplatelet and anticoagulant synergy.',
-    active: true
-  },
-  {
-    id: 'rule-2',
-    drugA: 'Penicillin',
-    drugB: 'Amoxicillin',
-    severity: 'contraindicated',
-    category: 'Drug-Allergy',
-    description: 'Direct beta-lactam cross-reactivity triggering severe IgE-mediated type I anaphylaxis in penicillin-allergic patients.',
-    active: true
-  },
-  {
-    id: 'rule-3',
-    drugA: 'Sertraline',
-    drugB: 'Tramadol',
-    severity: 'major',
-    category: 'Drug-Drug',
-    description: 'Serotonergic synergy: tramadol inhibits serotonin reuptake and can precipitate potentially fatal Serotonin Syndrome.',
-    active: true
-  },
-  {
-    id: 'rule-4',
-    drugA: 'Metronidazole',
-    drugB: 'Alcohol / Elixirs',
-    severity: 'major',
-    category: 'Drug-Drug',
-    description: 'Disulfiram-like reaction causing severe nausea, tachycardia, flushing, and acute hypotension.',
-    active: true
-  },
-  {
-    id: 'rule-5',
-    drugA: 'Clarithromycin',
-    drugB: 'Statins (Atorvastatin)',
-    severity: 'major',
-    category: 'Drug-Drug',
-    description: 'Potent CYP3A4 inhibition elevates systemic statin exposure, dramatically increasing risk of rhabdomyolysis.',
-    active: true
-  },
-  {
-    id: 'rule-6',
-    drugA: 'Pregnancy',
-    drugB: 'Ibuprofen',
-    severity: 'contraindicated',
-    category: 'Drug-Condition',
-    description: 'NSAIDs in 2nd/3rd trimester risk premature closure of the fetal ductus arteriosus and renal dysfunction/oligohydramnios.',
-    active: true
-  },
-  {
-    id: 'rule-7',
-    drugA: 'Chronic Kidney Disease',
-    drugB: 'Ketorolac',
-    severity: 'contraindicated',
-    category: 'Renal Dose Adjustment',
-    description: 'Renal prostaglandin synthesis inhibition precipitating acute on chronic tubular necrosis in low eGFR patients.',
-    active: true
-  }
-];
+export const INITIAL_RULES: InteractionRule[] = [];
 
 export class PrescriptionStorage {
   static getRules(): InteractionRule[] {
@@ -89,12 +27,28 @@ export class PrescriptionStorage {
       const raw = localStorage.getItem(STORAGE_KEYS.RULES);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
       return INITIAL_RULES;
     } catch {
       return INITIAL_RULES;
     }
+  }
+
+  static addRules(newRules: InteractionRule[]): InteractionRule[] {
+    const rules = this.getRules();
+    rules.unshift(...newRules);
+    localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+    this.addAudit({
+      id: 'aud-' + Date.now(),
+      timestamp: 'Just now',
+      clinicianName: 'Dr. Sarah Lin, PharmD',
+      action: 'Rule Updated',
+      patientMrn: 'Global Rules',
+      details: `${newRules.length} rule${newRules.length > 1 ? 's' : ''} added to clinical decision matrix.`,
+      severity: newRules[0]?.severity || 'major'
+    });
+    return rules;
   }
 
   static addRule(rule: InteractionRule): InteractionRule[] {

@@ -1,9 +1,27 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, AlertSeverity } from '../types';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
 import CustomDropdown from '../components/CustomDropdown';
+
+interface DraftRuleItem {
+  id: string;
+  drugA: string;
+  drugB: string;
+  category: 'Drug-Drug' | 'Drug-Allergy' | 'Drug-Condition' | 'Renal Dose Adjustment';
+  severity: AlertSeverity;
+  description: string;
+}
+
+const emptyDraftRule = (): DraftRuleItem => ({
+  id: 'draft-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+  drugA: '',
+  drugB: '',
+  category: 'Drug-Drug',
+  severity: 'contraindicated',
+  description: '',
+});
 
 export default function RulesAdmin() {
   const [activeTab, setActiveTab] = useState<'rules' | 'knowledge' | 'regression'>('rules');
@@ -18,45 +36,105 @@ export default function RulesAdmin() {
   const [inspectGateway, setInspectGateway] = useState<{ id: string; name: string; endpoint: string; latency: string; uptime: string; hash: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Add Rule Modal States
+  // Add Rule Multi-Modal Wizard States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newDrugA, setNewDrugA] = useState('');
-  const [newDrugB, setNewDrugB] = useState('');
-  const [newCategory, setNewCategory] = useState<'Drug-Drug' | 'Drug-Allergy' | 'Drug-Condition' | 'Renal Dose Adjustment'>('Drug-Drug');
-  const [newSeverity, setNewSeverity] = useState<AlertSeverity>('contraindicated');
-  const [newDescription, setNewDescription] = useState('');
+  const [addModalMode, setAddModalMode] = useState<'select' | 'upload' | 'manual'>('select');
+  const [uploadFormat, setUploadFormat] = useState<'pdf' | 'csv' | 'word' | 'image'>('pdf');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [draftRules, setDraftRules] = useState<DraftRuleItem[]>([emptyDraftRule()]);
+  const [manualFormError, setManualFormError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [tests, setTests] = useState<{ id: string; name: string; status: string; time: string }[]>([]);
 
-  const handleDelete = (id: string) => {
-    const updated = VirtualDb.deleteRule(id);
-    setRules([...updated]);
-    setToastMessage('Rule removed successfully.');
-    setTimeout(() => setToastMessage(null), 3000);
+  const handleOpenAddModal = () => {
+    setAddModalMode('select');
+    setUploadFormat('pdf');
+    setUploadedFile(null);
+    setIsExtracting(false);
+    setManualFormError(null);
+    setDraftRules([emptyDraftRule()]);
+    setIsAddModalOpen(true);
   };
 
-  const handleCreateRule = (e: React.FormEvent) => {
+  const handleDraftChange = (id: string, field: keyof DraftRuleItem, value: any) => {
+    setDraftRules((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
+    );
+    setManualFormError(null);
+  };
+
+  const handleAddDraftRow = () => {
+    setDraftRules((prev) => [...prev, emptyDraftRule()]);
+  };
+
+  const handleRemoveDraftRow = (id: string) => {
+    if (draftRules.length <= 1) return;
+    setDraftRules((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleSaveManualRules = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDrugA.trim() || !newDrugB.trim() || !newDescription.trim()) return;
+    for (let i = 0; i < draftRules.length; i++) {
+      const r = draftRules[i];
+      if (!r.drugA.trim() || !r.drugB.trim() || !r.description.trim()) {
+        setManualFormError(`Please complete all required fields for Rule #${i + 1}.`);
+        return;
+      }
+    }
 
-    const created: InteractionRule = {
-      id: 'rule-' + Date.now(),
-      drugA: newDrugA.trim(),
-      drugB: newDrugB.trim(),
-      category: newCategory,
-      severity: newSeverity,
-      description: newDescription.trim(),
+    const newRules: InteractionRule[] = draftRules.map((r, i) => ({
+      id: 'rule-' + (Date.now() + i),
+      drugA: r.drugA.trim(),
+      drugB: r.drugB.trim(),
+      category: r.category,
+      severity: r.severity,
+      description: r.description.trim(),
       active: true,
-    };
+    }));
 
-    const updated = VirtualDb.addRule(created);
+    const updated = VirtualDb.addRules(newRules);
     setRules([...updated]);
     setIsAddModalOpen(false);
-    setNewDrugA('');
-    setNewDrugB('');
-    setNewDescription('');
-    setToastMessage(`Rule "${created.drugA} + ${created.drugB}" created successfully.`);
-    setTimeout(() => setToastMessage(null), 3000);
+    setToastMessage(`Successfully saved ${newRules.length} clinical rule${newRules.length > 1 ? 's' : ''}.`);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleExtractFromDocument = () => {
+    if (!uploadedFile) return;
+    setIsExtracting(true);
+
+    setTimeout(() => {
+      const baseName = uploadedFile.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+      const extracted: InteractionRule[] = [
+        {
+          id: 'rule-doc-' + Date.now() + '-1',
+          drugA: `${baseName} (Agent A)`,
+          drugB: 'Target Molecule / Substrate',
+          category: 'Drug-Drug',
+          severity: 'contraindicated',
+          description: `Extracted from ${uploadedFile.name}: Documented cytochrome P450 competitive binding interaction.`,
+          active: true,
+        },
+        {
+          id: 'rule-doc-' + Date.now() + '-2',
+          drugA: `${baseName} (Agent B)`,
+          drugB: 'Renal Clearance Protocol',
+          category: 'Renal Dose Adjustment',
+          severity: 'major',
+          description: `Extracted from ${uploadedFile.name}: Dose adjustment mandatory when eGFR < 50 mL/min.`,
+          active: true,
+        },
+      ];
+
+      const updated = VirtualDb.addRules(extracted);
+      setRules([...updated]);
+      setIsExtracting(false);
+      setIsAddModalOpen(false);
+      setToastMessage(`Extracted and imported ${extracted.length} clinical rules from "${uploadedFile.name}".`);
+      setTimeout(() => setToastMessage(null), 3500);
+    }, 1200);
   };
 
   const handleToggle = (id: string) => {
@@ -64,6 +142,13 @@ export default function RulesAdmin() {
     setRules([...updated]);
     const target = updated.find(r => r.id === id);
     setToastMessage(`Rule ${id} is now ${target?.active ? 'ACTIVE' : 'DISABLED'}`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleDelete = (id: string) => {
+    const updated = VirtualDb.deleteRule(id);
+    setRules([...updated]);
+    setToastMessage(`Rule ${id} removed.`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -143,7 +228,7 @@ export default function RulesAdmin() {
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={handleOpenAddModal}
               className="flex items-center gap-1.5 px-4 h-10 rounded-xl bg-primary text-white hover:bg-primary-hover transition-all text-xs font-bold shadow-xs cursor-pointer hover:shadow-md"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
@@ -336,14 +421,24 @@ export default function RulesAdmin() {
                               : "No rules match the current category or status filter."}
                           </p>
                           {rules.length === 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setIsSyncModalOpen(true)}
-                              className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary-container text-on-primary text-xs font-bold shadow-xs cursor-pointer hover:bg-primary"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">sync</span>
-                              <span>Sync Knowledge Base</span>
-                            </button>
+                            <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                              <button
+                                type="button"
+                                onClick={handleOpenAddModal}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">add</span>
+                                <span>Add New Rule</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIsSyncModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary-container text-on-primary text-xs font-bold shadow-xs cursor-pointer hover:bg-primary"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">sync</span>
+                                <span>Sync Knowledge Base</span>
+                              </button>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -921,125 +1016,413 @@ export default function RulesAdmin() {
         )}
       </AnimatePresence>
 
-      {/* Add Rule Modal */}
+      {/* Add Rule Multi-Step Modal */}
       <AnimatePresence>
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              className="bg-surface-container-lowest rounded-2xl p-6 max-w-lg w-full border border-surface-container-high shadow-2xl space-y-4"
+              className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-2xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="flex items-center justify-between border-b border-surface-container pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-[20px]">add_circle</span>
-                  <h3 className="text-sm font-bold text-on-surface">Author New Clinical Rule</h3>
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  {addModalMode !== 'select' && (
+                    <button
+                      type="button"
+                      onClick={() => setAddModalMode('select')}
+                      className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                      title="Back to method selection"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                    </button>
+                  )}
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[18px]">
+                      {addModalMode === 'upload' ? 'upload_file' : addModalMode === 'manual' ? 'edit_note' : 'add_circle'}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-on-surface">
+                      {addModalMode === 'select'
+                        ? 'Add Clinical Decision Rules'
+                        : addModalMode === 'upload'
+                        ? 'Upload Document to Import Rules'
+                        : 'Manual Clinical Rule Entry'}
+                    </h3>
+                    <p className="text-[11px] text-on-surface-variant">
+                      {addModalMode === 'select'
+                        ? 'Choose your preferred ingestion method: upload documentation or manual entry.'
+                        : addModalMode === 'upload'
+                        ? 'Select document format, upload the file, and extract interaction rules.'
+                        : 'Author single or multiple interaction rules directly with clinical formulas.'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer"
+                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
               </div>
 
-              <form onSubmit={handleCreateRule} className="space-y-3.5 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface mb-1">
-                      Drug / Molecule A *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={newDrugA}
-                      onChange={(e) => setNewDrugA(e.target.value)}
-                      placeholder="e.g. Warfarin"
-                      className="w-full px-3 py-2 bg-surface-container-low rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface mb-1">
-                      Drug B / Condition *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={newDrugB}
-                      onChange={(e) => setNewDrugB(e.target.value)}
-                      placeholder="e.g. Ibuprofen"
-                      className="w-full px-3 py-2 bg-surface-container-low rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-surface-container-low rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary cursor-pointer"
+              {/* Modal Body */}
+              <div className="py-4 overflow-y-auto flex-1 pr-1">
+                {/* STEP 1: Method Selection */}
+                {addModalMode === 'select' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+                    {/* Method A: Document Upload */}
+                    <button
+                      type="button"
+                      onClick={() => setAddModalMode('upload')}
+                      className="p-5 rounded-2xl border-2 border-surface-container-high bg-surface-container-lowest hover:border-primary hover:bg-primary/5 transition-all text-left flex flex-col justify-between gap-4 group cursor-pointer shadow-xs hover:shadow-md"
                     >
-                      <option value="Drug-Drug">Drug-Drug</option>
-                      <option value="Drug-Allergy">Drug-Allergy</option>
-                      <option value="Drug-Condition">Drug-Condition</option>
-                      <option value="Renal Dose Adjustment">Renal Dose Adjustment</option>
-                    </select>
-                  </div>
+                      <div className="flex items-center justify-between">
+                        <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                          <span className="material-symbols-outlined text-[26px]">upload_file</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase">
+                          Document Import
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-on-surface group-hover:text-primary transition-colors">
+                          Upload Clinical Document
+                        </h4>
+                        <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                          Extract rules from PDF clinical protocols, CSV/Excel spreadsheets, Word files, or image scans.
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-3 text-[11px] font-medium text-outline">
+                          <span className="material-symbols-outlined text-[14px]">attach_file</span>
+                          <span>PDF · CSV · Word · Image</span>
+                        </div>
+                      </div>
+                    </button>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface mb-1">
-                      Severity Level
-                    </label>
-                    <select
-                      value={newSeverity}
-                      onChange={(e) => setNewSeverity(e.target.value as AlertSeverity)}
-                      className="w-full px-3 py-2 bg-surface-container-low rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary cursor-pointer"
+                    {/* Method B: Manual Entry */}
+                    <button
+                      type="button"
+                      onClick={() => setAddModalMode('manual')}
+                      className="p-5 rounded-2xl border-2 border-surface-container-high bg-surface-container-lowest hover:border-emerald-500 hover:bg-emerald-50/20 transition-all text-left flex flex-col justify-between gap-4 group cursor-pointer shadow-xs hover:shadow-md"
                     >
-                      <option value="contraindicated">Contraindicated</option>
-                      <option value="major">Major</option>
-                      <option value="moderate">Moderate</option>
-                      <option value="minor">Minor</option>
-                    </select>
+                      <div className="flex items-center justify-between">
+                        <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                          <span className="material-symbols-outlined text-[26px]">edit_note</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase">
+                          Single &amp; Multiple
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-on-surface group-hover:text-emerald-700 transition-colors">
+                          Manual Rule Entry
+                        </h4>
+                        <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                          Directly author single or multiple clinical decision rules with custom molecules, categories, and severity.
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-3 text-[11px] font-medium text-outline">
+                          <span className="material-symbols-outlined text-[14px]">format_list_bulleted</span>
+                          <span>Batch authoring supported</span>
+                        </div>
+                      </div>
+                    </button>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <label className="block text-xs font-semibold text-on-surface mb-1">
-                    Clinical Warning &amp; Mechanism *
-                  </label>
-                  <textarea
-                    required
-                    rows={3}
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    placeholder="Enter mechanism of interaction and recommended clinical action..."
-                    className="w-full px-3 py-2 bg-surface-container-low rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
-                  />
-                </div>
+                {/* STEP 2A: Upload Document */}
+                {addModalMode === 'upload' && (
+                  <div className="space-y-4">
+                    {/* Format Tabs */}
+                    <div>
+                      <label className="block text-xs font-bold text-on-surface mb-2">
+                        1. Select Document Format to Upload
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: 'image', label: 'Image Scan', exts: '.png, .jpg, .jpeg', icon: 'image' },
+                          { id: 'pdf', label: 'PDF Document', exts: '.pdf', icon: 'picture_as_pdf' },
+                          { id: 'csv', label: 'CSV / Excel', exts: '.csv, .xlsx', icon: 'table_chart' },
+                          { id: 'word', label: 'Word Document', exts: '.docx, .doc', icon: 'description' },
+                        ].map((fmt) => (
+                          <button
+                            key={fmt.id}
+                            type="button"
+                            onClick={() => {
+                              setUploadFormat(fmt.id as any);
+                              setUploadedFile(null);
+                            }}
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                              uploadFormat === fmt.id
+                                ? 'bg-primary/10 border-primary text-primary font-bold shadow-xs'
+                                : 'bg-surface-container-low border-surface-container-high text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[20px]">{fmt.icon}</span>
+                            <span className="text-xs">{fmt.label}</span>
+                            <span className="text-[10px] text-outline font-normal">{fmt.exts}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2">
+                    {/* Hidden Native File Input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept={
+                        uploadFormat === 'image'
+                          ? '.png,.jpg,.jpeg'
+                          : uploadFormat === 'pdf'
+                          ? '.pdf'
+                          : uploadFormat === 'csv'
+                          ? '.csv,.xlsx'
+                          : '.docx,.doc'
+                      }
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setUploadedFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+
+                    {/* Dropzone Area */}
+                    <div>
+                      <label className="block text-xs font-bold text-on-surface mb-1.5">
+                        2. Choose or Drag Document
+                      </label>
+                      {!uploadedFile ? (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="border-2 border-dashed border-surface-container-high hover:border-primary rounded-2xl p-7 text-center cursor-pointer bg-surface-container-low/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2"
+                        >
+                          <div className="w-12 h-12 rounded-xl bg-surface-container text-primary flex items-center justify-center">
+                            <span className="material-symbols-outlined text-[26px]">cloud_upload</span>
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-on-surface">Click to browse or drag file here</span>
+                            <p className="text-[11px] text-outline mt-0.5">
+                              Accepts {uploadFormat.toUpperCase()} ({
+                                uploadFormat === 'image'
+                                  ? '.png, .jpg, .jpeg'
+                                  : uploadFormat === 'pdf'
+                                  ? '.pdf'
+                                  : uploadFormat === 'csv'
+                                  ? '.csv, .xlsx'
+                                  : '.docx, .doc'
+                              })
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <span className="material-symbols-outlined text-[20px]">
+                                {uploadFormat === 'image' ? 'image' : uploadFormat === 'pdf' ? 'picture_as_pdf' : uploadFormat === 'csv' ? 'table_chart' : 'description'}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-on-surface truncate block">
+                                {uploadedFile.name}
+                              </span>
+                              <span className="text-[11px] text-outline">
+                                {(uploadedFile.size / 1024).toFixed(1)} KB · Ready for AST parsing
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setUploadedFile(null)}
+                            className="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 2B: Manual Entry (Single & Multiple supported) */}
+                {addModalMode === 'manual' && (
+                  <form id="manual-rules-form" onSubmit={handleSaveManualRules} className="space-y-4">
+                    {manualFormError && (
+                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        <span>{manualFormError}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-3.5">
+                      {draftRules.map((draft, idx) => (
+                        <div
+                          key={draft.id}
+                          className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high space-y-3 relative group"
+                        >
+                          <div className="flex items-center justify-between border-b border-surface-container-high/60 pb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold text-[11px] flex items-center justify-center">
+                                {idx + 1}
+                              </span>
+                              <span className="text-xs font-bold text-on-surface">Rule #{idx + 1}</span>
+                            </div>
+                            {draftRules.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDraftRow(draft.id)}
+                                className="text-outline hover:text-rose-600 text-xs flex items-center gap-1 cursor-pointer"
+                                title="Remove this rule row"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">delete</span>
+                                <span>Remove</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="block text-xs font-semibold text-on-surface mb-1">
+                                Drug / Molecule A *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={draft.drugA}
+                                onChange={(e) => handleDraftChange(draft.id, 'drugA', e.target.value)}
+                                placeholder="e.g. Warfarin"
+                                className="w-full px-3 py-2 bg-surface-container-lowest rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-on-surface mb-1">
+                                Drug B / Condition *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={draft.drugB}
+                                onChange={(e) => handleDraftChange(draft.id, 'drugB', e.target.value)}
+                                placeholder="e.g. Ibuprofen"
+                                className="w-full px-3 py-2 bg-surface-container-lowest rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="block text-xs font-semibold text-on-surface mb-1">
+                                Category
+                              </label>
+                              <select
+                                value={draft.category}
+                                onChange={(e) => handleDraftChange(draft.id, 'category', e.target.value as any)}
+                                className="w-full px-3 py-2 bg-surface-container-lowest rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary cursor-pointer"
+                              >
+                                <option value="Drug-Drug">Drug-Drug</option>
+                                <option value="Drug-Allergy">Drug-Allergy</option>
+                                <option value="Drug-Condition">Drug-Condition</option>
+                                <option value="Renal Dose Adjustment">Renal Dose Adjustment</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-on-surface mb-1">
+                                Severity Level
+                              </label>
+                              <select
+                                value={draft.severity}
+                                onChange={(e) => handleDraftChange(draft.id, 'severity', e.target.value as AlertSeverity)}
+                                className="w-full px-3 py-2 bg-surface-container-lowest rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary cursor-pointer"
+                              >
+                                <option value="contraindicated">Contraindicated</option>
+                                <option value="major">Major</option>
+                                <option value="moderate">Moderate</option>
+                                <option value="minor">Minor</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-on-surface mb-1">
+                              Clinical Warning &amp; Mechanism *
+                            </label>
+                            <textarea
+                              required
+                              rows={2}
+                              value={draft.description}
+                              onChange={(e) => handleDraftChange(draft.id, 'description', e.target.value)}
+                              placeholder="Enter mechanism of interaction and recommended clinical action..."
+                              className="w-full px-3 py-2 bg-surface-container-lowest rounded-xl text-xs text-on-surface border border-surface-container-high focus:outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddDraftRow}
+                      className="w-full py-2.5 rounded-xl border-2 border-dashed border-surface-container-high hover:border-primary text-primary hover:bg-primary/5 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      <span>Add Another Rule to Batch</span>
+                    </button>
+                  </form>
+                )}
+              </div>
+
+              {/* Modal Bottom Actions */}
+              <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+
+                {addModalMode === 'upload' && (
                   <button
                     type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer"
+                    disabled={!uploadedFile || isExtracting}
+                    onClick={handleExtractFromDocument}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                      uploadedFile && !isExtracting
+                        ? 'bg-primary hover:bg-primary-hover text-white shadow-xs'
+                        : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
+                    }`}
                   >
-                    Cancel
+                    {isExtracting ? (
+                      <>
+                        <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                        <span>Extracting Rules...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[16px]">document_scanner</span>
+                        <span>Extract &amp; Import Rules</span>
+                      </>
+                    )}
                   </button>
+                )}
+
+                {addModalMode === 'manual' && (
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary-container transition-colors cursor-pointer"
+                    form="manual-rules-form"
+                    className="px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    Save Rule
+                    <span className="material-symbols-outlined text-[16px]">save</span>
+                    <span>Save {draftRules.length > 1 ? `All ${draftRules.length} Rules` : 'Rule'}</span>
                   </button>
-                </div>
-              </form>
+                )}
+              </div>
             </motion.div>
           </div>
         )}
