@@ -16,8 +16,15 @@ export default function Report() {
   const currentCheck: SafetyCheckRecord = checks.find(c => c.id === checkId || c.checkNumber === checkId) || checks[0];
 
   // Dynamic logged in prescriber
-  const prescriberName = sessionStorage.getItem('rxguard_prescriber_name') || 'Dr. Sarah Lin, PharmD';
-  const prescriberRole = sessionStorage.getItem('rxguard_prescriber_role') || 'Lead Clinical Pharmacist';
+  let storedUser: any = null;
+  try {
+    const raw = localStorage.getItem('smileclinic_auth_user');
+    if (raw) storedUser = JSON.parse(raw);
+  } catch {
+    storedUser = null;
+  }
+  const prescriberName = currentCheck?.prescriberName || storedUser?.fullName || sessionStorage.getItem('rxguard_prescriber_name') || 'Authorized Prescriber';
+  const prescriberRole = storedUser?.role || sessionStorage.getItem('rxguard_prescriber_role') || 'Clinical Prescriber';
   const prescriberNpi = sessionStorage.getItem('rxguard_prescriber_npi') || 'PH-88412';
 
   const handleZoomChange = (val: number) => {
@@ -69,7 +76,7 @@ export default function Report() {
         sig: '1 tab PO Q12H × 7 days',
         quantity: '14 Tablets',
         indication: 'Pyelonephritis (ICD-10: N10)',
-        prescriber: 'Dr. Arthur Vance, MD (NPI: 1092837482)'
+        prescriber: `${prescriberName} (NPI: ${prescriberNpi})`
       },
       alertsEvaluated: [
         {
@@ -451,8 +458,8 @@ export default function Report() {
                 <div className="text-[11px] flex flex-col sm:flex-row justify-between text-slate-500 gap-1 pt-3 border-t border-slate-100">
                   <div>
                     <span>Prescriber: </span>
-                    <strong className="text-slate-800">Dr. Arthur Vance, MD</strong>
-                    <span className="font-mono text-slate-400"> (NPI: 1092837482)</span>
+                    <strong className="text-slate-800">{prescriberName}</strong>
+                    <span className="font-mono text-slate-400"> ({prescriberRole})</span>
                   </div>
                   <div className="font-mono text-slate-400 text-[10px]">
                     E-Prescribe Scan: SHA256:89fa2...a98 verified

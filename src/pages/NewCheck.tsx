@@ -36,17 +36,49 @@ export default function NewCheck() {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  // Clean Default Patient Reference
+  // Read active logged-in user profile
+  let storedUser: any = null;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('smileclinic_auth_user');
+      if (raw) storedUser = JSON.parse(raw);
+    } catch {
+      storedUser = null;
+    }
+  }
+
+  const userFullName = storedUser?.fullName || 'Screening Candidate';
+  const userAge = storedUser?.age ? Number(storedUser.age) : 40;
+  const userGender = storedUser?.gender || 'Female';
+  const userHeight = storedUser?.height || "5'9\"";
+  const userWeightRaw = storedUser?.weight || '65 kg';
+  const userWeightNum = typeof storedUser?.weight === 'number'
+    ? storedUser.weight
+    : parseFloat(storedUser?.weight) || 65;
+  const userHasAllergies = Boolean(storedUser?.hasAllergies);
+  const userAllergies = userHasAllergies && storedUser?.allergiesDescription
+    ? [storedUser.allergiesDescription]
+    : userHasAllergies
+    ? ['Documented Allergy']
+    : [];
+
+  const prescriberDisplayName = storedUser?.fullName || 'Arthur Vance, MD';
+  const prescriberRoleDisplay = storedUser?.role
+    ? storedUser.role.charAt(0).toUpperCase() + storedUser.role.slice(1)
+    : 'Active Prescriber';
+
+  // Dynamic Patient Reference
   const defaultPatient: Patient = {
     id: 'pt-screening-01',
-    name: 'New Screening Candidate',
+    name: userFullName,
     mrn: 'NEW-001',
-    age: 40,
-    gender: 'Female',
-    weightKg: 65,
+    age: userAge,
+    gender: userGender,
+    height: userHeight,
+    weightKg: userWeightNum,
     egfr: 90,
     pregnancyStatus: 'No',
-    allergies: [],
+    allergies: userAllergies,
     activeMedications: [],
     conditions: [],
     roomOrUnit: 'Dental Operatory'
@@ -55,11 +87,23 @@ export default function NewCheck() {
   // Patient Context Selection
   const [selectedPatientId, setSelectedPatientId] = useState<string>(() => patients[0]?.id || 'pt-screening-01');
   const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || patients[0] || defaultPatient;
-  const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn ? `PT-${selectedPatient.mrn}` : 'PT-NEW-01');
-  const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? 65);
+  const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn ? `PT-${selectedPatient.mrn}` : 'PT-NEW-001');
+  const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? userWeightNum);
   const [customEgfr, setCustomEgfr] = useState<number>(() => selectedPatient?.egfr ?? 90);
   const [activeMeds, setActiveMeds] = useState<string[]>(() => selectedPatient?.activeMedications ?? []);
-  const [allergies, setAllergies] = useState<string[]>(() => selectedPatient?.allergies ?? []);
+  const [allergies, setAllergies] = useState<string[]>(() => (selectedPatient?.allergies && selectedPatient.allergies.length > 0) ? selectedPatient.allergies : userAllergies);
+
+  const patientDisplayName = selectedPatient?.name || userFullName;
+  const patientAge = selectedPatient?.age ?? userAge;
+  const patientGender = selectedPatient?.gender ?? userGender;
+  const patientHeight = selectedPatient?.height || userHeight;
+  const patientWeightFormatted = selectedPatient?.weightKg
+    ? `${selectedPatient.weightKg} kg`
+    : (userWeightRaw.toString().includes('kg') ? userWeightRaw : `${userWeightRaw} kg`);
+
+  const allergyList = allergies.length > 0 ? allergies : userAllergies;
+  const allergySummary = allergyList.length > 0 ? allergyList.join(', ') : 'None documented (NKDA)';
+  const hasDocumentedAllergies = allergyList.length > 0;
 
   // Prescriptions List (Clean empty initial phase)
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([]);
@@ -216,15 +260,15 @@ export default function NewCheck() {
         checkNumber: 'CHK-2026-' + Math.floor(1000 + Math.random() * 9000),
         timestamp: 'Just now',
         patientId: updatedPatient.id,
-        patientName: updatedPatient.name,
+        patientName: patientDisplayName,
         mrn: updatedPatient.mrn,
         patientKey: ptKey,
-        unit: updatedPatient.roomOrUnit || 'Dental Surgery & Inpatient',
+        unit: updatedPatient.roomOrUnit || 'Dental Operatory',
         prescriptions,
         alerts: evaluatedAlerts,
         overallStatus,
-        reviewerName: 'Dr. Sarah Lin, PharmD',
-        prescriberName: 'Arthur Vance, MD',
+        reviewerName: prescriberDisplayName,
+        prescriberName: prescriberDisplayName,
         prescriberNpi: 'NPI-1092837482',
         fhirSynced: true
       };
@@ -424,14 +468,26 @@ export default function NewCheck() {
       {/* Patient Demographic & Clinical Context Strip */}
       <div className="w-full bg-surface-container-low rounded-xl border border-surface-container px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-primary font-bold text-xs">
+          <div className="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-primary font-bold text-xs shrink-0">
             PT
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <span className="font-bold text-on-surface">{ptKey}</span>
             <span className="text-outline">•</span>
+            <span className="text-on-surface font-semibold">
+              {patientDisplayName}
+            </span>
+            <span className="text-outline">•</span>
             <span className="text-on-surface-variant">
-              {selectedPatient?.name || 'Screening Candidate'} {selectedPatient?.age ? `(${selectedPatient.age}y ${selectedPatient.gender})` : ''}
+              ({patientAge ? `${patientAge}y` : 'Age N/A'} {patientGender || ''})
+            </span>
+            <span className="text-outline">•</span>
+            <span className="text-on-surface-variant">
+              Ht: <strong className="text-on-surface">{patientHeight}</strong>
+            </span>
+            <span className="text-outline">•</span>
+            <span className="text-on-surface-variant">
+              Wt: <strong className="text-on-surface">{patientWeightFormatted}</strong>
             </span>
             <span className="text-outline">•</span>
             <span className="inline-flex items-center gap-1 text-on-surface">
@@ -439,17 +495,17 @@ export default function NewCheck() {
               eGFR: <strong className={customEgfr < 50 ? 'text-rose-600' : 'text-slate-900'}>{customEgfr} mL/min</strong>
             </span>
             <span className="text-outline">•</span>
-            <span className={`inline-flex items-center gap-1 font-bold ${allergies.length > 0 ? 'text-rose-600' : 'text-on-surface-variant'}`}>
+            <span className={`inline-flex items-center gap-1 font-bold ${hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'text-rose-600' : 'text-on-surface-variant'}`}>
               <span className="material-symbols-outlined text-[14px]">
-                {allergies.length > 0 ? 'emergency' : 'verified'}
+                {hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'emergency' : 'verified'}
               </span>
-              Allergy: {allergies[0] || 'None documented'}
+              Allergy: {allergySummary}
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-on-surface-variant">
+        <div className="flex items-center gap-2 text-on-surface-variant shrink-0">
           <span className="material-symbols-outlined text-[16px] text-primary">stethoscope</span>
-          <span>Prescriber: <strong className="text-on-surface">Arthur Vance, MD</strong> (Inpatient &amp; Surgery)</span>
+          <span>Prescriber: <strong className="text-on-surface">{prescriberDisplayName}</strong> ({prescriberRoleDisplay})</span>
         </div>
       </div>
 
@@ -826,17 +882,32 @@ export default function NewCheck() {
                   <div>
                     <div className="font-bold text-on-surface">Current Medications</div>
                     <div className="text-[11px] text-outline mt-0.5">
-                      Checking {activeMeds.length} active medications on file: <strong>{activeMeds.join(', ')}</strong>.
+                      Checking {activeMeds.length} active medications on file: <strong>{activeMeds.join(', ') || 'None documented'}</strong>.
                     </div>
                   </div>
                 </div>
 
                 <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
-                  <span className="material-symbols-outlined text-rose-600 text-[18px] shrink-0 mt-0.5">emergency</span>
+                  <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    {hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'emergency' : 'verified'}
+                  </span>
                   <div>
                     <div className="font-bold text-on-surface">Documented Allergies</div>
-                    <div className="text-[11px] text-rose-700 font-semibold mt-0.5">
-                      {allergies.join(', ') || 'No known allergies'}
+                    <div className={`text-[11px] font-semibold mt-0.5 ${hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                      {allergySummary}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
+                  <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">badge</span>
+                  <div className="w-full">
+                    <div className="font-bold text-on-surface">Patient Profile Vitals</div>
+                    <div className="text-[11px] text-on-surface-variant mt-1 grid grid-cols-2 gap-y-1 gap-x-2">
+                      <div>Name: <strong className="text-on-surface font-semibold truncate block">{patientDisplayName}</strong></div>
+                      <div>Age / Gender: <strong className="text-on-surface font-semibold">{patientAge}y, {patientGender}</strong></div>
+                      <div>Height: <strong className="text-on-surface font-semibold">{patientHeight}</strong></div>
+                      <div>Weight: <strong className="text-on-surface font-semibold">{patientWeightFormatted}</strong></div>
                     </div>
                   </div>
                 </div>
@@ -1236,22 +1307,36 @@ export default function NewCheck() {
                     <span className="font-mono font-bold text-on-surface">{ptKey}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-outline">Clinic Chart:</span>
-                    <span className="font-semibold text-on-surface">{selectedPatient.name}</span>
+                    <span className="text-outline">Patient Name:</span>
+                    <span className="font-semibold text-on-surface">{patientDisplayName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-outline">Age &amp; Gender:</span>
+                    <span className="font-semibold text-on-surface">{patientAge ? `${patientAge}y` : 'N/A'}, {patientGender || 'Unspecified'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-outline">Height / Weight:</span>
+                    <span className="font-semibold text-on-surface">{patientHeight} / {patientWeightFormatted}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-outline">Renal Clearance:</span>
-                    <span className="font-bold text-rose-600">eGFR {customEgfr} mL/min</span>
+                    <span className={`font-bold ${customEgfr < 50 ? 'text-rose-600' : 'text-emerald-600'}`}>eGFR {customEgfr} mL/min</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-outline">Concurrent Meds:</span>
                     <span className="font-medium text-on-surface text-right max-w-[180px] truncate">
-                      {activeMeds.join(', ')}
+                      {activeMeds.length > 0 ? activeMeds.join(', ') : 'None documented'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-outline">Verified Allergies:</span>
-                    <span className="font-bold text-rose-600">{allergies.join(', ')}</span>
+                    <span className={`font-bold ${hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'text-rose-600' : 'text-emerald-700'}`}>
+                      {allergySummary}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-outline">Attending Prescriber:</span>
+                    <span className="font-semibold text-on-surface">{prescriberDisplayName}</span>
                   </div>
                 </div>
               </div>

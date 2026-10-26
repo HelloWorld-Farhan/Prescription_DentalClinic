@@ -5,8 +5,9 @@ export interface Patient {
   mrn: string;
   name: string;
   age: number;
-  gender: 'Male' | 'Female' | 'Other';
+  gender: 'Male' | 'Female' | 'Other' | string;
   weightKg: number;
+  height?: string;
   egfr: number; // mL/min/1.73m²
   pregnancyStatus: 'No' | 'First Trimester' | 'Second Trimester' | 'Third Trimester' | 'Lactating' | 'N/A';
   conditions: string[];

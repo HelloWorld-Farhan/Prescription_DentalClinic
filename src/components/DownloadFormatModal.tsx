@@ -69,6 +69,13 @@ export default function DownloadFormatModal({
   };
 
   const executeFileExport = (format: ExportFormat) => {
+    let fallbackPrescriber = 'Clinical Prescriber';
+    try {
+      const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+      if (u?.fullName) fallbackPrescriber = u.fullName;
+    } catch {
+      // ignore
+    }
     const checkNumber = check.checkNumber || 'CHK-2026-0001';
     const patientName = check.patientName || 'Anonymous Patient';
     const patientKey = check.patientKey || check.mrn || 'N/A';
@@ -100,8 +107,8 @@ export default function DownloadFormatModal({
         prescriptions: check.prescriptions || [],
         alerts: check.alerts || [],
         reviewer: {
-          name: check.reviewerName || 'Dr. Sarah Lin, PharmD',
-          prescriber: check.prescriberName || 'Arthur Vance, MD',
+          name: check.reviewerName || check.prescriberName || fallbackPrescriber,
+          prescriber: check.prescriberName || fallbackPrescriber,
           signatureSeal: '21-CFR-PART-11-DIGITAL-VERIFIED'
         }
       };
@@ -157,8 +164,8 @@ export default function DownloadFormatModal({
               .join('\n')
           : `  No Contraindicated Interactions Detected.\n`) +
         `\nCLINICAL AUTHORIZATION:\n` +
-        `  Prescribing MD : ${check.prescriberName || 'Arthur Vance, MD'}\n` +
-        `  Review Pharmacist: ${check.reviewerName || 'Dr. Sarah Lin, PharmD'}\n` +
+        `  Prescribing MD : ${check.prescriberName || fallbackPrescriber}\n` +
+        `  Review Pharmacist: ${check.reviewerName || check.prescriberName || fallbackPrescriber}\n` +
         `  Regulatory Seal  : 21 CFR Part 11 / HIPAA Safe Harbor Enforced\n` +
         `=================================================================\n`;
 
