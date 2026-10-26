@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 
 interface AnimatedCounterProps {
   value: number;
@@ -9,11 +9,10 @@ interface AnimatedCounterProps {
 }
 
 /**
- * AnimatedCounter counts from 0 to value in 1s (ease-out) on initial mount,
- * and interpolates from previous to new value in 0.5s on updates.
- * Uses tabular-nums to prevent jitter and respects prefers-reduced-motion.
+ * AnimatedCounter counts smoothly on initial mount and interpolates
+ * on updates without jitter, memoized to prevent re-renders when value is identical.
  */
-export default function AnimatedCounter({
+function AnimatedCounterComponent({
   value,
   duration,
   className = '',
@@ -25,7 +24,11 @@ export default function AnimatedCounter({
   const prevValue = useRef(0);
 
   useEffect(() => {
-    // Check for reduced motion
+    // If value hasn't changed since last animation, skip
+    if (!isFirstMount.current && prevValue.current === value) {
+      return;
+    }
+
     const prefersReducedMotion =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -39,7 +42,7 @@ export default function AnimatedCounter({
 
     const startValue = isFirstMount.current ? 0 : prevValue.current;
     const endValue = value;
-    const animDuration = duration ?? (isFirstMount.current ? 1000 : 500);
+    const animDuration = duration ?? (isFirstMount.current ? 800 : 400);
 
     if (startValue === endValue) {
       setDisplayValue(endValue);
@@ -55,8 +58,8 @@ export default function AnimatedCounter({
       const elapsed = timestamp - startTime;
       const progress = Math.min(elapsed / animDuration, 1);
 
-      // Deceleration easeOut: 1 - Math.pow(1 - progress, 3)
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      // Silky quartic easeOut: 1 - Math.pow(1 - progress, 4)
+      const easeProgress = 1 - Math.pow(1 - progress, 4);
       const current = Math.round(startValue + (endValue - startValue) * easeProgress);
 
       setDisplayValue(current);
@@ -85,3 +88,5 @@ export default function AnimatedCounter({
     </span>
   );
 }
+
+export default memo(AnimatedCounterComponent);

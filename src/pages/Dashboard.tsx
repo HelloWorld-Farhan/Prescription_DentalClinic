@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   motion,
@@ -20,7 +20,7 @@ interface LiveSyncBadgeProps {
   onSync: () => void;
 }
 
-const LiveSyncBadge = function LiveSyncBadge({ onSync }: LiveSyncBadgeProps) {
+const LiveSyncBadge = memo(function LiveSyncBadge({ onSync }: LiveSyncBadgeProps) {
   const [seconds, setSeconds] = useState(5);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -30,7 +30,7 @@ const LiveSyncBadge = function LiveSyncBadge({ onSync }: LiveSyncBadgeProps) {
         if (prev <= 1) {
           setIsSyncing(true);
           onSync();
-          setTimeout(() => setIsSyncing(false), 800);
+          setTimeout(() => setIsSyncing(false), 600);
           return 5;
         }
         return prev - 1;
@@ -40,13 +40,13 @@ const LiveSyncBadge = function LiveSyncBadge({ onSync }: LiveSyncBadgeProps) {
   }, [onSync]);
 
   return (
-    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs border border-surface-container-high/60 transition-colors duration-150 select-none">
-      <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500' : 'bg-primary'}`}></span>
-      <span className={`material-symbols-outlined text-[15px] text-primary transition-transform ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
+    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs border border-surface-container-high/60 select-none transform-gpu">
+      <span className={`w-2 h-2 rounded-full transition-colors duration-200 ${isSyncing ? 'bg-amber-500' : 'bg-primary'}`}></span>
+      <span className={`material-symbols-outlined text-[15px] text-primary transition-transform duration-300 ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
       <span className="font-medium">Live Sync: {isSyncing ? 'Syncing...' : `Just now (${seconds}s)`}</span>
     </div>
   );
-};
+});
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -71,27 +71,49 @@ export default function Dashboard() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
-  const highSeverityCount = checks.filter(c => c.alerts.some(a => a.severity === 'contraindicated' && !a.overridden)).length;
-  const inQueueCount = checks.filter(c => c.overallStatus === 'Requires Review' || c.overallStatus === 'Contraindicated').length;
-  const rulesCount = VirtualDb.getRules().length;
-  const priorityAlerts = checks
-    .flatMap(c => (c.alerts || []).map(a => ({ check: c, alert: a })))
-    .filter(item => (item.alert.severity === 'contraindicated' || item.alert.severity === 'major') && !item.alert.overridden)
-    .slice(0, 3);
 
-  const filteredChecks = checks.filter(c => {
-    const matchesUnit = selectedUnit === 'All Units' || c.unit.toLowerCase().includes(selectedUnit.toLowerCase());
-    const drugNames = c.prescriptions ? c.prescriptions.map(p => p.drugName) : (c.prescribedDrugs || []);
-    const pKey = c.patientKey || c.mrn;
-    const matchesSearch =
-      c.checkNumber.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      pKey.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      drugNames.some((d: string) => d.toLowerCase().includes(searchFilter.toLowerCase())) ||
-      c.unit.toLowerCase().includes(searchFilter.toLowerCase());
-    return matchesUnit && matchesSearch;
-  });
+  // Memoized metrics to prevent recalculation churn
+  const highSeverityCount = useMemo(() => 
+    checks.filter(c => c.alerts.some(a => a.severity === 'contraindicated' && !a.overridden)).length,
+    [checks]
+  );
 
-  const units = ['All Units', ...Array.from(new Set(checks.map(c => c.unit).filter(Boolean)))];
+  const inQueueCount = useMemo(() => 
+    checks.filter(c => c.overallStatus === 'Requires Review' || c.overallStatus === 'Contraindicated').length,
+    [checks]
+  );
+
+  const rulesCount = useMemo(() => VirtualDb.getRules().length, []);
+
+  const priorityAlerts = useMemo(() => 
+    checks
+      .flatMap(c => (c.alerts || []).map(a => ({ check: c, alert: a })))
+      .filter(item => (item.alert.severity === 'contraindicated' || item.alert.severity === 'major') && !item.alert.overridden)
+      .slice(0, 3),
+    [checks]
+  );
+
+  const units = useMemo(() => 
+    ['All Units', ...Array.from(new Set(checks.map(c => c.unit).filter(Boolean)))],
+    [checks]
+  );
+
+  const filteredChecks = useMemo(() => {
+    const q = searchFilter.trim().toLowerCase();
+    return checks.filter(c => {
+      const matchesUnit = selectedUnit === 'All Units' || c.unit.toLowerCase().includes(selectedUnit.toLowerCase());
+      if (!matchesUnit) return false;
+      if (!q) return true;
+      const drugNames = c.prescriptions ? c.prescriptions.map(p => p.drugName) : (c.prescribedDrugs || []);
+      const pKey = c.patientKey || c.mrn;
+      return (
+        c.checkNumber.toLowerCase().includes(q) ||
+        pKey.toLowerCase().includes(q) ||
+        drugNames.some((d: string) => d.toLowerCase().includes(q)) ||
+        c.unit.toLowerCase().includes(q)
+      );
+    });
+  }, [checks, selectedUnit, searchFilter]);
 
   useEffect(() => {
     if (!units.includes(selectedUnit)) {
@@ -99,11 +121,17 @@ export default function Dashboard() {
     }
   }, [units, selectedUnit]);
 
-  const handleAutoSync = () => {
-    setChecks(VirtualDb.getChecks());
-  };
+  // Stable sync handler: only trigger re-render if data actually changed
+  const handleAutoSync = useCallback(() => {
+    const fresh = VirtualDb.getChecks();
+    setChecks(prev => {
+      if (prev.length !== fresh.length) return fresh;
+      if (prev.length > 0 && fresh.length > 0 && prev[0].id !== fresh[0].id) return fresh;
+      return prev;
+    });
+  }, []);
 
-  const handleInspect = (check: SafetyCheckRecord) => {
+  const handleInspect = useCallback((check: SafetyCheckRecord) => {
     if (check.alerts.length > 0) {
       setActiveDrawerAlert(check.alerts[0]);
       setActiveDrawerCheckId(check.id);
@@ -111,15 +139,15 @@ export default function Dashboard() {
     } else {
       setActiveReportCheck(check);
     }
-  };
+  }, []);
 
-  const handleBatchSync = () => {
+  const handleBatchSync = useCallback(() => {
     setIsBatchSyncing(true);
     setChecks(VirtualDb.getChecks());
     setTimeout(() => {
       setIsBatchSyncing(false);
-    }, 800);
-  };
+    }, 600);
+  }, []);
 
   return (
     <div className="flex flex-col w-full gap-6">
@@ -185,17 +213,17 @@ export default function Dashboard() {
 
       {/* 2. FOUR STAT CARDS */}
       <motion.section
-        variants={hasMountedRef.current ? undefined : staggerVariants}
-        initial={hasMountedRef.current ? false : "initial"}
-        animate={hasMountedRef.current ? false : "animate"}
+        variants={staggerVariants}
+        initial="initial"
+        animate="animate"
         className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-w-0 max-w-full"
       >
         {/* Card 1: Checks Today */}
         <motion.div
           variants={fadeUpVariants}
-          whileHover={{ y: -2 }}
-          transition={{ duration: 0.2, ease: EASE }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-primary/50 cursor-pointer transition-colors duration-150"
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-primary/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/check')}
         >
           <div className="flex items-start justify-between">
@@ -213,7 +241,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors duration-150 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors duration-200 shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">fact_check</span>
             </div>
           </div>
@@ -249,9 +277,9 @@ export default function Dashboard() {
         {/* Card 2: Alerts In Queue */}
         <motion.div
           variants={fadeUpVariants}
-          whileHover={{ y: -2 }}
-          transition={{ duration: 0.2, ease: EASE }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#975A16]/50 cursor-pointer transition-colors duration-150"
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#975A16]/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/alerts')}
         >
           <div className="flex items-start justify-between">
@@ -268,7 +296,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center text-[#975A16] group-hover:bg-[#975A16] group-hover:text-white transition-colors duration-150 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center text-[#975A16] group-hover:bg-[#975A16] group-hover:text-white transition-colors duration-200 shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">pending_actions</span>
             </div>
           </div>
@@ -294,9 +322,9 @@ export default function Dashboard() {
         {/* Card 3: High-Severity Open */}
         <motion.div
           variants={fadeUpVariants}
-          whileHover={{ y: -2 }}
-          transition={{ duration: 0.2, ease: EASE }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-error/50 relative overflow-hidden cursor-pointer transition-colors duration-150"
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-error/50 relative overflow-hidden cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/alerts?q=contraindicated')}
         >
           <div className="flex items-start justify-between">
@@ -318,7 +346,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FFDAD6] flex items-center justify-center text-[#BA1A1A] group-hover:bg-[#BA1A1A] group-hover:text-white transition-colors duration-150 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-[#FFDAD6] flex items-center justify-center text-[#BA1A1A] group-hover:bg-[#BA1A1A] group-hover:text-white transition-colors duration-200 shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">warning</span>
             </div>
           </div>
@@ -344,9 +372,9 @@ export default function Dashboard() {
         {/* Card 4: Rules & Clinical Data */}
         <motion.div
           variants={fadeUpVariants}
-          whileHover={{ y: -2 }}
-          transition={{ duration: 0.2, ease: EASE }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#553C9A]/50 cursor-pointer transition-colors duration-150"
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#553C9A]/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/rules')}
         >
           <div className="flex items-start justify-between">
@@ -362,7 +390,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#553C9A] group-hover:bg-[#553C9A] group-hover:text-white transition-colors duration-150 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#553C9A] group-hover:bg-[#553C9A] group-hover:text-white transition-colors duration-200 shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">database</span>
             </div>
           </div>
@@ -387,7 +415,12 @@ export default function Dashboard() {
       </motion.section>
 
       {/* 3. 2-COLUMN MAIN CONTENT (8 cols Left / 4 cols Right) */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-w-0 max-w-full">
+      <motion.section 
+        variants={fadeUpVariants}
+        initial="initial"
+        animate="animate"
+        className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-w-0 max-w-full"
+      >
         {/* LEFT COLUMN: Recent Checks Table */}
         <div className="lg:col-span-8 flex flex-col gap-4 bg-surface-container-lowest rounded-2xl p-4 sm:p-6 shadow-xs border border-surface-container-high/60 min-w-0 max-w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container">
@@ -709,7 +742,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Modals & Drawers */}
       <AlertDetailDrawer

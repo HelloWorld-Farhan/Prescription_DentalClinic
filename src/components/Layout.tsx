@@ -797,14 +797,14 @@ export default function Layout() {
         {/* Content Route with Page Transition */}
         <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto min-h-[calc(100vh-140px)]">
           <ErrorBoundary fallbackTitle="Unable to load this clinical safety view">
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence initial={false}>
               <motion.div
                 key={location.pathname}
                 initial="initial"
                 animate="animate"
                 exit="exit"
                 variants={pageTransitionVariants}
-                className="w-full"
+                className="w-full transform-gpu will-change-transform"
               >
                 <Outlet />
               </motion.div>

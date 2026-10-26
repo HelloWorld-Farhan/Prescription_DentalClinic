@@ -11,22 +11,23 @@ import {
 
 /**
  * CLINICAL MOTION SYSTEM TOKENS
- * Precise, subtle, and calm. Deceleration-focused easing with zero playful bounce.
+ * Silky-smooth cinematic easing ([0.16, 1, 0.3, 1]) with elegant glide,
+ * zero stutter, and GPU hardware acceleration.
  */
-export const EASE = [0.22, 1, 0.36, 1] as const;
+export const EASE = [0.16, 1, 0.3, 1] as const;
 
 export const DURATIONS = {
-  instant: 0.1,
-  fast: 0.2,
-  base: 0.25,
-  slow: 0.35,
+  instant: 0.12,
+  fast: 0.25,
+  base: 0.38,
+  slow: 0.55,
   chart: 0.8,
   counter: 1.0,
-  counterUpdate: 0.5,
+  counterUpdate: 0.45,
 } as const;
 
 export const DISTANCES = {
-  entranceY: 8,
+  entranceY: 10,
   drawerX: 24,
   modalScale: 0.97,
 } as const;
@@ -58,12 +59,22 @@ export const INSTANT_TRANSITION: Transition = {
 
 /**
  * CORE CLINICAL MOTION VARIANTS
+ * Both 'hidden'/'visible' and 'initial'/'animate' are defined to ensure
+ * smooth compatibility regardless of naming convention.
  */
 
-// Stagger container: 0.05s per item, max 8 items
+// Stagger container: 0.05s per item
 export const staggerVariants: Variants = {
   hidden: { opacity: 0 },
+  initial: { opacity: 0 },
   visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.02,
+    },
+  },
+  animate: {
     opacity: 1,
     transition: {
       staggerChildren: 0.05,
@@ -72,10 +83,16 @@ export const staggerVariants: Variants = {
   },
 };
 
-// Subtle upward fade (8px lift)
+// Subtle upward fade (10px silky lift)
 export const fadeUpVariants: Variants = {
   hidden: { opacity: 0, y: DISTANCES.entranceY },
+  initial: { opacity: 0, y: DISTANCES.entranceY },
   visible: {
+    opacity: 1,
+    y: 0,
+    transition: BASE_TRANSITION,
+  },
+  animate: {
     opacity: 1,
     y: 0,
     transition: BASE_TRANSITION,
@@ -90,13 +107,18 @@ export const fadeUpVariants: Variants = {
 // Clean opacity fade
 export const fadeVariants: Variants = {
   hidden: { opacity: 0 },
+  initial: { opacity: 0 },
   visible: {
+    opacity: 1,
+    transition: FAST_TRANSITION,
+  },
+  animate: {
     opacity: 1,
     transition: FAST_TRANSITION,
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.15, ease: EASE },
+    transition: { duration: 0.18, ease: EASE },
   },
 };
 
@@ -104,22 +126,31 @@ export const fadeVariants: Variants = {
 export const modalVariants = {
   backdrop: {
     hidden: { opacity: 0 },
+    initial: { opacity: 0 },
     visible: { opacity: 1, transition: { duration: DURATIONS.fast, ease: EASE } },
-    exit: { opacity: 0, transition: { duration: 0.15, ease: EASE } },
+    animate: { opacity: 1, transition: { duration: DURATIONS.fast, ease: EASE } },
+    exit: { opacity: 0, transition: { duration: 0.18, ease: EASE } },
   },
   panel: {
-    hidden: { opacity: 0, scale: DISTANCES.modalScale, y: 4 },
+    hidden: { opacity: 0, scale: DISTANCES.modalScale, y: 6 },
+    initial: { opacity: 0, scale: DISTANCES.modalScale, y: 6 },
     visible: {
       opacity: 1,
       scale: 1,
       y: 0,
-      transition: { duration: DURATIONS.fast, ease: EASE },
+      transition: BASE_TRANSITION,
+    },
+    animate: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: BASE_TRANSITION,
     },
     exit: {
       opacity: 0,
       scale: DISTANCES.modalScale,
       y: 4,
-      transition: { duration: 0.15, ease: EASE },
+      transition: { duration: 0.18, ease: EASE },
     },
   },
 };
@@ -127,7 +158,13 @@ export const modalVariants = {
 // Drawers: x 24px to 0, fade
 export const drawerVariants: Variants = {
   hidden: { opacity: 0, x: DISTANCES.drawerX },
+  initial: { opacity: 0, x: DISTANCES.drawerX },
   visible: {
+    opacity: 1,
+    x: 0,
+    transition: BASE_TRANSITION,
+  },
+  animate: {
     opacity: 1,
     x: 0,
     transition: BASE_TRANSITION,
@@ -142,7 +179,13 @@ export const drawerVariants: Variants = {
 // Mobile Bottom Sheet variant
 export const bottomSheetVariants: Variants = {
   hidden: { opacity: 0, y: '100%' },
+  initial: { opacity: 0, y: '100%' },
   visible: {
+    opacity: 1,
+    y: 0,
+    transition: BASE_TRANSITION,
+  },
+  animate: {
     opacity: 1,
     y: 0,
     transition: BASE_TRANSITION,
@@ -157,7 +200,13 @@ export const bottomSheetVariants: Variants = {
 // Toasts: y: 8 to 0 + fade
 export const toastVariants: Variants = {
   hidden: { opacity: 0, y: 8 },
+  initial: { opacity: 0, y: 8 },
   visible: {
+    opacity: 1,
+    y: 0,
+    transition: FAST_TRANSITION,
+  },
+  animate: {
     opacity: 1,
     y: 0,
     transition: FAST_TRANSITION,
@@ -165,14 +214,20 @@ export const toastVariants: Variants = {
   exit: {
     opacity: 0,
     y: -4,
-    transition: { duration: 0.15, ease: EASE },
+    transition: { duration: 0.18, ease: EASE },
   },
 };
 
 // Alert Banners: height tween auto
 export const bannerVariants: Variants = {
   hidden: { opacity: 0, height: 0, overflow: 'hidden' },
+  initial: { opacity: 0, height: 0, overflow: 'hidden' },
   visible: {
+    opacity: 1,
+    height: 'auto',
+    transition: BASE_TRANSITION,
+  },
+  animate: {
     opacity: 1,
     height: 'auto',
     transition: BASE_TRANSITION,
@@ -187,14 +242,20 @@ export const bannerVariants: Variants = {
 // Page transitions: 8px entrance rise, fade
 export const pageTransitionVariants: Variants = {
   hidden: { opacity: 0, y: DISTANCES.entranceY },
+  initial: { opacity: 0, y: DISTANCES.entranceY },
   visible: {
+    opacity: 1,
+    y: 0,
+    transition: BASE_TRANSITION,
+  },
+  animate: {
     opacity: 1,
     y: 0,
     transition: BASE_TRANSITION,
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.15, ease: EASE },
+    transition: { duration: 0.18, ease: EASE },
   },
 };
 
@@ -204,7 +265,7 @@ export const otpBoxVariants: Variants = {
   entered: {
     scale: 1,
     opacity: 1,
-    transition: { duration: 0.12, ease: EASE },
+    transition: { duration: 0.15, ease: EASE },
   },
 };
 
@@ -220,10 +281,16 @@ export const shakeVariants: Variants = {
 // Checkmark path drawing (0 bounce)
 export const popCheckVariants: Variants = {
   hidden: { pathLength: 0, opacity: 0 },
+  initial: { pathLength: 0, opacity: 0 },
   visible: {
     pathLength: 1,
     opacity: 1,
-    transition: { duration: 0.2, ease: EASE },
+    transition: { duration: 0.25, ease: EASE },
+  },
+  animate: {
+    pathLength: 1,
+    opacity: 1,
+    transition: { duration: 0.25, ease: EASE },
   },
 };
 

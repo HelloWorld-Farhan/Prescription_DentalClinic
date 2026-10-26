@@ -116,7 +116,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <MotionConfig reducedMotion="user" transition={{ duration: 0.25, ease: EASE }}>
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.38, ease: EASE }}>
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>
