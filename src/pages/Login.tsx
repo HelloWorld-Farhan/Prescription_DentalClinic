@@ -15,7 +15,9 @@ export default function Login() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, []);
 
-  const [clinicalId, setClinicalId] = useState('');
+  const [clinicalId, setClinicalId] = useState(() => {
+    return localStorage.getItem('smileclinic_remembered_email') || '';
+  });
   const [password, setPassword] = useState('');
   const [clinicalIdTouched, setClinicalIdTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
@@ -125,6 +127,10 @@ export default function Login() {
         recordLoginEvent('Success', `Authorized session established (${res.user.fullName})`);
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
+          localStorage.setItem('smileclinic_remembered_email', inputEmail);
+        } else {
+          localStorage.removeItem('rxguard_authenticated');
+          localStorage.removeItem('smileclinic_remembered_email');
         }
         navigate('/dashboard');
         return;
@@ -177,6 +183,10 @@ export default function Login() {
         recordLoginEvent('2FA Verified', `Two-Factor sign-in OTP challenge verified (${res.user.fullName})`);
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
+          localStorage.setItem('smileclinic_remembered_email', clinicalId.trim().toLowerCase());
+        } else {
+          localStorage.removeItem('rxguard_authenticated');
+          localStorage.removeItem('smileclinic_remembered_email');
         }
         setTimeout(() => {
           setShowLoginOtpModal(false);
