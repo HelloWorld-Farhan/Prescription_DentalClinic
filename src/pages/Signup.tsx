@@ -595,17 +595,17 @@ export default function Signup() {
                     <PasswordStrengthMeter password={password} confirmPassword={confirmPassword} />
                   </div>
 
-                  {/* Attestation checkbox — styled with real-time error */}
+                  {/* Attestation confirmation card */}
                   <div
-                    className={`p-4 rounded-2xl border transition-all ${
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
                       termsError
-                        ? 'bg-rose-50/50 border-rose-400'
+                        ? 'bg-rose-50/60 border-rose-400 shadow-xs'
                         : agreedTerms
-                        ? 'bg-emerald-50 border-emerald-300'
-                        : 'bg-surface-container-low border-surface-container-high/60 hover:border-primary/40 hover:bg-surface-container-lowest'
+                        ? 'bg-emerald-50/80 border-emerald-300 shadow-xs'
+                        : 'bg-surface-container-low border-surface-container-high/80 hover:border-primary/40 hover:bg-surface-container-lowest'
                     }`}
                   >
-                    <label className="flex items-start gap-3 cursor-pointer">
+                    <label className="flex items-start gap-3 cursor-pointer select-none group">
                       {/* Custom checkbox visual */}
                       <div className="relative shrink-0 mt-0.5">
                         <input
@@ -619,40 +619,42 @@ export default function Signup() {
                         />
                         <motion.div
                           animate={agreedTerms ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                          transition={{ duration: 0.25 }}
+                          transition={{ duration: 0.22 }}
                           className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                             agreedTerms
-                              ? 'bg-emerald-500 border-emerald-500'
+                              ? 'bg-emerald-600 border-emerald-600 shadow-xs'
                               : termsError
                               ? 'bg-white border-rose-400'
-                              : 'bg-surface-container border-outline/50'
+                              : 'bg-white border-outline/50 group-hover:border-primary/60'
                           }`}
                         >
                           {agreedTerms && (
                             <motion.span
                               initial={{ scale: 0, opacity: 0 }}
                               animate={{ scale: 1, opacity: 1 }}
-                              className="material-symbols-outlined text-white text-[14px]"
+                              className="material-symbols-outlined text-white text-[14px] font-bold"
                             >
                               check
                             </motion.span>
                           )}
                         </motion.div>
                       </div>
-                      <span className={`text-xs leading-relaxed transition-colors ${
-                        termsError
-                          ? 'text-rose-900 font-medium'
-                          : agreedTerms
-                          ? 'text-emerald-800 font-medium'
-                          : 'text-on-surface-variant'
-                      }`}>
-                        I confirm that all details provided are accurate and I agree to the clinical terms and privacy policy.
-                      </span>
+                      <div className="flex-1">
+                        <span className={`text-xs leading-relaxed font-medium transition-colors block ${
+                          termsError
+                            ? 'text-rose-900 font-semibold'
+                            : agreedTerms
+                            ? 'text-emerald-950 font-semibold'
+                            : 'text-on-surface-variant group-hover:text-on-surface'
+                        }`}>
+                          I confirm that all details provided are accurate and I agree to the clinical terms and privacy policy.
+                        </span>
+                      </div>
                     </label>
 
                     {termsError && (
-                      <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-2.5 pt-2 border-t border-rose-200/60 animate-fadeIn">
-                        <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                      <p className="text-[11px] text-rose-600 font-semibold flex items-center gap-1.5 mt-2.5 pt-2 border-t border-rose-200 animate-fadeIn">
+                        <span className="material-symbols-outlined text-[15px] shrink-0">error</span>
                         <span>{termsError}</span>
                       </p>
                     )}

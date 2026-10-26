@@ -25,7 +25,7 @@ export default function Login() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [authorizedConfirmation, setAuthorizedConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successFlash, setSuccessFlash] = useState<string | null>(() => {
@@ -363,40 +363,98 @@ export default function Login() {
 
                     {/* Remember Device */}
                     <div className="flex items-center justify-between pt-0.5">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={rememberDevice}
-                          onChange={(e) => setRememberDevice(e.target.checked)}
-                          className="w-4 h-4 rounded text-primary focus:ring-0 accent-primary cursor-pointer"
-                        />
-                        <span className="text-xs text-on-surface-variant font-medium">Remember me on this workstation</span>
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none group">
+                        <div className="relative shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={rememberDevice}
+                            onChange={(e) => setRememberDevice(e.target.checked)}
+                            className="sr-only"
+                          />
+                          <motion.div
+                            animate={rememberDevice ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                            transition={{ duration: 0.2 }}
+                            className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
+                              rememberDevice
+                                ? 'bg-primary border-primary text-white shadow-xs'
+                                : 'bg-white border-outline/50 group-hover:border-primary/60'
+                            }`}
+                          >
+                            {rememberDevice && (
+                              <motion.span
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="material-symbols-outlined text-white text-[13px] font-bold"
+                              >
+                                check
+                              </motion.span>
+                            )}
+                          </motion.div>
+                        </div>
+                        <span className="text-xs text-on-surface-variant group-hover:text-on-surface font-medium transition-colors">
+                          Remember me on this workstation
+                        </span>
                       </label>
                     </div>
 
-                    {/* Clinician Authorization Confirmation */}
-                    <div className={`rounded-2xl p-3.5 border transition-all ${
-                      checkboxError
-                        ? 'bg-rose-50/40 border-rose-300'
-                        : 'bg-surface-container-low border-surface-container-high/60'
-                    }`}>
-                      <label className="flex items-start gap-2.5 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={authorizedConfirmation}
-                          onChange={(e) => {
-                            setAuthorizedConfirmation(e.target.checked);
-                            setErrorMessage(null);
-                          }}
-                          className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
-                        />
-                        <span className="text-xs text-on-surface-variant group-hover:text-on-surface transition-colors leading-relaxed">
-                          I confirm that I am an authorized clinician accessing Smile Clinic patient records.
-                        </span>
+                    {/* Clinician Authorization Confirmation Card */}
+                    <div
+                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                        checkboxError
+                          ? 'bg-rose-50/60 border-rose-400 shadow-xs'
+                          : authorizedConfirmation
+                          ? 'bg-emerald-50/80 border-emerald-300 shadow-xs'
+                          : 'bg-surface-container-low border-surface-container-high/80 hover:border-primary/40 hover:bg-surface-container-lowest'
+                      }`}
+                    >
+                      <label className="flex items-start gap-3 cursor-pointer group select-none">
+                        <div className="relative shrink-0 mt-0.5">
+                          <input
+                            type="checkbox"
+                            checked={authorizedConfirmation}
+                            onChange={(e) => {
+                              setAuthorizedConfirmation(e.target.checked);
+                              setErrorMessage(null);
+                            }}
+                            className="sr-only"
+                          />
+                          <motion.div
+                            animate={authorizedConfirmation ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                            transition={{ duration: 0.22 }}
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                              authorizedConfirmation
+                                ? 'bg-emerald-600 border-emerald-600 shadow-xs'
+                                : checkboxError
+                                ? 'bg-white border-rose-400'
+                                : 'bg-white border-outline/50 group-hover:border-primary/60'
+                            }`}
+                          >
+                            {authorizedConfirmation && (
+                              <motion.span
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="material-symbols-outlined text-white text-[14px] font-bold"
+                              >
+                                check
+                              </motion.span>
+                            )}
+                          </motion.div>
+                        </div>
+                        <div className="flex-1">
+                          <span className={`text-xs leading-relaxed font-medium transition-colors block ${
+                            checkboxError
+                              ? 'text-rose-900 font-semibold'
+                              : authorizedConfirmation
+                              ? 'text-emerald-950 font-semibold'
+                              : 'text-on-surface-variant group-hover:text-on-surface'
+                          }`}>
+                            I confirm that I am an authorized clinician accessing Smile Clinic patient records.
+                          </span>
+                        </div>
                       </label>
                       {checkboxError && (
-                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-2 pt-1.5 border-t border-rose-200/60 animate-fadeIn">
-                          <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                        <p className="text-[11px] text-rose-600 font-semibold flex items-center gap-1.5 mt-2.5 pt-2 border-t border-rose-200 animate-fadeIn">
+                          <span className="material-symbols-outlined text-[15px] shrink-0">error</span>
                           <span>{checkboxError}</span>
                         </p>
                       )}
