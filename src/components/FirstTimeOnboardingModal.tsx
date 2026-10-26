@@ -229,7 +229,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
     <AnimatePresence>
       {isOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto overscroll-contain"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-6 overflow-y-auto overscroll-contain"
           style={{ overscrollBehavior: 'contain' }}
         >
           {/* Subtle Backdrop - Closes off background interaction */}
@@ -247,42 +247,44 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 14 }}
             transition={{ type: 'spring', damping: 26, stiffness: 340 }}
-            className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col my-auto max-h-[92vh]"
+            className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col my-auto max-h-[96vh] sm:max-h-[92vh]"
           >
             {/* Modal Header */}
-            <div className="p-5 sm:p-6 pb-4 bg-surface-container-low border-b border-surface-container-high flex items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs shrink-0">
-                  <span className="material-symbols-outlined text-[24px]">clinical_notes</span>
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-on-surface leading-tight">
+            <div className="p-3.5 sm:p-5 bg-surface-container-low border-b border-surface-container-high shrink-0 space-y-1.5 sm:space-y-2">
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-xs shrink-0">
+                    <span className="material-symbols-outlined text-[18px] sm:text-[22px]">clinical_notes</span>
+                  </div>
+                  <h3 className="text-sm sm:text-base md:text-lg font-bold text-on-surface truncate">
                     Complete Clinical Profile
                   </h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5 leading-tight">
-                    {greetingSubtitle}
-                  </p>
+                </div>
+
+                {/* Red Action Required Pill */}
+                <div className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-2xs">
+                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-rose-600 animate-pulse"></span>
+                  <span>Action Required</span>
                 </div>
               </div>
 
-              {/* Red Action Required Pill */}
-              <div className="px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-2xs">
-                <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse"></span>
-                <span>Action Required</span>
-              </div>
+              {/* Subtitle spans full width cleanly across all devices */}
+              <p className="text-[11px] sm:text-xs text-on-surface-variant leading-snug">
+                {greetingSubtitle}
+              </p>
             </div>
 
             {/* Modal Scrollable Body */}
             <div 
-              className="p-5 sm:p-6 space-y-4 overflow-y-auto overscroll-contain flex-1"
+              className="p-3.5 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto overscroll-contain flex-1"
               style={{ overscrollBehavior: 'contain' }}
             >
               {/* Prominent Red Banner: Action Required Notice */}
-              <div className="p-3.5 rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-900 flex items-start gap-3 shadow-xs">
-                <span className="material-symbols-outlined text-rose-600 text-[20px] shrink-0 mt-0.5">
+              <div className="p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-900 flex items-start gap-2.5 sm:gap-3 shadow-xs">
+                <span className="material-symbols-outlined text-rose-600 text-[18px] sm:text-[20px] shrink-0 mt-0.5">
                   error
                 </span>
-                <div className="text-xs leading-relaxed">
+                <div className="text-[11px] sm:text-xs leading-relaxed">
                   <strong className="font-bold block text-rose-950 mb-0.5">
                     Profile Completion Required to Move Forward
                   </strong>
@@ -362,7 +364,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
                     />
 
                     {showCountryPicker && (
-                      <div className="absolute left-0 top-full mt-1 w-64 max-h-48 overflow-y-auto bg-surface-container-lowest rounded-xl shadow-xl border border-surface-container-high z-50 divide-y divide-surface-container py-1 overscroll-contain">
+                      <div className="absolute left-0 top-full mt-1 w-64 max-w-[calc(100vw-3.5rem)] max-h-48 overflow-y-auto bg-surface-container-lowest rounded-xl shadow-xl border border-surface-container-high z-50 divide-y divide-surface-container py-1 overscroll-contain">
                         {COUNTRIES.map((c) => (
                           <button
                             key={c.code}
@@ -512,7 +514,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
                               handleAddAllergy();
                             }
                           }}
-                          placeholder="Type allergen (e.g. Penicillin) and press Enter or Add..."
+                          placeholder="Allergen (e.g. Penicillin) and click Add..."
                           className="flex-1 h-9 px-3 text-xs rounded-xl border border-amber-300 bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-on-surface"
                         />
                         <button
@@ -587,9 +589,9 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 sm:p-5 bg-surface-container-low border-t border-surface-container-high flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-              <span className="text-xs text-on-surface-variant flex items-center gap-1.5 text-center sm:text-left">
-                <span className="material-symbols-outlined text-[16px] text-primary">shield</span>
+            <div className="p-3 sm:p-4 bg-surface-container-low border-t border-surface-container-high flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0">
+              <span className="text-[11px] sm:text-xs text-on-surface-variant flex items-center justify-center sm:justify-start gap-1.5 text-center">
+                <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-primary">shield</span>
                 <span>Encrypted &amp; HIPAA Safe Harbor Protected</span>
               </span>
 
@@ -597,7 +599,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
                 type="submit"
                 form="onboardingForm"
                 disabled={isSubmitting}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs sm:text-sm shadow-md hover:shadow-lg hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full sm:w-auto h-10 sm:h-11 px-5 sm:px-6 rounded-xl bg-primary-container text-on-primary font-bold text-xs sm:text-sm shadow-md hover:shadow-lg hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 {isSubmitting ? (
                   <>
