@@ -89,6 +89,7 @@ export default function Settings() {
   type VerificationMethod = 'email' | 'sms' | 'password_otp';
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>('email');
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [isVerificationUnlocked, setIsVerificationUnlocked] = useState(false);
   const [unlockedMethodLabel, setUnlockedMethodLabel] = useState('');
 
@@ -749,14 +750,25 @@ export default function Settings() {
                   {verificationMethod === 'password_otp' && (
                     <div className="p-3.5 bg-surface-container-low rounded-xl border border-surface-container-high space-y-1.5">
                       <label className="text-xs font-bold text-on-surface">Enter Current / Previous Password *</label>
-                      <input
-                        type="password"
-                        required
-                        value={currentPasswordInput}
-                        onChange={(e) => setCurrentPasswordInput(e.target.value)}
-                        placeholder="Type current clinical password"
-                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm focus:border-primary outline-none"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showCurrentPassword ? 'text' : 'password'}
+                          required
+                          value={currentPasswordInput}
+                          onChange={(e) => setCurrentPasswordInput(e.target.value)}
+                          placeholder="Type current clinical password"
+                          className="w-full h-10 pl-3 pr-10 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm focus:border-primary outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {showCurrentPassword ? 'visibility' : 'visibility_off'}
+                          </span>
+                        </button>
+                      </div>
                       <span className="text-[11px] text-outline block">
                         Requires entering existing password followed by 6-digit TOTP verification token.
                       </span>
@@ -813,7 +825,7 @@ export default function Settings() {
                         className="absolute right-3 top-2.5 text-outline hover:text-on-surface"
                       >
                         <span className="material-symbols-outlined text-[18px]">
-                          {showNewPassword ? 'visibility_off' : 'visibility'}
+                          {showNewPassword ? 'visibility' : 'visibility_off'}
                         </span>
                       </button>
                     </div>
@@ -858,7 +870,7 @@ export default function Settings() {
                         className="absolute right-3 top-2.5 text-outline hover:text-on-surface"
                       >
                         <span className="material-symbols-outlined text-[18px]">
-                          {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                          {showConfirmPassword ? 'visibility' : 'visibility_off'}
                         </span>
                       </button>
                     </div>

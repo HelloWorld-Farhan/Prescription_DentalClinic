@@ -522,7 +522,7 @@ export default function ForgotPasswordModal({
                         className="absolute right-3 text-outline hover:text-on-surface p-1"
                       >
                         <span className="material-symbols-outlined text-lg">
-                          {showPrevPassword ? 'visibility_off' : 'visibility'}
+                          {showPrevPassword ? 'visibility' : 'visibility_off'}
                         </span>
                       </button>
                     </div>
@@ -598,7 +598,7 @@ export default function ForgotPasswordModal({
                       className="absolute right-3 text-outline hover:text-on-surface p-1"
                     >
                       <span className="material-symbols-outlined text-lg">
-                        {showNewPassword ? 'visibility_off' : 'visibility'}
+                        {showNewPassword ? 'visibility' : 'visibility_off'}
                       </span>
                     </button>
                   </div>
@@ -628,7 +628,7 @@ export default function ForgotPasswordModal({
                       className="absolute right-3 text-outline hover:text-on-surface p-1"
                     >
                       <span className="material-symbols-outlined text-lg">
-                        {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                        {showConfirmPassword ? 'visibility' : 'visibility_off'}
                       </span>
                     </button>
                   </div>

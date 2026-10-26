@@ -381,7 +381,7 @@ export default function Signup() {
                           className="absolute right-3 top-2.5 text-outline hover:text-on-surface p-0.5 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[18px]">
-                            {showPassword ? 'visibility_off' : 'visibility'}
+                            {showPassword ? 'visibility' : 'visibility_off'}
                           </span>
                         </button>
                       </div>
@@ -406,7 +406,7 @@ export default function Signup() {
                           className="absolute right-3 top-2.5 text-outline hover:text-on-surface p-0.5 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[18px]">
-                            {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                            {showConfirmPassword ? 'visibility' : 'visibility_off'}
                           </span>
                         </button>
                       </div>

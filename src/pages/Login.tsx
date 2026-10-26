@@ -296,7 +296,7 @@ export default function Login() {
                           className="absolute right-3 text-outline hover:text-on-surface p-1 rounded cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-lg">
-                            {showPassword ? 'visibility_off' : 'visibility'}
+                            {showPassword ? 'visibility' : 'visibility_off'}
                           </span>
                         </button>
                       </div>
