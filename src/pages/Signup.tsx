@@ -56,7 +56,6 @@ export default function Signup() {
   // Email OTP Modal State
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [emailOtp, setEmailOtp] = useState<string[]>(Array(6).fill(''));
-  const [mockEmailOtp, setMockEmailOtp] = useState('749210');
   const [otpStatus, setOtpStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -105,8 +104,6 @@ export default function Signup() {
       return;
     }
 
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setMockEmailOtp(newCode);
     setEmailOtp(Array(6).fill(''));
     setOtpStatus('idle');
     setOtpError(null);
@@ -119,14 +116,8 @@ export default function Signup() {
     setOtpError(null);
 
     const entered = emailOtp.join('');
-    if (entered.length < 6) {
-      setOtpError('Please enter all 6 digits of the Email security code.');
-      setOtpStatus('error');
-      setTimeout(() => setOtpStatus('idle'), 1500);
-      return;
-    }
-    if (entered !== mockEmailOtp) {
-      setOtpError('Invalid code. Please check the code or auto-fill the test code.');
+    if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
+      setOtpError('Please enter all 6 numeric digits of the Email security code.');
       setOtpStatus('error');
       setTimeout(() => setOtpStatus('idle'), 1500);
       return;
@@ -580,23 +571,24 @@ export default function Signup() {
                   />
                 </div>
 
-                {/* Dev auto-fill + timer */}
+                {/* Resend & Timer */}
                 <div className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailOtp(mockEmailOtp.split(''));
-                      setOtpError(null);
-                      setOtpStatus('idle');
-                    }}
-                    className="text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">bolt</span>
-                    <span>Auto-fill test code</span>
-                  </button>
-                  <span className="text-outline text-[11px] font-mono">
-                    {resendCountdown > 0 ? `Expires in ${resendCountdown}s` : 'Code expired'}
+                  <span className="text-on-surface-variant text-[11px]">
+                    Didn't receive the email?
                   </span>
+                  {resendCountdown > 0 ? (
+                    <span className="text-outline text-[11px] font-mono">
+                      Resend in {resendCountdown}s
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setResendCountdown(60)}
+                      className="text-primary font-bold text-[11px] hover:underline cursor-pointer"
+                    >
+                      Resend Code
+                    </button>
+                  )}
                 </div>
 
                 {/* Actions */}

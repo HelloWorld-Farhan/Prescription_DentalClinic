@@ -104,7 +104,6 @@ export default function Settings() {
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpPurpose, setOtpPurpose] = useState<OtpModalPurpose>('password_change');
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const [mockOtpExpected, setMockOtpExpected] = useState('749210');
   const [isOtpVerifying, setIsOtpVerifying] = useState(false);
   const [isOtpSuccess, setIsOtpSuccess] = useState(false);
   const [isOtpError, setIsOtpError] = useState(false);
@@ -156,15 +155,6 @@ export default function Settings() {
       showToast('Please enter your current clinical password first.');
       return;
     }
-    // Set up mock OTP based on method
-    if (verificationMethod === 'email') {
-      setMockOtpExpected('749210');
-    } else if (verificationMethod === 'sms') {
-      setMockOtpExpected('482915');
-    } else {
-      setMockOtpExpected('826104');
-    }
-
     setOtpPurpose('password_change');
     setOtpDigits(['', '', '', '', '', '']);
     setIsOtpSuccess(false);
@@ -175,7 +165,6 @@ export default function Settings() {
 
   // --- 2FA Reconfigure Trigger ---
   const handleInitiate2FaReconfig = () => {
-    setMockOtpExpected('639521');
     setOtpPurpose('two_factor_reconfig');
     setOtpDigits(['', '', '', '', '', '']);
     setIsOtpSuccess(false);
@@ -216,12 +205,6 @@ export default function Settings() {
     otpInputRefs.current[nextIndex]?.focus();
   };
 
-  const handleAutoFillOtp = () => {
-    const chars = mockOtpExpected.split('');
-    setOtpDigits(chars);
-    setIsOtpError(false);
-    otpInputRefs.current[5]?.focus();
-  };
 
   // --- Submit & Validate OTP ---
   const handleVerifyOtp = (e?: React.FormEvent) => {
@@ -238,7 +221,7 @@ export default function Settings() {
 
     setTimeout(() => {
       setIsOtpVerifying(false);
-      if (entered === mockOtpExpected) {
+      if (entered.length === 6 && /^\d{6}$/.test(entered)) {
         // SUCCESS ANIMATION TRIGGER
         setIsOtpSuccess(true);
         setTimeout(() => {
@@ -1561,20 +1544,6 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    {/* Auto-Fill Demo Code Helper */}
-                    <div className="p-3 bg-primary/5 rounded-xl border border-primary/20 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-semibold text-primary">Demo Mock Passcode:</span>{' '}
-                        <strong className="font-mono text-on-surface">{mockOtpExpected}</strong>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleAutoFillOtp}
-                        className="px-2.5 py-1 rounded-lg bg-primary-container text-on-primary text-[11px] font-bold hover:bg-primary transition-colors cursor-pointer"
-                      >
-                        Auto-Fill
-                      </button>
-                    </div>
 
                     {/* Modal Buttons */}
                     <div className="pt-2 flex gap-3">

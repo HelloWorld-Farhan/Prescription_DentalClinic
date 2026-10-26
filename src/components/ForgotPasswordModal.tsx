@@ -23,8 +23,7 @@ export default function ForgotPasswordModal({
   const [mobilePhone, setMobilePhone] = useState('+1 (555) 849-2041');
   
   // OTP state
-  const [otp, setOtp] = useState(['4', '8', '2', '9', '1', '0']);
-  const [mockOtp, setMockOtp] = useState('482910');
+  const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
   const [otpStatus, setOtpStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
   const [otpError, setOtpError] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
@@ -56,9 +55,7 @@ export default function ForgotPasswordModal({
   useEffect(() => {
     if (isOpen) {
       setStep(1);
-      setMethod('email');
-      setOtp(['4', '8', '2', '9', '1', '0']);
-      setMockOtp('482910');
+      setOtp(Array(6).fill(''));
       setOtpError('');
       setResendTimer(60);
       setCanResend(false);
@@ -99,9 +96,7 @@ export default function ForgotPasswordModal({
 
     setResetError('');
     if (method === 'email' || method === 'sms') {
-      const generated = Math.floor(100000 + Math.random() * 900000).toString();
-      setMockOtp(generated);
-      setOtp(generated.split(''));
+      setOtp(Array(6).fill(''));
       setResendTimer(60);
       setCanResend(false);
       setStep(2);
@@ -114,9 +109,7 @@ export default function ForgotPasswordModal({
   // Resend code trigger (1 time per 60 sec countdown)
   const handleResendOtp = () => {
     if (!canResend) return;
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setMockOtp(newCode);
-    setOtp(newCode.split(''));
+    setOtp(Array(6).fill(''));
     setResendTimer(60);
     setCanResend(false);
     setResendCount((c) => c + 1);
@@ -128,14 +121,8 @@ export default function ForgotPasswordModal({
     e.preventDefault();
     if (method === 'email' || method === 'sms') {
       const entered = otp.join('');
-      if (entered.length < 6) {
-        setOtpError('Please enter all 6 digits of the security verification code.');
-        setOtpStatus('error');
-        setTimeout(() => setOtpStatus('idle'), 1500);
-        return;
-      }
-      if (entered !== mockOtp) {
-        setOtpError('Invalid verification code. Please check code or click Resend.');
+      if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
+        setOtpError('Please enter all 6 numeric digits of the security verification code.');
         setOtpStatus('error');
         setTimeout(() => setOtpStatus('idle'), 1500);
         return;
@@ -431,9 +418,6 @@ export default function ForgotPasswordModal({
                         <label className="text-xs font-bold text-on-surface">
                           Enter 6-Digit Verification Code
                         </label>
-                        <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                          Mock Code: {mockOtp}
-                        </span>
                       </div>
                       <p className="text-[11px] text-on-surface-variant">
                         {method === 'email'
