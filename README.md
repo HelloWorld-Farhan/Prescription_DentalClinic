@@ -17,15 +17,10 @@
 
 ---
 
-## 🔑 Demo Clinician Credentials
-
-| Field | Value |
-|---|---|
-| **Email** | `rxguard@smileclinic.com` *(also accepts `doctor@smileclinic.com`)* |
-| **Password** | `RxGuard@Smile2026#` *(also accepts `Doctor@Smile2026#`)* |
-| **Name** | `Dr. Sarah Lin, PharmD (Clinical Prescriber)` |
-| **NPI / Badge** | `RX-774021` |
-| **Quick Action** | Click **"Auto-Fill"** on the sign-in screen for 1-click authentication. |
+## 🔑 Clinician Authentication & Security
+- **Database-Backed Authentication**: All clinicians sign in using their registered clinician email and password, verified securely against the backend database.
+- **Account Protection**: Features automated rate-limiting (token bucket per minute), 3-attempt brute-force protection with temporary lockouts, and OTP password-reset verification.
+- **2FA & Device Trust**: Remembers recognized trusted devices via device fingerprint tokens, and provides step-up OTP verification when signing in from an untrusted device.
 
 ---
 

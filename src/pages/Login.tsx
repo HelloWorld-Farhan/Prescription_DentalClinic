@@ -127,20 +127,6 @@ export default function Login() {
         return;
       }
     } catch (apiErr: any) {
-      // 2. Demo credentials fallback if offline or using demo clinician
-      if (
-        (inputEmail === 'rxguard@smileclinic.com' || inputEmail === 'doctor@smileclinic.com') &&
-        (inputPass === 'RxGuard@Smile2026#' || inputPass === 'Doctor@Smile2026#')
-      ) {
-        sessionStorage.setItem('rxguard_authenticated', 'true');
-        sessionStorage.setItem('rxguard_prescriber_name', 'Dr. Sarah Lin, PharmD');
-        sessionStorage.setItem('rxguard_prescriber_role', 'Clinical Prescriber');
-        sessionStorage.setItem('rxguard_prescriber_npi', 'RX-774021');
-        sessionStorage.setItem('rxguard_prescriber_email', inputEmail);
-        navigate('/dashboard');
-        return;
-      }
-
       const errMsg = apiErr.message || 'Invalid credentials. No registered clinician account matches these credentials.';
       setErrorMessage(errMsg);
 
