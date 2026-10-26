@@ -194,15 +194,15 @@ export default function Layout() {
 
 
           {/* Right Header Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-3 ml-auto shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
             {/* Quick Action Button: New Check */}
             <button
               onClick={() => navigate('/check')}
-              className="p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-hover active:scale-95 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
               title="Start New Prescription Safety Check"
             >
-              <span className="material-symbols-outlined text-[18px] sm:text-[16px]">add_circle</span>
-              <span className="hidden sm:inline">New Check</span>
+              <span className="material-symbols-outlined text-[17px] sm:text-[18px] shrink-0">add_circle</span>
+              <span className="text-xs font-bold whitespace-nowrap">New Check</span>
             </button>
 
             {/* Notifications Dropdown */}
