@@ -2,18 +2,18 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || 'AIzaSyDninnRGkp0_MCiEjW-MwHE8w50iKohHqo',
-  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || 'smileclinic-auth.firebaseapp.com',
-  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || 'smileclinic-auth',
-  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || 'smileclinic-auth.firebasestorage.app',
-  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || '254397547995',
-  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || '1:254397547995:web:c5567dcfa9cf715e1953fe',
-  measurementId: (import.meta as any).env?.VITE_FIREBASE_MEASUREMENT_ID || 'G-JYEM6PJBM5'
+  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || '',
+  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || '',
+  measurementId: (import.meta as any).env?.VITE_FIREBASE_MEASUREMENT_ID || ''
 };
 
-// Initialize Firebase App singleton
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+// Initialize Firebase App singleton safely
+const app = getApps().length > 0 ? getApp() : (firebaseConfig.apiKey ? initializeApp(firebaseConfig) : null);
+export const auth = app ? getAuth(app) : (null as any);
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -31,6 +31,9 @@ export interface GoogleAuthResult {
  * Triggers 1-Click Google Sign-In popup with Firebase
  */
 export async function signInWithGooglePopup(): Promise<GoogleAuthResult | null> {
+  if (!auth) {
+    throw new Error('Google Sign-In is not configured. Missing VITE_FIREBASE_API_KEY environment variable.');
+  }
   try {
     const cred = await signInWithPopup(auth, googleProvider);
     const user = cred.user;
