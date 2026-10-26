@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VirtualDb } from '../data/virtualDb';
+import { PrescriptionStorage as VirtualDb } from '../data/prescriptionStorage';
 import { DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import PrintableReportModal from '../components/PrintableReportModal';

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { VirtualDb } from '../data/virtualDb';
+import { PrescriptionStorage as VirtualDb } from '../data/prescriptionStorage';
 import { SafetyCheckRecord } from '../types';
 import DownloadFormatModal from '../components/DownloadFormatModal';
 

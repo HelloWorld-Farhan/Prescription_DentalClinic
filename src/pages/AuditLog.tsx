@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { VirtualDb } from '../data/virtualDb';
+import { PrescriptionStorage as VirtualDb } from '../data/prescriptionStorage';
 import { SafetyCheckRecord } from '../types';
 import PrintableReportModal from '../components/PrintableReportModal';
 import ExportAuditModal from '../components/ExportAuditModal';

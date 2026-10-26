@@ -1,37 +1,23 @@
-import { Patient, SafetyCheckRecord, AuditLogEntry, InteractionRule, DrugInteractionAlert, PrescriptionItem } from '../types';
+import { Patient, SafetyCheckRecord, AuditLogEntry, DrugInteractionAlert, PrescriptionItem } from '../types';
 
-// Clean production baseline: default 0 patients, rules, checks, and audit logs
+const STORAGE_KEYS = {
+  PATIENTS: 'smileclinic_patients',
+  CHECKS: 'smileclinic_checks',
+  AUDIT: 'smileclinic_audit'
+};
+
 export const INITIAL_PATIENTS: Patient[] = [];
-export const INITIAL_RULES: InteractionRule[] = [];
 export const INITIAL_CHECKS: SafetyCheckRecord[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
 
-// LocalStorage Keys (v4 for completely clean zero-data state)
-const STORAGE_KEYS = {
-  PATIENTS: 'rxguard_patients_v4',
-  CHECKS: 'rxguard_checks_v4',
-  RULES: 'rxguard_rules_v4',
-  AUDIT: 'rxguard_audit_v4'
-};
-
-// Purge any legacy cached mock data keys from earlier sessions
-try {
-  ['rxguard_rules', 'rxguard_rules_v2', 'rxguard_rules_v3',
-   'rxguard_checks', 'rxguard_checks_v2', 'rxguard_checks_v3',
-   'rxguard_patients', 'rxguard_patients_v2', 'rxguard_patients_v3',
-   'rxguard_audit', 'rxguard_audit_v2', 'rxguard_audit_v3'].forEach(k => localStorage.removeItem(k));
-} catch {
-  // Ignore in environments without window/localStorage
-}
-
-export class VirtualDb {
+export class PrescriptionStorage {
   static getPatients(): Patient[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.PATIENTS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.PATIENTS, JSON.stringify(INITIAL_PATIENTS));
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.PATIENTS);
+      return raw ? JSON.parse(raw) : INITIAL_PATIENTS;
+    } catch {
       return INITIAL_PATIENTS;
     }
-    return JSON.parse(raw);
   }
 
   static getPatientById(id: string): Patient | undefined {
@@ -50,12 +36,12 @@ export class VirtualDb {
   }
 
   static getChecks(): SafetyCheckRecord[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.CHECKS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.CHECKS, JSON.stringify(INITIAL_CHECKS));
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.CHECKS);
+      return raw ? JSON.parse(raw) : INITIAL_CHECKS;
+    } catch {
       return INITIAL_CHECKS;
     }
-    return JSON.parse(raw);
   }
 
   static getCheckById(id: string): SafetyCheckRecord | undefined {
@@ -67,14 +53,13 @@ export class VirtualDb {
     checks.unshift(record);
     localStorage.setItem(STORAGE_KEYS.CHECKS, JSON.stringify(checks));
 
-    // Auto append audit log
     this.addAudit({
       id: 'aud-' + Date.now(),
       timestamp: 'Just now',
       clinicianName: record.prescriberName,
       action: 'Safety Screen Initiated',
       patientMrn: record.mrn,
-      details: `Screened ${record.prescriptions.length} items for ${record.patientName}. Overall result: ${record.overallStatus}.`,
+      details: `Screened ${record.prescriptions.length} items for ${record.patientName}. Result: ${record.overallStatus}.`,
       severity: record.alerts.length > 0 ? record.alerts[0].severity : 'safe'
     });
   }
@@ -104,46 +89,18 @@ export class VirtualDb {
       clinicianName: author,
       action: 'Alert Overridden',
       patientMrn: check.mrn,
-      details: `Alert "${alert?.title}" overridden. Rationale: ${reason}`,
+      details: `Alert "${alert?.title}" overridden: ${reason}`,
       severity: alert?.severity || 'major'
     });
   }
 
-  static getRules(): InteractionRule[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.RULES);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(INITIAL_RULES));
-      return INITIAL_RULES;
-    }
-    return JSON.parse(raw);
-  }
-
-  static toggleRule(ruleId: string) {
-    const rules = this.getRules();
-    const rule = rules.find(r => r.id === ruleId);
-    if (rule) {
-      rule.active = !rule.active;
-      localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
-      this.addAudit({
-        id: 'aud-' + Date.now(),
-        timestamp: 'Just now',
-        clinicianName: 'Dr. Sarah Lin, PharmD',
-        action: 'Rule Updated',
-        patientMrn: 'Global Rules',
-        details: `Rule "${rule.drugA} + ${rule.drugB}" set to ${rule.active ? 'ACTIVE' : 'DISABLED'}.`,
-        severity: rule.severity
-      });
-    }
-    return rules;
-  }
-
   static getAuditLogs(): AuditLogEntry[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.AUDIT);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(INITIAL_AUDIT_LOGS));
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.AUDIT);
+      return raw ? JSON.parse(raw) : INITIAL_AUDIT_LOGS;
+    } catch {
       return INITIAL_AUDIT_LOGS;
     }
-    return JSON.parse(raw);
   }
 
   static addAudit(entry: AuditLogEntry) {
@@ -152,24 +109,15 @@ export class VirtualDb {
     localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(logs));
   }
 
-  static resetDatabase() {
-    localStorage.removeItem(STORAGE_KEYS.PATIENTS);
-    localStorage.removeItem(STORAGE_KEYS.CHECKS);
-    localStorage.removeItem(STORAGE_KEYS.AUDIT);
-    localStorage.removeItem(STORAGE_KEYS.RULES);
-  }
-
-  // Clinical Rule Engine Screen Evaluator
   static evaluateScreening(patient: Patient, items: PrescriptionItem[]): DrugInteractionAlert[] {
     const alerts: DrugInteractionAlert[] = [];
-    const rules = this.getRules().filter(r => r.active);
 
     items.forEach(item => {
-      const generic = item.genericName.toLowerCase();
-      const brand = item.drugName.toLowerCase();
+      const generic = (item.genericName || '').toLowerCase();
+      const brand = (item.drugName || '').toLowerCase();
 
-      // 1. Check Drug Allergies
-      patient.allergies.forEach(allergy => {
+      // 1. Check Documented Drug Allergies
+      (patient.allergies || []).forEach(allergy => {
         const al = allergy.toLowerCase();
         if (
           (al.includes('penicillin') && (generic.includes('amoxicillin') || generic.includes('ampicillin') || brand.includes('augmentin'))) ||
@@ -194,7 +142,7 @@ export class VirtualDb {
       });
 
       // 2. Check Drug-Drug Interactions with Active Medications
-      patient.activeMedications.forEach(med => {
+      (patient.activeMedications || []).forEach(med => {
         const activeMed = med.toLowerCase();
 
         // Warfarin + NSAIDs
@@ -207,13 +155,13 @@ export class VirtualDb {
             mechanism: 'NSAIDs displace warfarin from plasma proteins and impair platelet aggregation, spiking INR and bleeding risk.',
             clinicalImpact: 'Life-threatening internal hemorrhage or protracted post-extraction socket bleeding.',
             evidenceGrade: 'Class I (Definitive)',
-            recommendation: 'Avoid NSAIDs entirely in anticoagulated dental patients. Use Acetaminophen 500mg-1000mg maximum 3g/day.',
-            alternatives: ['Acetaminophen 500mg Oral', 'Codeine/Acetaminophen low dose', 'Cold therapy'],
+            recommendation: 'Avoid NSAIDs entirely in anticoagulated dental patients. Use Acetaminophen.',
+            alternatives: ['Acetaminophen 500mg Oral', 'Codeine/Acetaminophen low dose'],
             timestamp: 'Just now'
           });
         }
 
-        // Sertraline / SSRI + Tramadol
+        // SSRI + Tramadol
         if ((activeMed.includes('sertraline') || activeMed.includes('fluoxetine') || activeMed.includes('escitalopram')) && generic.includes('tramadol')) {
           alerts.push({
             id: 'alt-ddi-' + Math.random().toString(36).substring(2, 9),
@@ -223,15 +171,15 @@ export class VirtualDb {
             mechanism: 'Dual inhibition of serotonin reuptake promotes excessive central 5-HT receptor stimulation.',
             clinicalImpact: 'Hyperreflexia, neuromuscular agitation, hyperthermia, and autonomic instability.',
             evidenceGrade: 'Class II (Probable)',
-            recommendation: 'Substitute with a non-serotonergic analgesic or monitor closely for cognitive/autonomic changes.',
+            recommendation: 'Substitute with a non-serotonergic analgesic or monitor closely for cognitive changes.',
             alternatives: ['Acetaminophen 650mg + Ibuprofen 400mg combination', 'Oxycodone short course'],
             timestamp: 'Just now'
           });
         }
       });
 
-      // 3. Organ Clearance & Pregnancy Checks
-      if (patient.pregnancyStatus !== 'No' && patient.pregnancyStatus !== 'N/A') {
+      // 3. Pregnancy Checks
+      if (patient.pregnancyStatus && patient.pregnancyStatus !== 'No' && patient.pregnancyStatus !== 'N/A') {
         if (generic.includes('ibuprofen') || generic.includes('ketorolac') || generic.includes('doxycycline')) {
           alerts.push({
             id: 'alt-preg-' + Math.random().toString(36).substring(2, 9),
@@ -241,15 +189,15 @@ export class VirtualDb {
             mechanism: 'NSAIDs in late trimesters risk premature closure of ductus arteriosus and fetal renal impairment.',
             clinicalImpact: 'Severe fetal cardiovascular compromise or permanent tooth discoloration (tetracyclines).',
             evidenceGrade: 'Class I (Definitive)',
-            recommendation: 'Consult OB/GYN. Acetaminophen and Amoxicillin (if non-allergic) are generally category B safer options.',
+            recommendation: 'Consult OB/GYN. Acetaminophen and Amoxicillin (if non-allergic) are safer options.',
             alternatives: ['Acetaminophen 500mg', 'Amoxicillin 500mg (if penicillin tolerant)'],
             timestamp: 'Just now'
           });
         }
       }
 
-      // Renal clearance
-      if (patient.egfr < 50 && (generic.includes('ketorolac') || generic.includes('ibuprofen'))) {
+      // 4. Renal Clearance Checks
+      if (typeof patient.egfr === 'number' && patient.egfr < 50 && (generic.includes('ketorolac') || generic.includes('ibuprofen'))) {
         alerts.push({
           id: 'alt-ren-' + Math.random().toString(36).substring(2, 9),
           title: `Renal Clearance Contraindication: eGFR ${patient.egfr} mL/min`,
@@ -268,3 +216,6 @@ export class VirtualDb {
     return alerts;
   }
 }
+
+// Named alias for backward compatibility across codebase
+export const VirtualDb = PrescriptionStorage;
