@@ -514,7 +514,7 @@ export const authApi = {
   /**
    * Revoke a specific workstation session remotely
    */
-  async revokeSession(email: string, device_id?: string, session_id?: string): Promise<any> {
+  async revokeSession(email: string, device_id?: string, session_id?: string, device_name?: string): Promise<any> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/revoke-session`, {
         method: 'POST',
@@ -522,7 +522,8 @@ export const authApi = {
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           device_id,
-          session_id
+          session_id,
+          device_name
         })
       });
       return await res.json();
@@ -549,6 +550,29 @@ export const authApi = {
     } catch {
       return { valid: true, active: true, revoked: false };
     }
+  },
+
+  /**
+   * Get current stored user profile
+   */
+  getCurrentUser(): UserProfile | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = localStorage.getItem('smileclinic_auth_user');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    const email = sessionStorage.getItem('rxguard_prescriber_email') || localStorage.getItem('rxguard_prescriber_email');
+    if (email) {
+      return {
+        id: sessionStorage.getItem('rxguard_prescriber_id') || '',
+        fullName: sessionStorage.getItem('rxguard_prescriber_name') || 'Clinician',
+        email,
+        phone: '',
+        role: 'USER',
+        profileCompleted: true
+      };
+    }
+    return null;
   },
 
   /**

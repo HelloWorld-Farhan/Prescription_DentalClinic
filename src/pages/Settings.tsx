@@ -508,7 +508,7 @@ export default function Settings() {
     const remoteSessions = sessions.filter((s) => !s.isCurrent && s.deviceId !== currentDev);
     for (const rem of remoteSessions) {
       try {
-        await authApi.revokeSession(profile.email, rem.deviceId, rem.id);
+        await authApi.revokeSession(profile.email, rem.deviceId, rem.id, rem.name);
       } catch {}
     }
 
@@ -541,7 +541,7 @@ export default function Settings() {
     const targetName = sessionToRevoke.name;
 
     try {
-      await authApi.revokeSession(profile.email, targetDeviceId, targetId);
+      await authApi.revokeSession(profile.email, targetDeviceId, targetId, targetName);
     } catch {}
 
     const remaining = sessions.filter((s) => s.id !== targetId);

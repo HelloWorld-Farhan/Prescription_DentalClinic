@@ -378,9 +378,15 @@ export default function Layout() {
     return [...matchingChecks, ...matchingActions];
   }, [searchQuery, realChecks]);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('rxguard_authenticated');
-    localStorage.removeItem('rxguard_authenticated');
+  const handleLogout = async () => {
+    try {
+      const email = authApi.getCurrentUser()?.email;
+      const deviceId = getDeviceId();
+      if (email && deviceId) {
+        await authApi.revokeSession(email, deviceId);
+      }
+    } catch {}
+    authApi.clearSession();
     navigate('/login');
   };
 
