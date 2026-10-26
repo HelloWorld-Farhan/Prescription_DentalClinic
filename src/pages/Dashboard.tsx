@@ -150,6 +150,7 @@ export default function Dashboard() {
             value={timeRange}
             onChange={setTimeRange}
             prefixIcon="schedule"
+            align="right"
             menuWidth="w-44"
             options={[
               { value: 'Today', label: 'Today', icon: 'today' },

@@ -195,7 +195,7 @@ export default function RulesAdmin() {
   });
 
   return (
-    <div className="flex flex-col w-full gap-6">
+    <div className="flex flex-col w-full gap-6 max-w-7xl mx-auto px-1 sm:px-2">
       {/* Top Page Header Section */}
       <div className="w-full flex flex-col gap-3 pb-2">
         {/* Breadcrumb */}
@@ -365,6 +365,7 @@ export default function RulesAdmin() {
                 value={statusFilter}
                 onChange={setStatusFilter}
                 prefixIcon="toggle_on"
+                align="right"
                 menuWidth="w-52"
                 options={[
                   { value: 'ALL', label: 'State: All Rules', icon: 'tune' },
@@ -577,8 +578,8 @@ export default function RulesAdmin() {
                     setInspectGateway({
                       id: 'fdb',
                       name: 'First Databank MedKnowledge Gateway',
-                      endpoint: 'https://cdg.fdbhealth.com/v2/cds-stream',
-                      latency: '38ms',
+                      endpoint: 'https://cds.smileclinic.org/v1/interaction-rules',
+                      latency: '12ms',
                       uptime: '99.99%',
                       hash: 'SHA256: 0x9f8e41a...c82b'
                     })
@@ -629,8 +630,8 @@ export default function RulesAdmin() {
                     setInspectGateway({
                       id: 'lexicomp',
                       name: 'Wolters Kluwer Lexicomp Monograph Gateway',
-                      endpoint: 'https://api.lexicomp.wolterskluwer.com/v3/monographs',
-                      latency: '45ms',
+                      endpoint: 'https://cds.smileclinic.org/v1/monographs',
+                      latency: '15ms',
                       uptime: '99.98%',
                       hash: 'SHA256: 0x4a7c19b...f30e'
                     })
@@ -681,9 +682,9 @@ export default function RulesAdmin() {
                     setInspectGateway({
                       id: 'rxnorm',
                       name: 'NIH National Library of Medicine Gateway',
-                      endpoint: 'https://rxnav.nlm.nih.gov/REST/rxcui',
-                      latency: '26ms',
-                      uptime: '99.95%',
+                      endpoint: 'https://cds.smileclinic.org/v1/rxcui-mappings',
+                      latency: '8ms',
+                      uptime: '99.99%',
                       hash: 'SHA256: 0x81da30c...7e41'
                     })
                   }
@@ -733,8 +734,8 @@ export default function RulesAdmin() {
                     setInspectGateway({
                       id: 'cpic',
                       name: 'CPIC Pharmacogenetics Guideline API',
-                      endpoint: 'https://api.cpicpgx.org/v1/recommendations',
-                      latency: '52ms',
+                      endpoint: 'https://cds.smileclinic.org/v1/pgx-guidelines',
+                      latency: '18ms',
                       uptime: '99.97%',
                       hash: 'SHA256: 0x3e18a9d...61c0'
                     })
@@ -841,7 +842,7 @@ export default function RulesAdmin() {
       {/* Inspect Rule AST Modal */}
       <AnimatePresence>
         {inspectRule && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -939,7 +940,7 @@ export default function RulesAdmin() {
       {/* Inspect Gateway Modal */}
       <AnimatePresence>
         {inspectGateway && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}

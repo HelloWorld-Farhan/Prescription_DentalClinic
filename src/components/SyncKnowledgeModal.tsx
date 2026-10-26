@@ -12,11 +12,8 @@ interface EngineSyncState {
   id: string;
   name: string;
   provider: string;
-  currentVersion: string;
-  targetVersion: string;
-  status: 'idle' | 'connecting' | 'downloading' | 'verifying' | 'synced' | 'error';
-  progress: number;
-  recordsUpdated: number;
+  status: 'idle' | 'syncing' | 'verified';
+  scope: string;
 }
 
 export default function SyncKnowledgeModal({
@@ -31,6 +28,38 @@ export default function SyncKnowledgeModal({
   const [logs, setLogs] = useState<string[]>([]);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
 
+  const [engines, setEngines] = useState<EngineSyncState[]>([
+    {
+      id: 'cds-core',
+      name: 'Clinical Decision Support (CDS) Rules',
+      provider: 'Smile Clinic Clinical Informatics',
+      status: 'idle',
+      scope: 'Active Prescription Safety & AST Checks'
+    },
+    {
+      id: 'ddi-matrix',
+      name: 'Drug-Drug Interaction Matrix',
+      provider: 'Verified Pharmacopeia Standards',
+      status: 'idle',
+      scope: 'Contraindication & Severity Scoring'
+    },
+    {
+      id: 'renal-dose',
+      name: 'Renal & Pediatric Dose Ceiling Engine',
+      provider: 'Clinical Pharmacokinetics Service',
+      status: 'idle',
+      scope: 'eGFR, CrCl & Frequency Thresholds'
+    },
+    {
+      id: 'allergy-cross',
+      name: 'Allergy & Contraindication Validator',
+      provider: 'National Clinical Ontology Standards',
+      status: 'idle',
+      scope: 'Cross-Reactivity & Drug Class Matching'
+    }
+  ]);
+
+  // Lock body scroll on open
   useEffect(() => {
     if (!isOpen) return;
     const originalOverflow = document.body.style.overflow;
@@ -47,49 +76,6 @@ export default function SyncKnowledgeModal({
     };
   }, [isOpen, onClose, isSyncing]);
 
-  const [engines, setEngines] = useState<EngineSyncState[]>([
-    {
-      id: 'fdb',
-      name: 'First Databank (FDB) MedKnowledge',
-      provider: 'First Databank Inc.',
-      currentVersion: 'v2025.02-A',
-      targetVersion: 'v2025.02-B',
-      status: 'idle',
-      progress: 0,
-      recordsUpdated: 1420
-    },
-    {
-      id: 'lexicomp',
-      name: 'Wolters Kluwer Lexicomp DDI',
-      provider: 'Wolters Kluwer Health',
-      currentVersion: 'Release 2024-Q4',
-      targetVersion: 'Release 2025-Q1',
-      status: 'idle',
-      progress: 0,
-      recordsUpdated: 870
-    },
-    {
-      id: 'rxnorm',
-      name: 'NIH NLM DailyMed & RxNorm',
-      provider: 'U.S. National Library of Medicine',
-      currentVersion: 'RxNorm 2025-01',
-      targetVersion: 'RxNorm 2025-02',
-      status: 'idle',
-      progress: 0,
-      recordsUpdated: 3150
-    },
-    {
-      id: 'cpic',
-      name: 'Clinical Pharmacogenetics (CPIC)',
-      provider: 'CPIC Consortium',
-      currentVersion: 'CPIC v3.0',
-      targetVersion: 'CPIC v3.1',
-      status: 'idle',
-      progress: 0,
-      recordsUpdated: 195
-    }
-  ]);
-
   // Auto-scroll logs
   useEffect(() => {
     if (logContainerRef.current) {
@@ -103,54 +89,41 @@ export default function SyncKnowledgeModal({
       setOverallProgress(0);
       setLogs([
         '[INIT] Gateway readiness check complete.',
-        '[INFO] Ready to establish mTLS 1.3 link to licensed knowledge feeds.',
-        '[INFO] Knowledge synchronization service active.'
+        '[INFO] Ready to synchronize active clinical knowledge engines.',
+        '[INFO] Zero-drift invariant verification service active.'
       ]);
     }
   }, [isOpen]);
 
   const addLog = (msg: string) => {
-    const timestamp = new Date().toISOString().slice(11, 19);
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLogs((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
   const handleStartSync = () => {
     setIsSyncing(true);
     setIsComplete(false);
-    setOverallProgress(5);
-    addLog(`Initiating ${syncMode === 'delta' ? 'Fast Incremental Delta' : 'Full Schema Re-Index'} synchronization sequence...`);
+    setOverallProgress(10);
+    addLog(`Initiating ${syncMode === 'delta' ? 'incremental delta' : 'full index'} synchronization...`);
 
-    // Step 1: Connecting (0 - 25%)
+    // Step 1: Connecting
     setTimeout(() => {
-      setOverallProgress(25);
+      setOverallProgress(35);
       setEngines((prev) =>
-        prev.map((e) => ({ ...e, status: 'connecting', progress: 30 }))
+        prev.map((e) => ({ ...e, status: 'syncing' }))
       );
-      addLog('Handshake established with FDB CDG Gateway (TLS_AES_256_GCM_SHA384).');
-      addLog('Connected to Wolters Kluwer Lexicomp Evidence Repository.');
-    }, 600);
+      addLog('Connecting to clinical decision support rules repository...');
+      addLog('Verifying AST compiled rules against active prescription database...');
+    }, 500);
 
-    // Step 2: Downloading & Parsing (25 - 65%)
+    // Step 2: Validating
     setTimeout(() => {
-      setOverallProgress(65);
-      setEngines((prev) =>
-        prev.map((e) => ({ ...e, status: 'downloading', progress: 75 }))
-      );
-      addLog('Streaming delta monographs: Drug-Drug interactions, QT prolongation & CYP3A4 tables.');
-      addLog('Fetched 5,635 updated concept mappings from RxNorm CUI ontology.');
-    }, 1400);
+      setOverallProgress(70);
+      addLog('Validating drug-drug interaction matrix and severity grading thresholds...');
+      addLog('Re-compiling deterministic AST rule trees into active memory...');
+    }, 1200);
 
-    // Step 3: Verifying Cryptographic Signatures (65 - 90%)
-    setTimeout(() => {
-      setOverallProgress(90);
-      setEngines((prev) =>
-        prev.map((e) => ({ ...e, status: 'verifying', progress: 95 }))
-      );
-      addLog('Verifying FDB & Lexicomp SHA-256 cryptographic signatures: PASS (0 collisions).');
-      addLog('Re-compiling deterministic AST rule trees into in-memory engine...');
-    }, 2200);
-
-    // Step 4: Finished (100%)
+    // Step 3: Verified & Completed
     setTimeout(() => {
       setOverallProgress(100);
       setIsSyncing(false);
@@ -158,16 +131,19 @@ export default function SyncKnowledgeModal({
       setEngines((prev) =>
         prev.map((e) => ({
           ...e,
-          status: 'synced',
-          progress: 100,
-          currentVersion: e.targetVersion
+          status: 'verified'
         }))
       );
-      addLog('SUCCESS: All clinical knowledge engines synchronized and verified.');
-      addLog('Engine Health: 100% Invariant. Zero-Drift safety enforcement verified.');
+      addLog('SUCCESS: All clinical knowledge engines verified and active.');
+      addLog('Engine Health: 100% Invariant. In-memory cache compiled.');
 
-      onSyncComplete?.('v2025.02-B', 'Just now');
-    }, 3000);
+      const nowFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      try {
+        localStorage.setItem('smileclinic_knowledge_sync_timestamp', `Today at ${nowFormatted}`);
+      } catch {}
+
+      onSyncComplete?.('Production', `Today at ${nowFormatted}`);
+    }, 2000);
   };
 
   if (!isOpen) return null;
@@ -175,18 +151,28 @@ export default function SyncKnowledgeModal({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[110] overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        {/* Backdrop (matching standard popups across application) */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.94, y: 16 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => !isSyncing && onClose()}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        />
+
+        {/* Modal Window Container */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: 16 }}
-          transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="relative w-full max-w-3xl bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden flex flex-col max-h-[92vh]"
+          exit={{ opacity: 0, scale: 0.95, y: 16 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="relative w-full max-w-2xl bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col max-h-[90vh]"
         >
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-surface-container-high bg-surface-container-low/60 flex items-center justify-between shrink-0">
+          {/* Top Clinical Header Strip with Smooth Gradient */}
+          <div className="bg-gradient-to-r from-primary/10 via-surface-container-low to-transparent p-5 sm:p-6 border-b border-surface-container-high/60 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs">
                 <span className={`material-symbols-outlined text-[24px] ${isSyncing ? 'animate-spin' : ''}`}>
                   sync
                 </span>
@@ -196,9 +182,12 @@ export default function SyncKnowledgeModal({
                   <h2 className="text-base sm:text-lg font-bold text-on-surface">
                     Synchronize Clinical Knowledge Bases
                   </h2>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold uppercase tracking-wider">
+                    CDS Engine
+                  </span>
                 </div>
                 <p className="text-xs text-on-surface-variant">
-                  Update licensed pharmacopeias, verify cryptographic checksums, and re-compile AST rules.
+                  Update active clinical rules, verify AST decision trees, and re-compile in-memory knowledge cache.
                 </p>
               </div>
             </div>
@@ -207,14 +196,16 @@ export default function SyncKnowledgeModal({
               type="button"
               onClick={onClose}
               disabled={isSyncing}
-              className="p-1.5 rounded-xl text-outline hover:text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 cursor-pointer"
+              className="w-8 h-8 rounded-lg hover:bg-surface-container text-outline hover:text-on-surface transition-colors flex items-center justify-center cursor-pointer disabled:opacity-40"
+              title="Close"
+              aria-label="Close"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
           </div>
 
           {/* Modal Body */}
-          <div className="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs">
             {/* Sync Mode Selector */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-on-surface block">Synchronization Mode</label>
@@ -242,7 +233,7 @@ export default function SyncKnowledgeModal({
                     />
                   </div>
                   <p className="text-[11px] text-on-surface-variant">
-                    Applies newly published drug interactions, monographs, and FDA warnings since last sync.
+                    Applies newly updated clinical rules and active monograph adjustments since last synchronization.
                   </p>
                 </div>
 
@@ -257,7 +248,7 @@ export default function SyncKnowledgeModal({
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-bold text-on-surface flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-primary text-[16px]">verified</span>
-                      Full Cryptographic Re-Index
+                      Full Re-Compilation
                     </span>
                     <input
                       type="radio"
@@ -269,7 +260,7 @@ export default function SyncKnowledgeModal({
                     />
                   </div>
                   <p className="text-[11px] text-on-surface-variant">
-                    Re-downloads complete knowledge datasets, validates SHA-256 hashes, and rebuilds entire AST.
+                    Re-compiles the entire decision support rule base and validates all AST invariant trees.
                   </p>
                 </div>
               </div>
@@ -281,9 +272,9 @@ export default function SyncKnowledgeModal({
                 <div className="flex items-center justify-between text-xs font-bold text-on-surface">
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${isComplete ? 'bg-emerald-500' : 'bg-primary animate-ping'}`}></span>
-                    <span>{isComplete ? 'Sync Successfully Completed' : 'Synchronization In Progress...'}</span>
+                    <span>{isComplete ? 'Synchronization Verified & Complete' : 'Synchronizing Knowledge Cache...'}</span>
                   </div>
-                  <span className="font-mono text-primary">{overallProgress}%</span>
+                  <span className="font-mono text-primary font-bold">{overallProgress}%</span>
                 </div>
                 <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
                   <motion.div
@@ -296,18 +287,18 @@ export default function SyncKnowledgeModal({
               </div>
             )}
 
-            {/* 4 Knowledge Engines Grid */}
+            {/* Knowledge Engines Status Grid */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-on-surface">Licensed Knowledge Base Feeds</span>
-                <span className="text-[11px] text-outline">4 Active Endpoints</span>
+                <span className="text-xs font-bold text-on-surface">Clinical Knowledge Modules</span>
+                <span className="text-[11px] text-outline">4 Active Modules</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {engines.map((engine) => (
                   <div
                     key={engine.id}
-                    className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 flex flex-col justify-between gap-2"
+                    className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 flex flex-col justify-between gap-1.5"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -316,24 +307,26 @@ export default function SyncKnowledgeModal({
                       </div>
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
-                          engine.status === 'synced'
+                          engine.status === 'verified'
                             ? 'bg-emerald-100 text-emerald-800'
                             : engine.status === 'idle'
                             ? 'bg-surface-container-high text-on-surface-variant'
                             : 'bg-primary/10 text-primary'
                         }`}
                       >
-                        {engine.status === 'synced'
+                        {engine.status === 'verified'
                           ? 'VERIFIED'
                           : engine.status === 'idle'
                           ? 'READY'
-                          : engine.status}
+                          : 'SYNCING'}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-on-surface-variant pt-1 border-t border-surface-container">
-                      <span className="font-mono">{engine.currentVersion}</span>
-                      <span className="text-primary font-medium">Standard Feed</span>
+                      <span className="text-outline text-[10px]">{engine.scope}</span>
+                      <span className="text-emerald-700 font-semibold text-[10px] flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -347,7 +340,7 @@ export default function SyncKnowledgeModal({
                   <span className="material-symbols-outlined text-[15px] text-primary">terminal</span>
                   Audit Event Stream
                 </span>
-                <span className="text-[10px] text-outline font-mono">TLS 1.3 | SHA-256</span>
+                <span className="text-[10px] text-outline font-mono">TLS 1.3 | AES-256</span>
               </div>
               <div
                 ref={logContainerRef}
@@ -372,10 +365,10 @@ export default function SyncKnowledgeModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="px-6 py-3.5 border-t border-surface-container-high bg-surface-container-low/60 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          <div className="p-4 sm:p-5 border-t border-surface-container-high bg-surface-container-low/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2 text-outline text-[11px]">
-              <span className="material-symbols-outlined text-[16px] text-primary">verified</span>
-              <span>Encrypted Clinical Knowledge Sync</span>
+              <span className="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+              <span>Encrypted Decision Support Engine</span>
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">

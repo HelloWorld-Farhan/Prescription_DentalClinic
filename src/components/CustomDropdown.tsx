@@ -114,7 +114,7 @@ export default function CustomDropdown({
             role="listbox"
             className={`absolute top-full mt-1.5 ${
               align === 'right' ? 'right-0' : 'left-0'
-            } ${menuWidth} max-h-64 overflow-y-auto no-scrollbar rounded-2xl bg-surface-container-lowest border border-surface-container-high/80 shadow-xl p-1.5 z-50`}
+            } ${menuWidth} max-w-[calc(100vw-32px)] max-h-64 overflow-y-auto no-scrollbar rounded-2xl bg-surface-container-lowest border border-surface-container-high/80 shadow-xl p-1.5 z-50`}
           >
             {options.map((option) => {
               const isSelected = option.value === value;
