@@ -44,6 +44,7 @@ export default function Login() {
   const [loginOtpError, setLoginOtpError] = useState<string | null>(null);
   const [isVerifyingLoginOtp, setIsVerifyingLoginOtp] = useState(false);
   const [loginOtpResendCountdown, setLoginOtpResendCountdown] = useState(60);
+  const [isResendingLoginOtp, setIsResendingLoginOtp] = useState(false);
 
   // Device fingerprint token helper
   const getDeviceId = (): string => {
@@ -191,7 +192,7 @@ export default function Login() {
         setTimeout(() => {
           setShowLoginOtpModal(false);
           navigate('/dashboard');
-        }, 800);
+        }, 1200);
       }
     } catch (err: any) {
       setLoginOtpError(err.message || 'Invalid or expired sign-in code.');
@@ -203,14 +204,17 @@ export default function Login() {
   };
 
   const handleResendLoginOtp = async () => {
-    if (loginOtpResendCountdown > 0) return;
+    if (loginOtpResendCountdown > 0 || isResendingLoginOtp) return;
+    setIsResendingLoginOtp(true);
     try {
       setLoginOtp(Array(6).fill(''));
       setLoginOtpError(null);
-      setLoginOtpResendCountdown(60);
       await authApi.resendOtp(clinicalId.trim().toLowerCase());
+      setLoginOtpResendCountdown(60);
     } catch (err: any) {
       setLoginOtpError(err.message || 'Failed to resend sign-in code.');
+    } finally {
+      setIsResendingLoginOtp(false);
     }
   };
 
@@ -817,10 +821,14 @@ export default function Login() {
                   ) : (
                     <button
                       type="button"
+                      disabled={isResendingLoginOtp}
                       onClick={handleResendLoginOtp}
-                      className="text-primary font-bold hover:underline cursor-pointer"
+                      className="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
                     >
-                      Resend Code
+                      {isResendingLoginOtp && (
+                        <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+                      )}
+                      <span>{isResendingLoginOtp ? 'Sending OTP...' : 'Resend Code'}</span>
                     </button>
                   )}
                 </div>

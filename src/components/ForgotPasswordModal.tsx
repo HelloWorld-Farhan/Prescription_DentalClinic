@@ -34,6 +34,7 @@ export default function ForgotPasswordModal({
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [resendCount, setResendCount] = useState(0);
+  const [isResending, setIsResending] = useState(false);
 
   // Previous password verification state
   const [previousPasswordInput, setPreviousPasswordInput] = useState('');
@@ -139,7 +140,8 @@ export default function ForgotPasswordModal({
 
   // Resend code trigger (1 time per 60 sec countdown)
   const handleResendOtp = async () => {
-    if (!canResend) return;
+    if (!canResend || isResending) return;
+    setIsResending(true);
     try {
       await authApi.forgotPassword(accountEmail.trim().toLowerCase());
       setOtp(Array(6).fill(''));
@@ -149,6 +151,8 @@ export default function ForgotPasswordModal({
       setOtpError('');
     } catch (err: any) {
       setOtpError(err.message || 'Failed to resend code');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -193,7 +197,7 @@ export default function ForgotPasswordModal({
         setIsSubmitting(false);
         setStep(3);
         setOtpStatus('idle');
-      }, 600);
+      }, 1200);
     } catch (err: any) {
       setOtpStatus('error');
       setOtpError(err.message || 'Invalid 6-digit verification code. Please check your email.');
@@ -460,10 +464,20 @@ export default function ForgotPasswordModal({
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                    disabled={isSubmitting}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs hover:shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
                   >
-                    <span>Proceed to Verification</span>
-                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    {isSubmitting ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span>{method === 'email' ? 'Sending OTP Code...' : 'Verifying Identity...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>{method === 'email' ? 'Send OTP Code' : 'Proceed to Verification'}</span>
+                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
@@ -524,16 +538,25 @@ export default function ForgotPasswordModal({
 
                       <button
                         type="button"
-                        disabled={!canResend}
+                        disabled={!canResend || isResending}
                         onClick={handleResendOtp}
                         className={`font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer ${
-                          canResend
+                          canResend && !isResending
                             ? 'text-primary hover:underline'
                             : 'text-outline cursor-not-allowed opacity-60'
                         }`}
                       >
-                        <span className="material-symbols-outlined text-[14px]">refresh</span>
-                        <span>Resend Code</span>
+                        {isResending ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+                            <span>Sending OTP...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-[14px]">refresh</span>
+                            <span>Resend Code</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </>
@@ -560,7 +583,11 @@ export default function ForgotPasswordModal({
                           setPrevPassError('');
                         }}
                         placeholder="Enter previous password"
-                        className="w-full h-10 pl-10 pr-10 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs sm:text-sm font-medium focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all"
+                        className={`w-full h-10 pl-10 pr-10 rounded-xl ${
+                          prevPassError
+                            ? 'border-2 border-rose-500 bg-rose-50/25'
+                            : 'bg-surface-container-low border border-surface-container-high'
+                        } text-on-surface text-xs sm:text-sm font-medium focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all`}
                       />
                       <button
                         type="button"
@@ -574,8 +601,8 @@ export default function ForgotPasswordModal({
                     </div>
 
                     {prevPassError && (
-                      <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm">error</span>
+                      <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2 animate-shake">
+                        <span className="material-symbols-outlined text-rose-600 text-sm">error</span>
                         <span>{prevPassError}</span>
                       </div>
                     )}
@@ -613,6 +640,15 @@ export default function ForgotPasswordModal({
             {/* STEP 3: Change Password with Criteria Validation */}
             {step === 3 && (
               <form onSubmit={handleSaveNewPassword} className="flex flex-col gap-4">
+                {/* OTP Confirmation Header Badge */}
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs text-emerald-800 font-semibold">
+                  <span className="material-symbols-outlined text-emerald-600 text-[18px]">verified</span>
+                  <span>
+                    Identity Confirmed &mdash;{' '}
+                    {method === 'email' ? '6-Digit OTP Verified Successfully' : 'Previous Password Authenticated'}
+                  </span>
+                </div>
+
                 <div>
                   <h4 className="text-xs font-bold text-on-surface">Establish New Prescriber Password</h4>
                   <p className="text-[11px] text-on-surface-variant">

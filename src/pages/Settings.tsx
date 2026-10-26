@@ -124,6 +124,7 @@ export default function Settings() {
   const [verifiedResetOtp, setVerifiedResetOtp] = useState('');
   const [isSendingPasswordOtp, setIsSendingPasswordOtp] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [previousPasswordError, setPreviousPasswordError] = useState<string | null>(null);
 
   // Password reset fields
   const [newPassword, setNewPassword] = useState('');
@@ -239,18 +240,22 @@ export default function Settings() {
     }
     if (verificationMethod === 'password_otp') {
       if (!currentPasswordInput.trim()) {
+        setPreviousPasswordError('Please enter your current clinical password first.');
         showToast('Please enter your current clinical password first.');
         return;
       }
 
       setIsSendingPasswordOtp(true);
+      setPreviousPasswordError(null);
       try {
         await authApi.verifyCurrentPassword(profile.email, currentPasswordInput);
         setIsVerificationUnlocked(true);
         setUnlockedMethodLabel('Verified Current Password');
         showToast('Current password verified! You may now set your new clinical password.');
       } catch (err: any) {
-        showToast(err.message || 'Incorrect previous password. Please check your credentials.');
+        const errorMsg = err.message || 'Incorrect previous password. Please check your credentials.';
+        setPreviousPasswordError(errorMsg);
+        showToast(errorMsg);
       } finally {
         setIsSendingPasswordOtp(false);
       }
@@ -355,7 +360,7 @@ export default function Settings() {
           setIsVerificationUnlocked(true);
           setUnlockedMethodLabel(`Verified Email Passcode (${profile.email})`);
           showToast('Identity verified successfully! You may now set your new clinical password.');
-        }, 700);
+        }, 1200);
       } else {
         setIsOtpSuccess(true);
         setTimeout(() => {
@@ -363,7 +368,7 @@ export default function Settings() {
           setIsOtpSuccess(false);
           setTwoFactorConfigured(true);
           showToast('Two-Factor Authentication reconfigured and verified successfully.');
-        }, 700);
+        }, 1200);
       }
     } catch (err: any) {
       setIsOtpError(true);
@@ -841,23 +846,37 @@ export default function Settings() {
                           type={showCurrentPassword ? 'text' : 'password'}
                           required
                           value={currentPasswordInput}
-                          onChange={(e) => setCurrentPasswordInput(e.target.value)}
+                          onChange={(e) => {
+                            setCurrentPasswordInput(e.target.value);
+                            if (previousPasswordError) setPreviousPasswordError(null);
+                          }}
                           placeholder="Type current clinical password"
-                          className="w-full h-10 pl-3 pr-10 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm focus:border-primary outline-none"
+                          className={`w-full h-10 pl-3 pr-10 rounded-xl border text-xs sm:text-sm outline-none transition-colors ${
+                            previousPasswordError
+                              ? 'border-2 border-rose-500 bg-rose-50/25 text-rose-900 focus:border-rose-600'
+                              : 'border-surface-container-high bg-surface-container-lowest text-on-surface focus:border-primary'
+                          }`}
                         />
                         <button
                           type="button"
                           onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface"
+                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[18px]">
                             {showCurrentPassword ? 'visibility' : 'visibility_off'}
                           </span>
                         </button>
                       </div>
-                      <span className="text-[11px] text-outline block">
-                        Verify directly using your valid current password without needing an email OTP.
-                      </span>
+                      {previousPasswordError ? (
+                        <p className="text-xs text-rose-600 font-semibold flex items-center gap-1.5 mt-1 animate-shake">
+                          <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+                          <span>{previousPasswordError}</span>
+                        </p>
+                      ) : (
+                        <span className="text-[11px] text-outline block">
+                          Verify directly using your valid current password without needing an email OTP.
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -873,7 +892,7 @@ export default function Settings() {
                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                         <span>
                           {verificationMethod === 'email'
-                            ? 'Dispatching Security Passcode...'
+                            ? 'Sending OTP Passcode...'
                             : 'Verifying Current Password...'}
                         </span>
                       </>
@@ -1647,8 +1666,8 @@ export default function Settings() {
                       </motion.svg>
                     </motion.div>
                     <div className="text-center">
-                      <div className="text-sm font-bold text-emerald-800">Passcode Verified!</div>
-                      <div className="text-xs text-emerald-600 mt-0.5">Authorization complete. Proceeding...</div>
+                      <div className="text-sm font-bold text-emerald-800">OTP Verified Successfully!</div>
+                      <div className="text-xs text-emerald-600 mt-0.5">Identity confirmed. Proceeding to password configuration...</div>
                     </div>
                   </div>
                 ) : (
