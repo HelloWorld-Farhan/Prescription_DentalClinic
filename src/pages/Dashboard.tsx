@@ -28,6 +28,7 @@ export default function Dashboard() {
   const highSeverityCount = checks.filter(c => c.alerts.some(a => a.severity === 'contraindicated' && !a.overridden)).length;
   const inQueueCount = checks.filter(c => c.overallStatus === 'Requires Review' || c.overallStatus === 'Contraindicated').length;
   const unableToAssessCount = checks.filter(c => c.alerts.some(a => a.severity === 'moderate' || a.severity === 'minor')).length;
+  const rulesCount = VirtualDb.getRules().length;
   const priorityAlerts = checks
     .flatMap(c => (c.alerts || []).map(a => ({ check: c, alert: a })))
     .filter(item => (item.alert.severity === 'contraindicated' || item.alert.severity === 'major') && !item.alert.overridden)
@@ -317,7 +318,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Card 4: Unable to Assess */}
+        {/* Card 4: Rules & Clinical Data */}
         <motion.div
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.01 }}
@@ -327,22 +328,22 @@ export default function Dashboard() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Unable to Assess</span>
+              <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Rules &amp; Data</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">{unableToAssessCount}</span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">{rulesCount}</span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#FAF5FF] text-[#553C9A] font-bold">
-                  <span className="material-symbols-outlined text-[13px]">help</span>
-                  {unableToAssessCount > 0 ? 'Missing Lab' : 'All Clear'}
+                  <span className="material-symbols-outlined text-[13px]">verified</span>
+                  <span>Active Rules</span>
                 </span>
               </div>
             </div>
             <div className="w-10 h-10 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#553C9A] group-hover:scale-105 group-hover:bg-[#553C9A] group-hover:text-white transition-colors shadow-2xs">
-              <span className="material-symbols-outlined text-[22px]">rule</span>
+              <span className="material-symbols-outlined text-[22px]">database</span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between gap-1">
             <p className="text-[11px] text-on-surface-variant truncate">
-              {unableToAssessCount > 0 ? 'Missing lab / novel' : 'Full CDS rules coverage'}
+              Clinical CDS rules &amp; knowledge base
             </p>
             <button
               type="button"
@@ -351,9 +352,9 @@ export default function Dashboard() {
                 navigate('/rules');
               }}
               className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#553C9A] bg-[#FAF5FF] hover:bg-[#553C9A] hover:text-white transition-colors text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
-              title="Manage Clinical CDS Rules"
+              title="Manage Clinical CDS Rules & Data"
             >
-              <span>CDS Rules</span>
+              <span>Rules &amp; Data</span>
               <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
             </button>
           </div>

@@ -274,34 +274,34 @@ export default function Login() {
       className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden"
     >
       {/* Global Clinical Header */}
-      <header className="h-16 w-full bg-surface-container-lowest border-b border-outline-variant/30 px-4 lg:px-8 flex items-center justify-between shadow-xs z-20">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-bold shadow-xs overflow-hidden">
+      <header className="h-14 sm:h-16 w-full bg-surface-container-lowest border-b border-outline-variant/30 px-3 sm:px-6 lg:px-8 flex items-center justify-between shadow-xs z-20">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-bold shadow-xs overflow-hidden shrink-0">
             {savedLogo ? (
               <img src={savedLogo} alt="Smile Clinic Logo" className="w-full h-full object-contain p-1" />
             ) : (
-              <span className="material-symbols-outlined text-[22px]">dentistry</span>
+              <span className="material-symbols-outlined text-[20px] sm:text-[22px]">dentistry</span>
             )}
           </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-lg text-primary leading-none">Smile Clinic</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold uppercase tracking-wider">
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5 flex-nowrap">
+              <span className="font-bold text-base sm:text-lg text-primary leading-none whitespace-nowrap">Smile Clinic</span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] bg-primary/10 text-primary font-bold uppercase tracking-wider whitespace-nowrap">
                 Prescription Portal
               </span>
             </div>
-            <span className="text-[11px] text-on-surface-variant font-medium">Prescription Safety &amp; Decision Support</span>
+            <span className="text-[10px] sm:text-[11px] text-on-surface-variant font-medium truncate hidden sm:block">Prescription Safety &amp; Decision Support</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
           <div className="hidden md:flex items-center gap-1.5 text-on-surface-variant text-xs font-medium bg-surface-container-low px-3 py-1.5 rounded-full border border-surface-container-high">
             <span className="material-symbols-outlined text-[16px] text-primary">verified_user</span>
             <span>HIPAA Compliant 256-Bit SSL</span>
           </div>
           <Link
             to="/support"
-            className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors text-xs font-semibold"
+            className="flex items-center gap-1 sm:gap-1.5 text-on-surface-variant hover:text-primary transition-colors text-xs font-semibold"
           >
             <span className="material-symbols-outlined text-[18px]">help_outline</span>
             <span>Support</span>
@@ -310,7 +310,7 @@ export default function Login() {
       </header>
 
       {/* Main 2-Column Split Viewport: Left = Login Form, Right = Prescription Video */}
-      <main className="flex-1 flex items-center justify-center py-6 sm:py-10 px-4 relative z-10">
+      <main className="flex-1 flex items-center justify-center py-4 sm:py-10 px-2.5 sm:px-4 relative z-10">
         <div className="w-full max-w-6xl mx-auto">
           {/* High-Modern Floating Ambient Teal & Cyan Orbs */}
           <div className="relative">
@@ -333,26 +333,26 @@ export default function Login() {
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 className="lg:col-span-7 flex flex-col justify-between"
               >
-                <div className="bg-surface-container-lowest rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-6 sm:p-9 flex flex-col gap-6">
+                <div className="bg-surface-container-lowest rounded-2xl sm:rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-4 sm:p-9 flex flex-col gap-4 sm:gap-6">
                   {/* Top Badge Strip */}
-                  <div className="flex items-center justify-between text-on-surface-variant text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <span className="font-semibold text-primary">Secure Clinical Workspace</span>
+                  <div className="flex items-center justify-between text-on-surface-variant text-[11px] sm:text-xs gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                      <span className="font-semibold text-primary truncate">Secure Clinical Workspace</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-on-surface-variant font-medium">
-                      <span className="material-symbols-outlined text-sm text-primary">lock</span>
-                      <span>256-Bit SSL Encrypted</span>
+                    <div className="flex items-center gap-1 text-on-surface-variant/90 font-medium shrink-0">
+                      <span className="material-symbols-outlined text-[14px] text-primary">lock</span>
+                      <span className="whitespace-nowrap">256-Bit SSL Encrypted</span>
                     </div>
                   </div>
 
                   {/* Header Title */}
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary shadow-xs">
-                      <span className="material-symbols-outlined text-[24px]">lock</span>
+                  <div className="flex items-start gap-3 sm:gap-3.5">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary shadow-xs">
+                      <span className="material-symbols-outlined text-[20px] sm:text-[24px]">lock</span>
                     </div>
                     <div>
-                      <h1 className="text-xl sm:text-2xl font-bold text-on-surface tracking-tight">
+                      <h1 className="text-xl sm:text-2xl font-bold text-on-surface tracking-tight leading-tight">
                         Sign In &amp; Prescriber Access
                       </h1>
                       <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5 leading-snug">
