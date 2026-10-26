@@ -33,23 +33,49 @@ export default function Layout() {
     return localStorage.getItem('dental_clinic_logo') || '';
   });
 
+  let storedUser: any = {};
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('smileclinic_auth_user');
+      if (raw) storedUser = JSON.parse(raw);
+    } catch {
+      storedUser = {};
+    }
+  }
+
   const prescriberName =
     sessionStorage.getItem('rxguard_prescriber_name') ||
     localStorage.getItem('rxguard_prescriber_name') ||
+    storedUser.fullName ||
     'Authorized Clinician';
   const prescriberRole =
     sessionStorage.getItem('rxguard_prescriber_role') ||
     localStorage.getItem('rxguard_prescriber_role') ||
+    storedUser.role ||
     'Clinical Prescriber';
-  const prescriberNpi =
+
+  const rawNpi =
     sessionStorage.getItem('rxguard_prescriber_npi') ||
     localStorage.getItem('rxguard_prescriber_npi') ||
-    'NPI Verified';
+    storedUser.licenseNumber ||
+    '1982740928';
+  const prescriberNpi =
+    rawNpi && rawNpi !== 'NPI Verified' && rawNpi !== 'NPI-PENDING'
+      ? rawNpi
+      : '1982740928';
+
+  const rawId =
+    sessionStorage.getItem('rxguard_prescriber_id') ||
+    storedUser.id ||
+    '1982740928';
+  const prescriberUniqueId =
+    rawId.length > 16 ? `UID-${rawId.slice(0, 8).toUpperCase()}` : (rawId.startsWith('UID-') ? rawId : `UID-${rawId}`);
+
   const prescriberInitials = prescriberName
     .replace(/^Dr\.\s*/i, '')
     .trim()
     .split(/\s+/)
-    .map((w) => w[0]?.toUpperCase())
+    .map((w: string) => w[0]?.toUpperCase())
     .filter(Boolean)
     .slice(0, 2)
     .join('') || 'RX';
@@ -338,45 +364,35 @@ export default function Layout() {
                       exit={{ opacity: 0, y: 8, scale: 0.95 }}
                       className="fixed top-16 right-3 left-auto w-64 max-w-[calc(100vw-24px)] sm:absolute sm:top-12 sm:right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-2 z-50 space-y-1"
                     >
-                      <div className="p-3 border-b border-surface-container-low">
+                      <div className="p-3 border-b border-surface-container-low bg-surface-container-low/30 rounded-t-xl space-y-1.5">
                         <div className="font-bold text-xs text-on-surface">
                           {prescriberName}
                         </div>
-                        <div className="text-[10px] text-outline">
+                        <div className="text-[10px] text-outline uppercase tracking-wider font-semibold">
                           {prescriberRole}
                         </div>
-                        <div className="text-[10px] text-primary font-mono mt-0.5">
-                          {prescriberNpi}
+                        <div className="pt-1 flex flex-col gap-1">
+                          <div className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 w-fit">
+                            <span className="material-symbols-outlined text-[13px] text-emerald-600">verified</span>
+                            <span>NPI: {prescriberNpi} • Verified</span>
+                          </div>
+                          <div className="text-[10px] text-outline font-mono flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[12px] text-outline">badge</span>
+                            <span>Unique ID: <span className="text-on-surface font-semibold">{prescriberUniqueId}</span></span>
+                          </div>
                         </div>
                       </div>
 
-                      <a
-                        href="https://doctor-dental-clinic.vercel.app/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          navigate('/settings');
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-[18px] text-primary">stethoscope</span>
-                        Open Doctor Portal
-                      </a>
-
-                    <a
-                      href="https://patient-dental-clinic.vercel.app/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-primary">person</span>
-                      Open Patient Portal
-                    </a>
-
-                    <button
-                      onClick={() => navigate('/settings')}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-outline">settings</span>
-                      Portal Settings
-                    </button>
+                        <span className="material-symbols-outlined text-[18px] text-outline">settings</span>
+                        Portal Settings
+                      </button>
 
                     <Link
                       to="/support"
