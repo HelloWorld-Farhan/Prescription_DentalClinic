@@ -153,23 +153,53 @@ export default function ForgotPasswordModal({
   };
 
   // Step 2 -> Step 3
-  const handleConfirmVerification = (e: React.FormEvent) => {
-    e.preventDefault();
-    const entered = otp.join('');
+  const handleConfirmVerification = async (e?: React.FormEvent, directOtp?: string) => {
+    if (e) e.preventDefault();
+
+    if (method === 'previous') {
+      if (!previousPasswordInput.trim()) {
+        setPrevPassError('Please enter your previous password.');
+        return;
+      }
+      setIsSubmitting(true);
+      setPrevPassError('');
+      try {
+        await authApi.verifyCurrentPassword(accountEmail.trim().toLowerCase(), previousPasswordInput);
+        setStep(3);
+      } catch (err: any) {
+        setPrevPassError(err.message || 'Incorrect previous password. Please verify your credentials.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    const entered = directOtp || otp.join('');
     if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
       setOtpError('Please enter all 6 numeric digits of the security verification code.');
       setOtpStatus('error');
       setTimeout(() => setOtpStatus('idle'), 1500);
       return;
     }
-    setOtpError('');
-    setOtpStatus('success');
+
     setIsSubmitting(true);
-    setTimeout(() => {
+    setOtpStatus('verifying');
+    setOtpError('');
+
+    try {
+      await authApi.verifyResetOtp(accountEmail.trim().toLowerCase(), entered);
+      setOtpStatus('success');
+      setTimeout(() => {
+        setIsSubmitting(false);
+        setStep(3);
+        setOtpStatus('idle');
+      }, 600);
+    } catch (err: any) {
+      setOtpStatus('error');
+      setOtpError(err.message || 'Invalid 6-digit verification code. Please check your email.');
       setIsSubmitting(false);
-      setStep(3);
-      setOtpStatus('idle');
-    }, 600);
+      setTimeout(() => setOtpStatus('idle'), 1500);
+    }
   };
 
   // Step 3 Password Criteria
@@ -193,15 +223,23 @@ export default function ForgotPasswordModal({
     setResetError('');
 
     try {
-      await authApi.resetPassword(
-        accountEmail.trim().toLowerCase(),
-        otp.join(''),
-        newPassword
-      );
+      if (method === 'previous' && previousPasswordInput) {
+        await authApi.changePasswordWithCurrent(
+          accountEmail.trim().toLowerCase(),
+          previousPasswordInput,
+          newPassword
+        );
+      } else {
+        await authApi.resetPassword(
+          accountEmail.trim().toLowerCase(),
+          otp.join(''),
+          newPassword
+        );
+      }
 
       recordLoginEvent(
-        '2FA Verified',
-        `Prescriber password reset authorized via 6-digit email OTP (${accountEmail.trim().toLowerCase()})`
+        'Success',
+        `Prescriber password reset authorized (${accountEmail.trim().toLowerCase()})`
       );
 
       setIsSuccess(true);
@@ -457,6 +495,7 @@ export default function ForgotPasswordModal({
                           if (otpError) setOtpError('');
                           if (otpStatus === 'error') setOtpStatus('idle');
                         }}
+                        onComplete={(code) => handleConfirmVerification(undefined, code)}
                         status={otpStatus}
                         errorMessage={otpError}
                         disabled={isSubmitting || otpStatus === 'success'}

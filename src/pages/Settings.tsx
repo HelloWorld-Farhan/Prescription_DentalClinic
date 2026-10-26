@@ -219,11 +219,27 @@ export default function Settings() {
       showToast('SMS verification is coming soon. Please use Email Passcode.');
       return;
     }
-    if (verificationMethod === 'password_otp' && !currentPasswordInput.trim()) {
-      showToast('Please enter your current clinical password first.');
+    if (verificationMethod === 'password_otp') {
+      if (!currentPasswordInput.trim()) {
+        showToast('Please enter your current clinical password first.');
+        return;
+      }
+
+      setIsSendingPasswordOtp(true);
+      try {
+        await authApi.verifyCurrentPassword(profile.email, currentPasswordInput);
+        setIsVerificationUnlocked(true);
+        setUnlockedMethodLabel('Verified Current Password');
+        showToast('Current password verified! You may now set your new clinical password.');
+      } catch (err: any) {
+        showToast(err.message || 'Incorrect previous password. Please check your credentials.');
+      } finally {
+        setIsSendingPasswordOtp(false);
+      }
       return;
     }
 
+    // Email Passcode method: send OTP to email
     setIsSendingPasswordOtp(true);
     try {
       await authApi.forgotPassword(profile.email);
@@ -258,9 +274,16 @@ export default function Settings() {
     updated[index] = char;
     setOtpDigits(updated);
     setIsOtpError(false);
+    setOtpErrorMessage('');
 
     if (char && index < 5) {
       otpInputRefs.current[index + 1]?.focus();
+    } else if (char && index === 5) {
+      // Auto-validate on entering 6th digit
+      const fullCode = updated.join('');
+      if (fullCode.length === 6) {
+        setTimeout(() => handleVerifyOtp(undefined, fullCode), 50);
+      }
     }
   };
 
@@ -279,16 +302,20 @@ export default function Settings() {
       updated[i] = pasted[i] || '';
     }
     setOtpDigits(updated);
-    const nextIndex = Math.min(pasted.length, 5);
-    otpInputRefs.current[nextIndex]?.focus();
+    if (pasted.length === 6) {
+      setTimeout(() => handleVerifyOtp(undefined, pasted), 50);
+    } else {
+      const nextIndex = Math.min(pasted.length, 5);
+      otpInputRefs.current[nextIndex]?.focus();
+    }
   };
 
 
   // --- Submit & Validate OTP ---
-  const handleVerifyOtp = (e?: React.FormEvent) => {
+  const handleVerifyOtp = async (e?: React.FormEvent, directOtp?: string) => {
     if (e) e.preventDefault();
-    const entered = otpDigits.join('');
-    if (entered.length < 6) {
+    const entered = directOtp || otpDigits.join('');
+    if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
       setIsOtpError(true);
       setOtpErrorMessage('Please enter all 6 digits of the verification code.');
       return;
@@ -296,32 +323,36 @@ export default function Settings() {
 
     setIsOtpVerifying(true);
     setIsOtpError(false);
+    setOtpErrorMessage('');
 
-    setTimeout(() => {
-      setIsOtpVerifying(false);
-      if (entered.length === 6 && /^\d{6}$/.test(entered)) {
-        // SUCCESS ANIMATION TRIGGER
+    try {
+      if (otpPurpose === 'password_change') {
+        // Authenticate with backend: strictly reject wrong OTP
+        await authApi.verifyResetOtp(profile.email, entered);
         setIsOtpSuccess(true);
         setTimeout(() => {
           setShowOtpModal(false);
           setIsOtpSuccess(false);
-
-          if (otpPurpose === 'password_change') {
-            setVerifiedResetOtp(entered);
-            setIsVerificationUnlocked(true);
-            setUnlockedMethodLabel(`Verified Email Code (${profile.email})`);
-            showToast('Identity verified successfully! You may now set your new clinical password.');
-          } else {
-            setTwoFactorConfigured(true);
-            showToast('Two-Factor Authentication reconfigured and verified successfully.');
-          }
-        }, 800);
+          setVerifiedResetOtp(entered);
+          setIsVerificationUnlocked(true);
+          setUnlockedMethodLabel(`Verified Email Passcode (${profile.email})`);
+          showToast('Identity verified successfully! You may now set your new clinical password.');
+        }, 700);
       } else {
-        // ERROR SHAKE ANIMATION TRIGGER
-        setIsOtpError(true);
-        setOtpErrorMessage('Invalid verification passcode. Check your code or request a new one.');
+        setIsOtpSuccess(true);
+        setTimeout(() => {
+          setShowOtpModal(false);
+          setIsOtpSuccess(false);
+          setTwoFactorConfigured(true);
+          showToast('Two-Factor Authentication reconfigured and verified successfully.');
+        }, 700);
       }
-    }, 400);
+    } catch (err: any) {
+      setIsOtpError(true);
+      setOtpErrorMessage(err.message || 'Invalid 6-digit verification code. Please check your email and try again.');
+    } finally {
+      setIsOtpVerifying(false);
+    }
   };
 
   // --- Save New Password in Database ---
@@ -338,20 +369,25 @@ export default function Settings() {
 
     setIsSavingPassword(true);
     try {
-      await authApi.resetPassword(profile.email, verifiedResetOtp, newPassword);
+      if (verificationMethod === 'password_otp' && currentPasswordInput) {
+        // Direct password change via previous password (no OTP needed)
+        await authApi.changePasswordWithCurrent(profile.email, currentPasswordInput, newPassword);
+      } else {
+        await authApi.resetPassword(profile.email, verifiedResetOtp, newPassword);
+      }
       setIsVerificationUnlocked(false);
       setNewPassword('');
       setConfirmPassword('');
       setVerifiedResetOtp('');
       setCurrentPasswordInput('');
       const ev = recordLoginEvent(
-        '2FA Verified',
-        `Clinical password updated in database via OTP verification (${profile.email})`
+        'Success',
+        `Clinical password updated in database (${profile.email})`
       );
       setLoginHistory((prev) => [ev, ...prev]);
       showToast('Clinical password updated successfully in the database.');
     } catch (err: any) {
-      showToast(err.message || 'Failed to update password. Code may have expired.');
+      showToast(err.message || 'Failed to update password.');
     } finally {
       setIsSavingPassword(false);
     }
@@ -731,7 +767,7 @@ export default function Settings() {
                         </div>
                       </div>
 
-                      {/* Option 3: Current Password + OTP */}
+                      {/* Option 3: Current Password (Direct Verify, No OTP needed) */}
                       <label
                         className={`p-3 rounded-xl border flex flex-col justify-between gap-2 cursor-pointer transition-all ${
                           verificationMethod === 'password_otp'
@@ -750,8 +786,8 @@ export default function Settings() {
                           />
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-on-surface block">Previous Psw + OTP</span>
-                          <span className="text-[10px] text-outline line-clamp-1">Current Password &amp; 2FA</span>
+                          <span className="text-xs font-bold text-on-surface block">Previous / Current Psw</span>
+                          <span className="text-[10px] text-outline line-clamp-1">Direct Verify • No OTP Needed</span>
                         </div>
                       </label>
                     </div>
@@ -781,7 +817,7 @@ export default function Settings() {
                         </button>
                       </div>
                       <span className="text-[11px] text-outline block">
-                        Requires entering existing password followed by 6-digit TOTP verification token.
+                        Verify directly using your valid current password without needing an email OTP.
                       </span>
                     </div>
                   )}
@@ -796,7 +832,11 @@ export default function Settings() {
                     {isSendingPasswordOtp ? (
                       <>
                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        <span>Dispatching Security Passcode...</span>
+                        <span>
+                          {verificationMethod === 'email'
+                            ? 'Dispatching Security Passcode...'
+                            : 'Verifying Current Password...'}
+                        </span>
                       </>
                     ) : (
                       <>
@@ -804,7 +844,7 @@ export default function Settings() {
                         <span>
                           {verificationMethod === 'email'
                             ? 'Send Email 6-Digit Passcode'
-                            : 'Verify Current Password & Enter OTP'}
+                            : 'Verify Current Password & Unlock Form'}
                         </span>
                       </>
                     )}

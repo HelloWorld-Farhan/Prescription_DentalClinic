@@ -281,6 +281,85 @@ export const authApi = {
   },
 
   /**
+   * Validate password reset 6-digit OTP code against backend
+   */
+  async verifyResetOtp(email: string, otp_code: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-reset-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          otp_code: otp_code.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Invalid or expired verification code.');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Verify clinician's current/previous password directly without requiring OTP
+   */
+  async verifyCurrentPassword(email: string, password: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password: password
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Incorrect current password. Please enter your valid clinical password.');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Update clinical password directly using verified current password (no OTP needed)
+   */
+  async changePasswordWithCurrent(email: string, current_password: string, new_password: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          current_password,
+          new_password
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Failed to update clinical password.');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
    * Persist session JWT and clinician profile
    */
   saveSession(token: string, user: UserProfile): void {
