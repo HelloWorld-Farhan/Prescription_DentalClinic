@@ -138,15 +138,20 @@ export default function Login() {
         setTimeout(() => {
           setShowForgotPasswordModal(true);
         }, 1100);
+      } else if (errMsg.toLowerCase().includes('not verified')) {
+        // Unverified account: backend dispatched verification code to their email
+        setTimeout(() => {
+          setShowLoginOtpModal(true);
+        }, 800);
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleVerifyLoginOtp = async (e?: React.FormEvent) => {
+  const handleVerifyLoginOtp = async (e?: React.FormEvent, directCode?: string) => {
     if (e) e.preventDefault();
-    const entered = loginOtp.join('');
+    const entered = directCode || loginOtp.join('');
     if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
       setLoginOtpError('Please enter all 6 numeric digits of your sign-in verification code.');
       setLoginOtpStatus('error');
@@ -343,6 +348,29 @@ export default function Login() {
                           <p className="mt-1 text-[11px] text-rose-800 font-normal">
                             A one-time reset code has been sent to your email. Opening reset window...
                           </p>
+                        )}
+                        {errorMessage.toLowerCase().includes('not verified') && (
+                          <p className="mt-1 text-[11px] text-teal-800 font-semibold">
+                            Opening email verification window... Please enter the 6-digit code sent to your email.
+                          </p>
+                        )}
+                        {(errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('no registered')) && (
+                          <div className="mt-2 pt-2 border-t border-rose-200/60 flex items-center gap-3 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => setShowForgotPasswordModal(true)}
+                              className="font-bold underline text-rose-900 hover:text-rose-950 cursor-pointer"
+                            >
+                              Reset Password?
+                            </button>
+                            <span className="text-rose-400">•</span>
+                            <Link
+                              to="/signup"
+                              className="font-bold underline text-rose-900 hover:text-rose-950"
+                            >
+                              Enroll Clinician Account →
+                            </Link>
+                          </div>
                         )}
                       </div>
                     </motion.div>
@@ -716,6 +744,7 @@ export default function Login() {
                       setLoginOtp(newVal);
                       setLoginOtpError(null);
                     }}
+                    onComplete={(code) => handleVerifyLoginOtp(undefined, code)}
                     status={loginOtpStatus}
                   />
                 </div>

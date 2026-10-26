@@ -197,6 +197,9 @@ export default function Signup() {
     const tErr = getTermsError(agreedTerms);
 
     if (nErr || eErr || pErr || passErr || cPassErr || tErr) {
+      const firstError = nErr || eErr || pErr || passErr || cPassErr || tErr;
+      setSignupError(firstError || 'Please complete all required fields and accept the clinical terms.');
+      window.scrollTo({ top: 120, behavior: 'smooth' });
       return;
     }
 
@@ -226,11 +229,11 @@ export default function Signup() {
     }
   };
 
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
+  const handleVerifyOtp = async (e?: React.FormEvent, codeOverride?: string) => {
     if (e) e.preventDefault();
     setOtpError(null);
 
-    const entered = emailOtp.join('');
+    const entered = codeOverride || emailOtp.join('');
     if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
       setOtpError('Please enter all 6 numeric digits of the Email security code.');
       setOtpStatus('error');
@@ -248,7 +251,7 @@ export default function Signup() {
       setOtpStatus('success');
       setTimeout(() => {
         navigate('/dashboard');
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       setOtpStatus('error');
       setOtpError(err.message || 'Invalid or expired code.');
@@ -368,10 +371,22 @@ export default function Signup() {
                       initial={{ opacity: 0, y: -6 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -6 }}
-                      className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2"
+                      className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2.5 shadow-xs"
                     >
-                      <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
-                      <span>{signupError}</span>
+                      <span className="material-symbols-outlined text-base shrink-0 mt-0.5 text-rose-600">error</span>
+                      <div className="flex-1">
+                        <span className="font-semibold block">{signupError}</span>
+                        {signupError.toLowerCase().includes('already exists') && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Link
+                              to="/login"
+                              className="px-3 py-1 rounded-lg bg-rose-600 text-white font-bold text-[11px] hover:bg-rose-700 transition-colors inline-block"
+                            >
+                              Sign In to Account →
+                            </Link>
+                          </div>
+                        )}
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -673,13 +688,27 @@ export default function Signup() {
 
                   {/* Submit */}
                   <motion.button
-                    whileHover={{ scale: 1.015, y: -1 }}
-                    whileTap={{ scale: 0.985 }}
+                    whileHover={{ scale: isSubmitting ? 1 : 1.015, y: isSubmitting ? 0 : -1 }}
+                    whileTap={{ scale: isSubmitting ? 1 : 0.985 }}
                     type="submit"
-                    className="w-full bg-primary hover:bg-primary-hover text-white py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                    disabled={isSubmitting}
+                    className={`w-full py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 shadow-md transition-all cursor-pointer ${
+                      isSubmitting
+                        ? 'bg-primary/80 text-white cursor-wait opacity-90'
+                        : 'bg-primary hover:bg-primary-hover text-white hover:shadow-lg'
+                    }`}
                   >
-                    <span>Proceed to Email Verification</span>
-                    <span className="material-symbols-outlined text-[18px]">mail_lock</span>
+                    {isSubmitting ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Authenticating &amp; Sending Verification Code...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Proceed to Email Verification</span>
+                        <span className="material-symbols-outlined text-[18px]">mail_lock</span>
+                      </>
+                    )}
                   </motion.button>
 
                   {/* Divider */}
@@ -812,6 +841,7 @@ export default function Signup() {
                       if (otpError) setOtpError(null);
                       if (otpStatus === 'error') setOtpStatus('idle');
                     }}
+                    onComplete={(code) => handleVerifyOtp(undefined, code)}
                     status={otpStatus}
                     errorMessage={otpError || undefined}
                     disabled={isVerifying || otpStatus === 'success'}
