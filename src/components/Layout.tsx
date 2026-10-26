@@ -40,6 +40,9 @@ export default function Layout() {
     try {
       const raw = localStorage.getItem('smileclinic_auth_user');
       if (raw) storedUser = JSON.parse(raw);
+      if (storedUser && !storedUser.phone) {
+        storedUser.phone = sessionStorage.getItem('rxguard_prescriber_phone') || localStorage.getItem('rxguard_prescriber_phone') || '';
+      }
     } catch {
       storedUser = {};
     }

@@ -207,11 +207,15 @@ export default function Signup() {
 
     try {
       setIsSubmitting(true);
+      const fullPhone = selectedCountry.dial + ' ' + phone.trim();
+      sessionStorage.setItem('rxguard_prescriber_phone', fullPhone);
+      localStorage.setItem('rxguard_prescriber_phone', fullPhone);
+
       const res = await authApi.signup({
         full_name: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
-        phone: selectedCountry.dial + ' ' + phone.trim(),
+        phone: fullPhone,
         country_code: selectedCountry.code,
         role: 'USER'
       });
@@ -247,6 +251,9 @@ export default function Signup() {
       setOtpStatus('verifying');
       const res = await authApi.verifyOtp(email, entered);
       if (res.token && res.user) {
+        if (!res.user.phone) {
+          res.user.phone = sessionStorage.getItem('rxguard_prescriber_phone') || localStorage.getItem('rxguard_prescriber_phone') || (selectedCountry.dial + ' ' + phone.trim());
+        }
         authApi.saveSession(res.token, res.user);
       }
       setOtpStatus('success');
