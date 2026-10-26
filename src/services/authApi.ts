@@ -5,9 +5,7 @@
 
 const API_BASE_URL = (
   (import.meta as any).env?.VITE_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8000'
-    : 'https://dentalclinic-backend-eiav.onrender.com')
+  (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8000' : '')
 ).replace(/\/$/, '');
 
 export interface SignupPayload {
