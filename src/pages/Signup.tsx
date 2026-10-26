@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import OtpVerificationInput from '../components/OtpVerificationInput';
+import AuthInfoPanel from '../components/AuthInfoPanel';
 
 export interface RegisteredPrescriber {
   fullName: string;
@@ -244,119 +245,14 @@ export default function Signup() {
         <div className="w-full max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
             
-            {/* LEFT COLUMN: Modern Clinical Credential Stream & Privileges Gateway (5 cols on lg) */}
+            {/* LEFT COLUMN: Animated Info Panel */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="lg:col-span-5 relative rounded-3xl overflow-hidden shadow-2xl border border-white/10 min-h-[580px] bg-gradient-to-br from-[#02131b] via-[#05212d] to-[#010c12] flex flex-col justify-between p-6 sm:p-8 text-white group"
+              className="lg:col-span-5"
             >
-              {/* Refined Background Video with Glassmorphic Blend */}
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="absolute inset-0 w-full h-full object-cover opacity-25 mix-blend-screen scale-105 group-hover:scale-100 transition-transform duration-1000 pointer-events-none"
-              >
-                <source
-                  src="https://assets.mixkit.co/videos/preview/mixkit-scientist-looking-at-a-sample-under-a-microscope-41614-large.mp4"
-                  type="video/mp4"
-                />
-              </video>
-
-              {/* Ambient Glowing Radial Beams */}
-              <div className="absolute -top-12 -right-12 w-72 h-72 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
-              <div className="absolute -bottom-12 -left-12 w-72 h-72 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-
-              {/* Top Video Header Overlay */}
-              <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-xs">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">
-                    Prescriber Credential Stream
-                  </span>
-                </div>
-                <span className="text-[11px] font-mono text-cyan-300 font-bold bg-cyan-950/80 px-2.5 py-1 rounded-lg border border-cyan-500/40 shadow-xs">
-                  NPI Registry v4.1
-                </span>
-              </div>
-
-              {/* Center Telemetry Card */}
-              <div className="relative z-10 my-auto py-6">
-                <div className="bg-white/[0.07] backdrop-blur-2xl p-6 rounded-2xl border border-white/15 shadow-2xl space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/25 to-emerald-500/25 border border-cyan-400/30 text-cyan-300 flex items-center justify-center shadow-xs">
-                        <span className="material-symbols-outlined text-[22px]">badge</span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-white tracking-tight">Prescriber Privileges Gateway</h4>
-                        <span className="text-[11px] text-slate-300">Dual-Factor Notarized Identity</span>
-                      </div>
-                    </div>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full font-bold border border-emerald-500/30">
-                      Tier II Ready
-                    </span>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs">
-                    <motion.div
-                      whileHover={{ y: -2, scale: 1.01 }}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        <span className="text-slate-200 text-xs font-medium">HHS NPI National Registry</span>
-                      </div>
-                      <span className="text-emerald-400 font-bold text-[10px] uppercase bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded-md">
-                        Verified Live
-                      </span>
-                    </motion.div>
-
-                    <motion.div
-                      whileHover={{ y: -2, scale: 1.01 }}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                        <span className="text-slate-200 text-xs font-medium">DEA Schedule II-IV EPCS</span>
-                      </div>
-                      <span className="text-cyan-300 font-bold text-[10px] uppercase bg-cyan-950/70 border border-cyan-500/30 px-2 py-0.5 rounded-md">
-                        2FA Biometric Ready
-                      </span>
-                    </motion.div>
-
-                    <motion.div
-                      whileHover={{ y: -2, scale: 1.01 }}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-teal-400" />
-                        <span className="text-slate-200 text-xs font-medium">Hospital Inpatient Dental Privileges</span>
-                      </div>
-                      <span className="text-teal-300 font-bold text-[10px] uppercase bg-teal-950/70 border border-teal-500/30 px-2 py-0.5 rounded-md">
-                        Active Tier I
-                      </span>
-                    </motion.div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Telemetry Strip */}
-              <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Security Architecture</span>
-                  <span className="text-xs font-bold text-emerald-300 font-mono flex items-center gap-1.5 mt-0.5">
-                    <span className="material-symbols-outlined text-[14px]">lock</span>
-                    <span>256-Bit TLS AES · Zero-Knowledge</span>
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Regulatory Standard</span>
-                  <span className="text-xs font-bold text-cyan-300">21 CFR §1311 EPCS</span>
-                </div>
-              </div>
+              <AuthInfoPanel variant="signup" />
             </motion.div>
 
             {/* RIGHT COLUMN: Clinician Registration Form (7 cols on lg) - Swapped from Left! */}

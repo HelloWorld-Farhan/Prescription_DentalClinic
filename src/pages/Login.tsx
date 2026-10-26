@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
+import AuthInfoPanel from '../components/AuthInfoPanel';
 
 export const OFFICIAL_PRESCRIBER_CREDENTIALS = {
   email: 'prescription@smileclinic.com',
@@ -426,119 +427,14 @@ export default function Login() {
                 </div>
               </motion.div>
 
-              {/* RIGHT COLUMN: Modern Clinical Safety Stream & CDS Engine Showcase Card (5 cols on lg) */}
+              {/* RIGHT COLUMN: Animated Info Panel */}
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-                className="lg:col-span-5 relative rounded-3xl overflow-hidden shadow-2xl border border-white/10 min-h-[580px] bg-gradient-to-br from-[#02131b] via-[#041d27] to-[#010b10] flex flex-col justify-between p-6 sm:p-8 text-white group"
+                className="lg:col-span-5"
               >
-                {/* Refined Background Video with Glassmorphic Blend */}
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="absolute inset-0 w-full h-full object-cover opacity-25 mix-blend-screen scale-105 group-hover:scale-100 transition-transform duration-1000 pointer-events-none"
-                >
-                  <source
-                    src="https://assets.mixkit.co/videos/preview/mixkit-doctor-working-with-a-tablet-41617-large.mp4"
-                    type="video/mp4"
-                  />
-                </video>
-
-                {/* Ambient Glowing Radial Beams */}
-                <div className="absolute -top-12 -right-12 w-72 h-72 bg-teal-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
-                <div className="absolute -bottom-12 -left-12 w-72 h-72 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-
-                {/* Top Video Header Overlay */}
-                <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-xs">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-xs font-bold text-white tracking-wide uppercase">
-                      Prescription Safety Stream
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-teal-300 font-bold bg-teal-950/80 px-2.5 py-1 rounded-lg border border-teal-500/40 shadow-xs">
-                    FHIR R4 v4.0.1
-                  </span>
-                </div>
-
-                {/* Center Telemetry Card */}
-                <div className="relative z-10 my-auto py-6">
-                  <div className="bg-white/[0.07] backdrop-blur-2xl p-6 rounded-2xl border border-white/15 shadow-2xl space-y-4">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500/25 to-emerald-500/25 border border-teal-400/30 text-teal-300 flex items-center justify-center shadow-xs">
-                          <span className="material-symbols-outlined text-[22px]">medication</span>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-white tracking-tight">Clinical Interaction Screener</h4>
-                          <span className="text-[11px] text-slate-300">Deterministic Cross-Match Engine</span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full font-bold border border-emerald-500/30">
-                        Live Screening
-                      </span>
-                    </div>
-
-                    <div className="space-y-2.5 text-xs">
-                      <motion.div
-                        whileHover={{ y: -2, scale: 1.01 }}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
-                          <span className="text-slate-200 text-xs font-medium">Warfarin + Fluconazole</span>
-                        </div>
-                        <span className="text-rose-300 font-bold text-[10px] uppercase bg-rose-950/70 border border-rose-500/40 px-2 py-0.5 rounded-md">
-                          Contraindicated
-                        </span>
-                      </motion.div>
-
-                      <motion.div
-                        whileHover={{ y: -2, scale: 1.01 }}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-amber-400" />
-                          <span className="text-slate-200 text-xs font-medium">eGFR Renal Clearance &lt;50mL</span>
-                        </div>
-                        <span className="text-amber-300 font-bold text-[10px] uppercase bg-amber-950/70 border border-amber-500/40 px-2 py-0.5 rounded-md">
-                          Auto-Adjust Dose
-                        </span>
-                      </motion.div>
-
-                      <motion.div
-                        whileHover={{ y: -2, scale: 1.01 }}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-teal-400" />
-                          <span className="text-slate-200 text-xs font-medium">Penicillin Anaphylaxis Guard</span>
-                        </div>
-                        <span className="text-teal-300 font-bold text-[10px] uppercase bg-teal-950/70 border border-teal-500/40 px-2 py-0.5 rounded-md">
-                          Cross-Class Safe
-                        </span>
-                      </motion.div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Telemetry Strip */}
-                <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Engine Verification</span>
-                    <span className="text-xs font-bold text-teal-300 font-mono flex items-center gap-1.5 mt-0.5">
-                      <span className="material-symbols-outlined text-[14px]">verified</span>
-                      <span>Real-Time Interlock · Zero Fault</span>
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Compliance Matrix</span>
-                    <span className="text-xs font-bold text-emerald-300">21 CFR §1311 EPCS</span>
-                  </div>
-                </div>
+                <AuthInfoPanel variant="login" />
               </motion.div>
             </div>
           </div>
