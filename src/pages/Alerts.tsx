@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
+import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
 import { DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import PrintableReportModal from '../components/PrintableReportModal';
@@ -55,7 +55,7 @@ export default function Alerts() {
   const handleOverride = (alertId: string, reason: string) => {
     const target = allAlerts.find(a => a.alert.id === alertId);
     if (target) {
-      VirtualDb.overrideAlert(target.checkId, alertId, reason, 'Dr. Sarah Lin, PharmD');
+      VirtualDb.overrideAlert(target.checkId, alertId, reason, getActiveClinicianName());
       setChecks([...VirtualDb.getChecks()]);
       setActiveDrawerAlert(null);
       setToastMessage('Clinical decision signed & recorded into HIPAA audit trail');

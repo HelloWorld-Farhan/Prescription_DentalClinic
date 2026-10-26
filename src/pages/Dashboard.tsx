@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
+import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
 import { SafetyCheckRecord, DrugInteractionAlert } from '../types';
 import PrintableReportModal from '../components/PrintableReportModal';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
@@ -680,7 +680,7 @@ export default function Dashboard() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         onOverride={(alertId, reason) => {
-          VirtualDb.overrideAlert(activeDrawerCheckId || checks[0]?.id, alertId, reason, 'Dr. Sarah Lin, PharmD');
+          VirtualDb.overrideAlert(activeDrawerCheckId || checks[0]?.id, alertId, reason, getActiveClinicianName());
           setChecks([...VirtualDb.getChecks()]);
           setIsDrawerOpen(false);
           setToastMessage('Clinical decision signed & recorded into HIPAA audit trail');

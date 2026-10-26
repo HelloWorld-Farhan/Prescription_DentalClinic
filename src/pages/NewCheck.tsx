@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PrescriptionStorage as VirtualDb, INITIAL_PATIENTS } from '../services/prescriptionService';
+import { PrescriptionStorage as VirtualDb, INITIAL_PATIENTS, isMockPatient } from '../services/prescriptionService';
 import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import PrintableReportModal from '../components/PrintableReportModal';
@@ -60,7 +60,7 @@ export default function NewCheck() {
     ? ['Documented Allergy']
     : [];
 
-  const prescriberDisplayName = storedUser?.fullName || 'Arthur Vance, MD';
+  const prescriberDisplayName = storedUser?.fullName || 'Authorized Clinician';
   const prescriberRoleDisplay = storedUser?.role
     ? storedUser.role.charAt(0).toUpperCase() + storedUser.role.slice(1)
     : 'Active Prescriber';
@@ -82,12 +82,11 @@ export default function NewCheck() {
     roomOrUnit: 'Dental Operatory'
   };
 
-  // Ensure patients list is never empty: current patient profile + clinical testing records
-  const rawPatients = VirtualDb.getPatients();
-  const availablePatients = rawPatients && rawPatients.length > 0 ? rawPatients : INITIAL_PATIENTS;
+  // Only genuine patient records: strictly filter out any mock/test data
+  const rawPatients = VirtualDb.getPatients().filter(p => p && !isMockPatient(p));
   const patients: Patient[] = [
     defaultPatient,
-    ...availablePatients.filter(p => p.id !== defaultPatient.id && p.name !== userFullName)
+    ...rawPatients.filter(p => p.id !== defaultPatient.id && p.name !== userFullName)
   ];
 
   // Patient Context Selection
@@ -292,11 +291,11 @@ export default function NewCheck() {
   // Override alert from detail drawer
   const handleOverrideFromDrawer = (alertId: string, reason: string) => {
     if (savedCheckRecord) {
-      VirtualDb.overrideAlert(savedCheckRecord.id, alertId, reason, 'Dr. Sarah Lin, PharmD');
+      VirtualDb.overrideAlert(savedCheckRecord.id, alertId, reason, prescriberDisplayName);
       setAlerts(prev =>
         prev.map(a =>
           a.id === alertId
-            ? { ...a, overridden: true, overrideReason: reason, overrideAuthor: 'Dr. Sarah Lin, PharmD' }
+            ? { ...a, overridden: true, overrideReason: reason, overrideAuthor: prescriberDisplayName }
             : a
         )
       );
@@ -841,20 +840,39 @@ export default function NewCheck() {
                   <span className="text-[11px] text-outline">Cross-checks medical history, allergies &amp; kidney health</span>
                 </div>
                 <div className="relative w-full sm:w-auto min-w-[260px]">
-                  <select
-                    value={selectedPatientId}
-                    onChange={(e) => handlePatientSelect(e.target.value)}
-                    className="w-full h-10 pl-3 pr-8 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs font-semibold text-on-surface focus:border-primary outline-none cursor-pointer appearance-none shadow-2xs transition-colors"
-                  >
-                    {patients.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.mrn}) • {p.age}y • eGFR {p.egfr}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="material-symbols-outlined text-[18px] text-outline absolute right-2.5 top-2.5 pointer-events-none">
-                    unfold_more
-                  </span>
+                  {patients.length > 1 ? (
+                    <>
+                      <select
+                        value={selectedPatientId}
+                        onChange={(e) => handlePatientSelect(e.target.value)}
+                        className="w-full h-10 pl-3 pr-8 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs font-semibold text-on-surface focus:border-primary outline-none cursor-pointer appearance-none shadow-2xs transition-colors"
+                      >
+                        {patients.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.mrn}) • {p.age}y • eGFR {p.egfr}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="material-symbols-outlined text-[18px] text-outline absolute right-2.5 top-2.5 pointer-events-none">
+                        unfold_more
+                      </span>
+                    </>
+                  ) : (
+                    <div className="w-full h-10 px-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest flex items-center justify-between shadow-2xs gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                        <span className="text-xs font-bold text-on-surface truncate">
+                          {defaultPatient.name} ({defaultPatient.mrn})
+                        </span>
+                        <span className="text-[10px] text-outline shrink-0 font-medium">
+                          • {defaultPatient.age}y • eGFR {defaultPatient.egfr}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 shrink-0">
+                        Active Patient
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -925,11 +943,17 @@ export default function NewCheck() {
                 </div>
 
                 <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
-                  <span className="material-symbols-outlined text-amber-600 text-[18px] shrink-0 mt-0.5">health_and_safety</span>
+                  <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${customEgfr >= 60 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    health_and_safety
+                  </span>
                   <div>
                     <div className="font-bold text-on-surface">Renal Function Indicator</div>
                     <div className="text-[11px] text-outline mt-0.5">
-                      eGFR {customEgfr} mL/min (Stage 3b). Renally cleared medications require dosage titration.
+                      {customEgfr >= 90
+                        ? `eGFR ${customEgfr} mL/min (Optimal / Normal). Standard clinical dosing applies.`
+                        : customEgfr >= 60
+                        ? `eGFR ${customEgfr} mL/min (Stage 2 Mild Reduction). Adequate renal clearance.`
+                        : `eGFR ${customEgfr} mL/min (Renal Caution). Titrate dose for renally eliminated medications.`}
                     </div>
                   </div>
                 </div>

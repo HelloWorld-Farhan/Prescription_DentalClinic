@@ -1,10 +1,25 @@
 import { Patient, SafetyCheckRecord, AuditLogEntry, DrugInteractionAlert, PrescriptionItem, InteractionRule } from '../types';
 
 const STORAGE_KEYS = {
-  PATIENTS: 'smileclinic_patients',
+  PATIENTS: 'smileclinic_patients_v3',
   CHECKS: 'smileclinic_checks',
   AUDIT: 'smileclinic_audit',
   RULES: 'smileclinic_rules_v5'
+};
+
+export const isMockPatient = (p: any): boolean => {
+  if (!p || typeof p !== 'object') return true;
+  const name = String(p.name || '').toLowerCase();
+  const id = String(p.id || '').toLowerCase();
+  const mrn = String(p.mrn || '').toLowerCase();
+  return (
+    name.includes('eleanor') ||
+    name.includes('marcus') ||
+    name.includes('jenkins') ||
+    name.includes('vance') ||
+    id.includes('pt-00') ||
+    mrn.includes('pt-00')
+  );
 };
 
 // Purge legacy mock rules, audits, and mock patient seeds if present
@@ -13,13 +28,14 @@ try {
   localStorage.removeItem('smileclinic_rules_v5');
   localStorage.removeItem('smileclinic_audit');
   localStorage.removeItem('smileclinic_patients');
+  localStorage.removeItem('smileclinic_patients_v2');
   localStorage.removeItem('smileclinic_custom_prescriber_password');
   localStorage.removeItem('smileclinic_registered_doctors');
 } catch {
   // ignore
 }
 
-const getActiveClinicianName = () => {
+export const getActiveClinicianName = () => {
   try {
     return (
       sessionStorage.getItem('rxguard_prescriber_name') ||
@@ -109,10 +125,19 @@ export class PrescriptionStorage {
 
   static getPatients(): Patient[] {
     try {
+      localStorage.removeItem('smileclinic_patients');
+      localStorage.removeItem('smileclinic_patients_v2');
       const raw = localStorage.getItem(STORAGE_KEYS.PATIENTS);
-      return raw ? JSON.parse(raw) : INITIAL_PATIENTS;
+      if (!raw) return [];
+      const parsed: Patient[] = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      const realOnly = parsed.filter(p => p && !isMockPatient(p));
+      if (realOnly.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEYS.PATIENTS, JSON.stringify(realOnly));
+      }
+      return realOnly;
     } catch {
-      return INITIAL_PATIENTS;
+      return [];
     }
   }
 
@@ -121,6 +146,7 @@ export class PrescriptionStorage {
   }
 
   static addPatient(patient: Patient) {
+    if (isMockPatient(patient)) return;
     const patients = this.getPatients();
     const existingIndex = patients.findIndex(p => p.id === patient.id || p.mrn.toLowerCase() === patient.mrn.toLowerCase());
     if (existingIndex >= 0) {
