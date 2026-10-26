@@ -13,13 +13,14 @@ import {
 export interface ClinicalProfile {
   fullName: string;
   role: string;
-  authority: string;
-  license: string;
-  npi: string;
-  hospital: string;
-  department: string;
   email: string;
   phone: string;
+  age?: number;
+  gender?: string;
+  height?: string;
+  weight?: string;
+  hasAllergies?: boolean;
+  allergiesDescription?: string;
   avatarInitials: string;
   avatarColor: string;
 }
@@ -45,23 +46,18 @@ function loadRealUserProfile(): ClinicalProfile {
     sessionStorage.getItem('rxguard_prescriber_email') ||
     localStorage.getItem('rxguard_prescriber_email') ||
     storedUser.email ||
-    'clinician@smileclinic.com';
+    '';
 
   const role =
     sessionStorage.getItem('rxguard_prescriber_role') ||
     localStorage.getItem('rxguard_prescriber_role') ||
     storedUser.role ||
-    'Clinical Prescriber';
+    'USER';
 
-  const rawNpi =
-    sessionStorage.getItem('rxguard_prescriber_npi') ||
-    localStorage.getItem('rxguard_prescriber_npi') ||
-    storedUser.id ||
-    '1982740928';
-  const npi =
-    rawNpi && rawNpi !== 'NPI Verified' && rawNpi !== 'NPI-PENDING' && rawNpi !== 'RX-774021'
-      ? rawNpi
-      : '1982740928';
+  const phone =
+    sessionStorage.getItem('rxguard_prescriber_phone') ||
+    storedUser.phone ||
+    '';
 
   const initials = name
     .replace(/^Dr\.\s*/i, '')
@@ -75,13 +71,14 @@ function loadRealUserProfile(): ClinicalProfile {
   return {
     fullName: name,
     role: role,
-    authority: 'Clinical Prescriber Sign-Off Authority',
-    license: `NPI #${npi}`,
-    npi: npi,
-    hospital: 'Smile Clinic Health System',
-    department: 'Clinical Operatory & Dispensary',
     email: email,
-    phone: storedUser.phone || '+1 (555) 948-2819',
+    phone: phone,
+    age: storedUser.age,
+    gender: storedUser.gender || 'Prefer not to say',
+    height: storedUser.height || '',
+    weight: storedUser.weight || '',
+    hasAllergies: Boolean(storedUser.hasAllergies),
+    allergiesDescription: storedUser.allergiesDescription || '',
     avatarInitials: initials,
     avatarColor: 'bg-primary-container text-on-primary'
   };
@@ -198,16 +195,38 @@ export default function Settings() {
     setShowEditProfileModal(true);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfile(editForm);
     localStorage.setItem('smileclinic_rxguard_profile', JSON.stringify(editForm));
     sessionStorage.setItem('rxguard_prescriber_name', editForm.fullName);
     sessionStorage.setItem('rxguard_prescriber_role', editForm.role);
     sessionStorage.setItem('rxguard_prescriber_email', editForm.email);
-    sessionStorage.setItem('rxguard_prescriber_npi', editForm.npi);
+    if (editForm.phone) {
+      sessionStorage.setItem('rxguard_prescriber_phone', editForm.phone);
+    }
     setShowEditProfileModal(false);
-    showToast('Clinical Profile updated successfully across the portal.');
+    showToast('Saving profile to database...');
+
+    try {
+      const res = await authApi.updateProfile({
+        email: editForm.email,
+        full_name: editForm.fullName,
+        phone: editForm.phone,
+        age: editForm.age,
+        gender: editForm.gender,
+        height: editForm.height,
+        weight: editForm.weight,
+        has_allergies: editForm.hasAllergies,
+        allergies_description: editForm.allergiesDescription,
+        profile_completed: true
+      });
+      if (res.user) {
+        showToast('Clinical profile updated successfully.');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Profile saved locally.');
+    }
   };
 
   // --- Toggle 2FA in Database ---
@@ -520,9 +539,9 @@ export default function Settings() {
               </span>
             </div>
             <div className="text-[11px] text-outline flex items-center gap-1.5 mt-0.5">
-              <span>{profile.license.split(' ')[0]}</span>
+              <span>{profile.role}</span>
               <span>•</span>
-              <span className="text-primary font-semibold">{profile.department}</span>
+              <span className="text-primary font-semibold">{profile.phone || profile.email}</span>
             </div>
           </div>
         </div>
@@ -598,25 +617,26 @@ export default function Settings() {
               <div className="flex flex-col">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl sm:text-2xl font-bold text-on-surface">{profile.fullName}</h2>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
-                    {profile.authority}
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Verified User
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-outline mt-0.5">
-                  {profile.role} • License #{profile.license}
+                  {profile.role} • Registered Prescriber Account
                 </p>
                 <div className="flex items-center gap-4 text-xs text-on-surface-variant mt-2 flex-wrap">
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px] text-primary">domain</span>
-                    {profile.hospital}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px] text-primary">local_hospital</span>
-                    {profile.department}
-                  </span>
                   <span className="flex items-center gap-1 text-outline">
                     <span className="material-symbols-outlined text-[16px]">mail</span>
                     {profile.email}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-primary">call</span>
+                    {profile.phone || 'Phone not set'}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-teal-600">health_and_safety</span>
+                    <span>{profile.age ? `${profile.age} yrs` : 'Age: —'} • {profile.gender || 'Not specified'}</span>
                   </span>
                 </div>
               </div>
@@ -630,44 +650,58 @@ export default function Settings() {
                 onClick={handleOpenEditProfile}
                 className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs shadow-xs hover:bg-primary transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">badge</span>
+                <span className="material-symbols-outlined text-[16px]">edit</span>
                 <span>Edit Clinical Profile</span>
               </motion.button>
-              <span className="text-xs text-outline font-mono">NPI: {profile.npi}</span>
+              <span className="text-xs text-outline">{profile.phone || profile.email}</span>
             </div>
           </div>
 
-          {/* Verified Database Clinician Account Details */}
+          {/* Clinical Profile Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex flex-col gap-2">
               <div className="flex items-center gap-2 text-primary">
-                <span className="material-symbols-outlined text-[20px]">fingerprint</span>
-                <span className="text-xs font-bold uppercase tracking-wide">Database Unique ID (NPI)</span>
+                <span className="material-symbols-outlined text-[20px]">monitor_heart</span>
+                <span className="text-xs font-bold uppercase tracking-wide">Health &amp; Vitals Profile</span>
               </div>
-              <div className="font-mono text-sm font-bold text-on-surface break-all">{profile.npi}</div>
-              <div className="text-[11px] text-outline mt-1 flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>Active Database Record / NPI</span>
+              <div className="text-sm font-bold text-on-surface">
+                {profile.age ? `${profile.age} Yrs` : 'Age: —'} • {profile.gender || 'Gender: —'}
+              </div>
+              <div className="text-[11px] text-outline mt-0.5">
+                {profile.height ? `Height: ${profile.height}` : 'Height: —'} {profile.weight ? `• Weight: ${profile.weight}` : '• Weight: —'}
+              </div>
+              <div className="text-[11px] font-medium mt-1 flex items-center gap-1">
+                {profile.hasAllergies ? (
+                  <span className="text-amber-700 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px] text-amber-600">warning</span>
+                    <span>Allergies: {profile.allergiesDescription || 'Reported'}</span>
+                  </span>
+                ) : (
+                  <span className="text-emerald-700 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px] text-emerald-600">check_circle</span>
+                    <span>No Known Drug Allergies (NKDA)</span>
+                  </span>
+                )}
               </div>
             </div>
 
             <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex flex-col gap-2">
               <div className="flex items-center gap-2 text-primary">
                 <span className="material-symbols-outlined text-[20px]">badge</span>
-                <span className="text-xs font-bold uppercase tracking-wide">Clinical Authority &amp; Role</span>
+                <span className="text-xs font-bold uppercase tracking-wide">Clinical Role</span>
               </div>
               <div className="text-sm font-bold text-on-surface">{profile.role}</div>
-              <div className="text-[11px] text-outline mt-1">{profile.authority}</div>
+              <div className="text-[11px] text-outline mt-1">Prescriber Safety Verification Active</div>
             </div>
 
             <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex flex-col gap-2">
               <div className="flex items-center gap-2 text-primary">
-                <span className="material-symbols-outlined text-[20px]">verified</span>
-                <span className="text-xs font-bold uppercase tracking-wide">Identity Status</span>
+                <span className="material-symbols-outlined text-[20px]">verified_user</span>
+                <span className="text-xs font-bold uppercase tracking-wide">Identity &amp; Security</span>
               </div>
               <div className="text-sm font-bold text-emerald-700 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                <span>Verified Clinician Account</span>
+                <span className="material-symbols-outlined text-[18px]">lock</span>
+                <span>Encrypted &amp; Confidential</span>
               </div>
               <div className="text-[11px] text-outline mt-1">Real-time database authorization active</div>
             </div>
@@ -1406,115 +1440,154 @@ export default function Settings() {
                           .toUpperCase();
                         setEditForm({ ...editForm, fullName: name, avatarInitials: initials || 'CL' });
                       }}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
                     />
                   </div>
 
                   {/* Clinical Role */}
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Clinical Designation *</label>
+                    <label className="text-xs font-bold text-on-surface">Clinical Designation / Role *</label>
                     <input
                       type="text"
                       required
                       value={editForm.role}
                       onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                      placeholder="e.g. Lead Clinical Pharmacist"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary"
+                      placeholder="e.g. Lead Clinician / USER"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* License */}
+                  {/* Read-Only Email */}
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Board License # *</label>
-                    <input
-                      type="text"
-                      required
-                      value={editForm.license}
-                      onChange={(e) => setEditForm({ ...editForm, license: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-mono"
-                    />
-                  </div>
-
-                  {/* NPI */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">National Provider Identifier (NPI) *</label>
-                    <input
-                      type="text"
-                      required
-                      value={editForm.npi}
-                      onChange={(e) => setEditForm({ ...editForm, npi: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Facility */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Clinical Hospital Facility</label>
-                    <input
-                      type="text"
-                      required
-                      value={editForm.hospital}
-                      onChange={(e) => setEditForm({ ...editForm, hospital: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary"
-                    />
-                  </div>
-
-                  {/* Department */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Assigned Unit / Department</label>
-                    <input
-                      type="text"
-                      required
-                      value={editForm.department}
-                      onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Email */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Official Clinical Email</label>
-                    <input
-                      type="email"
-                      required
-                      value={editForm.email}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary"
-                    />
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-on-surface">Registered Account Email</label>
+                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">Read-Only</span>
+                    </div>
+                    <div className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-mono flex items-center justify-between">
+                      <span className="truncate">{editForm.email}</span>
+                      <span className="material-symbols-outlined text-slate-400 text-[16px]">lock</span>
+                    </div>
                   </div>
 
                   {/* Phone */}
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Direct Mobile Phone (for SMS 2FA)</label>
+                    <label className="text-xs font-bold text-on-surface">Direct Mobile Phone (for 2FA &amp; Alerts) *</label>
                     <input
                       type="text"
                       required
                       value={editForm.phone}
                       onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary"
+                      placeholder="+91 9876543210"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
                     />
                   </div>
                 </div>
 
-                {/* Authority Scope Selection */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-on-surface">Clinical Authority Level</label>
-                  <select
-                    value={editForm.authority}
-                    onChange={(e) => setEditForm({ ...editForm, authority: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary cursor-pointer"
-                  >
-                    <option value="Pharmacist Sign-Off Authority">Pharmacist Sign-Off Authority (Overrides &amp; Dispense)</option>
-                    <option value="Prescribing Clinician Authority">Prescribing Clinician Authority (Order &amp; Screening)</option>
-                    <option value="Patient Safety Reviewer">Patient Safety Reviewer (QA Audit)</option>
-                    <option value="System Administrator">System Administrator (Governance &amp; Tenant)</option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Age */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Age (Years) *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="125"
+                      value={editForm.age || ''}
+                      onChange={(e) => setEditForm({ ...editForm, age: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                      placeholder="e.g. 32"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
+                    />
+                  </div>
+
+                  {/* Gender */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Gender *</label>
+                    <select
+                      value={editForm.gender || 'Prefer not to say'}
+                      onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium cursor-pointer"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Non-Binary">Non-Binary</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Height */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Height</label>
+                    <input
+                      type="text"
+                      value={editForm.height || ''}
+                      onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
+                      placeholder="e.g. 175 cm or 5'9''"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
+                    />
+                  </div>
+
+                  {/* Weight */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Weight</label>
+                    <input
+                      type="text"
+                      value={editForm.weight || ''}
+                      onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
+                      placeholder="e.g. 70 kg or 154 lbs"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Allergies */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px] text-amber-600">warning</span>
+                      <span>Known Drug / Medical Allergies?</span>
+                    </span>
+                    <div className="flex items-center rounded-lg bg-slate-200 p-0.5 text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setEditForm({ ...editForm, hasAllergies: false, allergiesDescription: '' })}
+                        className={`px-2.5 py-1 rounded-md transition-all ${
+                          !editForm.hasAllergies ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
+                        }`}
+                      >
+                        No (NKDA)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditForm({ ...editForm, hasAllergies: true })}
+                        className={`px-2.5 py-1 rounded-md transition-all ${
+                          editForm.hasAllergies ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                    </div>
+                  </div>
+
+                  {editForm.hasAllergies ? (
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-amber-900">Specify Allergies *</label>
+                      <input
+                        type="text"
+                        value={editForm.allergiesDescription || ''}
+                        onChange={(e) => setEditForm({ ...editForm, allergiesDescription: e.target.value })}
+                        placeholder="e.g. Penicillin, Amoxicillin, Latex, NSAIDs"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-amber-300 bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[15px] text-emerald-600">check_circle</span>
+                      <span>No Known Drug Allergies (NKDA) recorded</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Actions */}

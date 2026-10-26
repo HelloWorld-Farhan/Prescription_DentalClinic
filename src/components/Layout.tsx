@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ErrorBoundary from './ErrorBoundary';
+import FirstTimeOnboardingModal from './FirstTimeOnboardingModal';
+import { UserProfile } from '../services/authApi';
 
 interface NotificationItem {
   id: string;
@@ -43,7 +45,26 @@ export default function Layout() {
     }
   }
 
+  const [currentUser, setCurrentUser] = useState<any>(storedUser);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const email = (storedUser?.email || '').toLowerCase();
+    if (!email) return false;
+    const isDoneLocal = localStorage.getItem(`profile_completed_${email}`) === 'true';
+    const isDoneServer = Boolean(storedUser?.profileCompleted);
+    return !isDoneLocal && !isDoneServer;
+  });
+
+  const handleOnboardingComplete = (updated: UserProfile) => {
+    setCurrentUser(updated);
+    setShowOnboarding(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`profile_completed_${updated.email.toLowerCase()}`, 'true');
+    }
+  };
+
   const prescriberName =
+    currentUser?.fullName ||
     sessionStorage.getItem('rxguard_prescriber_name') ||
     localStorage.getItem('rxguard_prescriber_name') ||
     storedUser.fullName ||
@@ -460,6 +481,14 @@ export default function Layout() {
           </div>
         </footer>
       </div>
+
+      {currentUser?.email && (
+        <FirstTimeOnboardingModal
+          user={currentUser}
+          isOpen={showOnboarding}
+          onComplete={handleOnboardingComplete}
+        />
+      )}
     </div>
   );
 }

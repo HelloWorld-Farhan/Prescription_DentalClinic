@@ -22,6 +22,15 @@ export interface UserProfile {
   email: string;
   fullName: string;
   role: string;
+  phone?: string;
+  age?: number;
+  gender?: string;
+  height?: string;
+  weight?: string;
+  hasAllergies?: boolean;
+  allergiesDescription?: string;
+  profileCompleted?: boolean;
+  authProvider?: string;
   twoFactorEnabled?: boolean;
 }
 
@@ -360,21 +369,62 @@ export const authApi = {
   },
 
   /**
+   * Update clinical health profile details (Age, Gender, Height, Weight, Allergies, Phone, Name)
+   */
+  async updateProfile(payload: {
+    email: string;
+    full_name?: string;
+    phone?: string;
+    age?: number;
+    gender?: string;
+    height?: string;
+    weight?: string;
+    has_allergies?: boolean;
+    allergies_description?: string;
+    profile_completed?: boolean;
+  }): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/update-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Failed to update user profile.');
+      }
+      if (data.user) {
+        this.saveSession(data.token || localStorage.getItem('smileclinic_jwt_token') || '', data.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`profile_completed_${data.user.email.toLowerCase()}`, 'true');
+        }
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical server to save profile.');
+      }
+      throw err;
+    }
+  },
+
+  /**
    * Persist session JWT and clinician profile
    */
   saveSession(token: string, user: UserProfile): void {
     if (typeof window === 'undefined') return;
     sessionStorage.setItem('rxguard_authenticated', 'true');
-    sessionStorage.setItem('rxguard_jwt_token', token);
+    if (token) sessionStorage.setItem('rxguard_jwt_token', token);
     sessionStorage.setItem('rxguard_prescriber_name', user.fullName);
     sessionStorage.setItem('rxguard_prescriber_email', user.email);
     sessionStorage.setItem('rxguard_prescriber_role', user.role);
     sessionStorage.setItem('rxguard_prescriber_id', user.id);
     sessionStorage.setItem('rxguard_prescriber_npi', user.id);
+    if (user.phone) sessionStorage.setItem('rxguard_prescriber_phone', user.phone);
     if (user.twoFactorEnabled !== undefined) {
       sessionStorage.setItem('rxguard_two_factor_enabled', String(user.twoFactorEnabled));
     }
-    localStorage.setItem('smileclinic_jwt_token', token);
+    if (token) localStorage.setItem('smileclinic_jwt_token', token);
     localStorage.setItem('smileclinic_auth_user', JSON.stringify(user));
   },
 
