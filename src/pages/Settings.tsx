@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authApi } from '../services/authApi';
+import {
+  ActiveSessionItem,
+  LoginHistoryItem,
+  getActiveSessions,
+  saveActiveSessions,
+  getLoginHistory,
+  recordLoginEvent
+} from '../services/sessionAudit';
 
 export interface ClinicalProfile {
   fullName: string;
@@ -77,37 +85,7 @@ function loadRealUserProfile(): ClinicalProfile {
   };
 }
 
-interface ActiveSessionItem {
-  id: string;
-  name: string;
-  isCurrent: boolean;
-  details: string;
-  badge: string;
-  icon: string;
-}
-
-const initialSessions: ActiveSessionItem[] = [
-  {
-    id: 'SES-01',
-    name: 'Current Clinical Workstation',
-    isCurrent: true,
-    details: 'Active Web Session • Verified TLS Encrypted',
-    badge: 'Active Now',
-    icon: 'desktop_windows'
-  }
-];
-
-interface LoginHistoryItem {
-  id: string;
-  timestamp: string;
-  device: string;
-  browserOs: string;
-  ip: string;
-  location: string;
-  status: 'Success' | '2FA Verified' | 'Revoked' | 'Blocked';
-}
-
-const initialLoginHistory: LoginHistoryItem[] = [];
+// Types are imported from ../services/sessionAudit
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile');
@@ -118,8 +96,10 @@ export default function Settings() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.email !== 'm.vance@smileclinic.com' && !parsed.fullName?.includes('Marcus Vance')) {
+        if (parsed && parsed.email !== 'm.vance@smileclinic.com' && !parsed.fullName?.includes('Marcus Vance')) {
           return parsed;
+        } else {
+          localStorage.removeItem('smileclinic_rxguard_profile');
         }
       } catch {
         // Fall back to real user profile
@@ -172,12 +152,12 @@ export default function Settings() {
   const [isToggling2Fa, setIsToggling2Fa] = useState(false);
 
   // Active Sessions
-  const [sessions, setSessions] = useState<ActiveSessionItem[]>(initialSessions);
+  const [sessions, setSessions] = useState<ActiveSessionItem[]>(() => getActiveSessions());
   const [showTerminateAllModal, setShowTerminateAllModal] = useState(false);
   const [sessionToRevoke, setSessionToRevoke] = useState<ActiveSessionItem | null>(null);
 
   // Login History State
-  const [loginHistory, setLoginHistory] = useState<LoginHistoryItem[]>(initialLoginHistory);
+  const [loginHistory, setLoginHistory] = useState<LoginHistoryItem[]>(() => getLoginHistory(profile.fullName));
   const [historySearch, setHistorySearch] = useState('');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'All' | 'Success' | '2FA Verified' | 'Revoked' | 'Blocked'>('All');
   const [historyPage, setHistoryPage] = useState(1);
@@ -361,6 +341,11 @@ export default function Settings() {
       setConfirmPassword('');
       setVerifiedResetOtp('');
       setCurrentPasswordInput('');
+      const ev = recordLoginEvent(
+        '2FA Verified',
+        `Clinical password updated in database via OTP verification (${profile.email})`
+      );
+      setLoginHistory((prev) => [ev, ...prev]);
       showToast('Clinical password updated successfully in the database.');
     } catch (err: any) {
       showToast(err.message || 'Failed to update password. Code may have expired.');
@@ -371,34 +356,27 @@ export default function Settings() {
 
   // --- Session Termination & Revocation ---
   const handleConfirmTerminateAllRemote = () => {
-    setSessions((prev) => prev.filter((s) => s.isCurrent));
+    const remaining = sessions.filter((s) => s.isCurrent);
+    setSessions(remaining);
+    saveActiveSessions(remaining);
     setShowTerminateAllModal(false);
-    // Add revocation to login history
-    const revokedRecord: LoginHistoryItem = {
-      id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
-      timestamp: 'Just now',
-      device: 'All Remote Sessions (Cart #12, Consultation Room 2)',
-      browserOs: 'Multiple Devices',
-      ip: '10.240.*.*',
-      location: 'Remote Terminated via Governance Console',
-      status: 'Revoked'
-    };
+    const revokedRecord = recordLoginEvent(
+      'Revoked',
+      'All remote clinical terminals terminated via governance console'
+    );
     setLoginHistory((prev) => [revokedRecord, ...prev]);
     showToast('All remote active sessions terminated immediately.');
   };
 
   const handleConfirmRevokeSingle = () => {
     if (!sessionToRevoke) return;
-    setSessions((prev) => prev.filter((s) => s.id !== sessionToRevoke.id));
-    const revokedRecord: LoginHistoryItem = {
-      id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
-      timestamp: 'Just now',
-      device: sessionToRevoke.name,
-      browserOs: sessionToRevoke.details.split(' • ')[0] || 'Unknown',
-      ip: sessionToRevoke.details.split('IP: ')[1] || '10.240.x.x',
-      location: sessionToRevoke.badge.split(' • ')[1] || 'Smile Clinic Intranet',
-      status: 'Revoked'
-    };
+    const remaining = sessions.filter((s) => s.id !== sessionToRevoke.id);
+    setSessions(remaining);
+    saveActiveSessions(remaining);
+    const revokedRecord = recordLoginEvent(
+      'Revoked',
+      `Remote terminal #${sessionToRevoke.id} revoked (${sessionToRevoke.name})`
+    );
     setLoginHistory((prev) => [revokedRecord, ...prev]);
     showToast(`Session #${sessionToRevoke.id} (${sessionToRevoke.name}) has been revoked.`);
     setSessionToRevoke(null);
@@ -406,11 +384,15 @@ export default function Settings() {
 
   // --- Login History Filter & Pagination ---
   const filteredHistory = loginHistory.filter((item) => {
+    const q = historySearch.toLowerCase().trim();
     const matchesSearch =
-      item.device.toLowerCase().includes(historySearch.toLowerCase()) ||
-      item.ip.toLowerCase().includes(historySearch.toLowerCase()) ||
-      item.location.toLowerCase().includes(historySearch.toLowerCase()) ||
-      item.id.toLowerCase().includes(historySearch.toLowerCase());
+      !q ||
+      item.device.toLowerCase().includes(q) ||
+      item.browserOs.toLowerCase().includes(q) ||
+      item.ip.toLowerCase().includes(q) ||
+      item.location.toLowerCase().includes(q) ||
+      item.id.toLowerCase().includes(q) ||
+      Boolean(item.details && item.details.toLowerCase().includes(q));
     const matchesStatus = historyStatusFilter === 'All' || item.status === historyStatusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -1176,6 +1158,11 @@ export default function Settings() {
                           <span className="material-symbols-outlined text-[16px] text-outline">terminal</span>
                           <span>{row.device}</span>
                         </div>
+                        {row.details && (
+                          <div className="text-[10px] text-outline font-normal mt-0.5 line-clamp-1">
+                            {row.details}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-on-surface-variant">{row.browserOs}</td>
                       <td className="py-3.5 px-4">

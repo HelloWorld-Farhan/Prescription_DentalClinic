@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import OtpVerificationInput from './OtpVerificationInput';
 import PasswordStrengthMeter from './PasswordStrengthMeter';
 import { authApi } from '../services/authApi';
+import { recordLoginEvent } from '../services/sessionAudit';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -196,6 +197,11 @@ export default function ForgotPasswordModal({
         accountEmail.trim().toLowerCase(),
         otp.join(''),
         newPassword
+      );
+
+      recordLoginEvent(
+        '2FA Verified',
+        `Prescriber password reset authorized via 6-digit email OTP (${accountEmail.trim().toLowerCase()})`
       );
 
       setIsSuccess(true);

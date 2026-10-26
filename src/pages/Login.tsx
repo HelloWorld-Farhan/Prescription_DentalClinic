@@ -5,6 +5,7 @@ import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import OtpVerificationInput from '../components/OtpVerificationInput';
 import AuthInfoPanel from '../components/AuthInfoPanel';
 import { authApi } from '../services/authApi';
+import { recordLoginEvent } from '../services/sessionAudit';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -120,6 +121,7 @@ export default function Login() {
 
       if (res.token && res.user) {
         authApi.saveSession(res.token, res.user);
+        recordLoginEvent('Success', `Authorized session established (${res.user.fullName})`);
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
         }
@@ -129,6 +131,7 @@ export default function Login() {
     } catch (apiErr: any) {
       const errMsg = apiErr.message || 'Invalid credentials. No registered clinician account matches these credentials.';
       setErrorMessage(errMsg);
+      recordLoginEvent('Blocked', errMsg);
 
       // If account is locked due to 3 failed attempts, automatically pop open the Reset Password modal on Step 2 (OTP code)
       if (errMsg.toLowerCase().includes('account locked') || errMsg.toLowerCase().includes('3 failed login attempts')) {
@@ -165,6 +168,7 @@ export default function Login() {
       if (res.token && res.user) {
         setLoginOtpStatus('success');
         authApi.saveSession(res.token, res.user);
+        recordLoginEvent('2FA Verified', `Two-Factor sign-in OTP challenge verified (${res.user.fullName})`);
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
         }
