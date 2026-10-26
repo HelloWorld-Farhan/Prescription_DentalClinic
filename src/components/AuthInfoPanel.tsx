@@ -66,30 +66,30 @@ export default function AuthInfoPanel({ variant }: { variant: 'login' | 'signup'
     : 'from-cyan-100/80 to-teal-100/80';
 
   return (
-    <div className="relative rounded-3xl overflow-hidden shadow-xl border border-surface-container-high h-full min-h-[580px] w-full bg-gradient-to-br from-white via-slate-50 to-[#F0FDFA]/30 flex flex-col justify-between p-6 sm:p-8 text-on-surface">
+    <div className="relative rounded-3xl overflow-hidden shadow-xl border border-surface-container-high h-full min-h-0 lg:min-h-[580px] w-full bg-gradient-to-br from-white via-slate-50 to-[#F0FDFA]/30 flex flex-col justify-between p-5 sm:p-8 text-on-surface">
 
-      {/* Ambient orbs */}
+      {/* Ambient orbs with 60fps GPU acceleration */}
       <motion.div
         animate={{ scale: [1, 1.2, 1], opacity: [0.35, 0.6, 0.35] }}
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-        className={`absolute -top-16 -right-16 w-72 h-72 rounded-full blur-3xl pointer-events-none ${
+        className={`absolute -top-16 -right-16 w-72 h-72 rounded-full blur-3xl pointer-events-none gpu-layer ${
           accent === 'teal' ? 'bg-teal-200/40' : 'bg-cyan-200/40'
         }`}
       />
       <motion.div
         animate={{ scale: [1, 1.15, 1], opacity: [0.25, 0.5, 0.25] }}
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
-        className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full blur-3xl pointer-events-none bg-emerald-200/35"
+        className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full blur-3xl pointer-events-none bg-emerald-200/35 gpu-layer"
       />
 
-      {/* Floating micro-particles */}
+      {/* Floating micro-particles with GPU compositing */}
       {particles.map((p, i) => (
         <motion.span
           key={i}
           animate={{ y: [0, -12, 0], opacity: [0.3, 0.7, 0.3] }}
           transition={{ duration: p.dur, repeat: Infinity, ease: 'easeInOut', delay: p.delay }}
           style={{ left: p.left, top: p.top, width: p.size, height: p.size, position: 'absolute' }}
-          className={`rounded-full pointer-events-none ${accent === 'teal' ? 'bg-teal-400/50' : 'bg-cyan-400/50'}`}
+          className={`rounded-full pointer-events-none gpu-layer ${accent === 'teal' ? 'bg-teal-400/50' : 'bg-cyan-400/50'}`}
         />
       ))}
 

@@ -7,6 +7,38 @@ import PrintableReportModal from '../components/PrintableReportModal';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CustomDropdown from '../components/CustomDropdown';
 
+interface LiveSyncBadgeProps {
+  onSync: () => void;
+}
+
+const LiveSyncBadge = function LiveSyncBadge({ onSync }: LiveSyncBadgeProps) {
+  const [seconds, setSeconds] = useState(5);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSeconds((prev) => {
+        if (prev <= 1) {
+          setIsSyncing(true);
+          onSync();
+          setTimeout(() => setIsSyncing(false), 800);
+          return 5;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [onSync]);
+
+  return (
+    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs border border-surface-container-high/60 transition-all select-none gpu-layer">
+      <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-primary animate-pulse'}`}></span>
+      <span className={`material-symbols-outlined text-[15px] text-primary transition-transform ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
+      <span className="font-medium">Live Sync: {isSyncing ? 'Syncing...' : `Just now (${seconds}s)`}</span>
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -20,8 +52,7 @@ export default function Dashboard() {
   const [activeDrawerAlert, setActiveDrawerAlert] = useState<DrugInteractionAlert | null>(null);
   const [activeDrawerCheckId, setActiveDrawerCheckId] = useState<string>('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncTimer, setSyncTimer] = useState(5);
+  const [isBatchSyncing, setIsBatchSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
@@ -54,21 +85,9 @@ export default function Dashboard() {
     }
   }, [units, selectedUnit]);
 
-  // 5-second auto-sync interval
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSyncTimer(prev => {
-        if (prev <= 1) {
-          setIsSyncing(true);
-          setChecks(VirtualDb.getChecks());
-          setTimeout(() => setIsSyncing(false), 900);
-          return 5;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const handleAutoSync = () => {
+    setChecks(VirtualDb.getChecks());
+  };
 
   const handleInspect = (check: SafetyCheckRecord) => {
     if (check.alerts.length > 0) {
@@ -81,10 +100,11 @@ export default function Dashboard() {
   };
 
   const handleBatchSync = () => {
-    setIsSyncing(true);
+    setIsBatchSyncing(true);
+    setChecks(VirtualDb.getChecks());
     setTimeout(() => {
-      setIsSyncing(false);
-    }, 1000);
+      setIsBatchSyncing(false);
+    }, 800);
   };
 
   const containerVariants = {
@@ -113,11 +133,7 @@ export default function Dashboard() {
             <h1 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">
               Prescription Safety Dashboard
             </h1>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs border border-surface-container-high/60 transition-all">
-              <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-primary animate-pulse'}`}></span>
-              <span className={`material-symbols-outlined text-[15px] text-primary transition-transform ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
-              <span className="font-medium">Live Sync: {isSyncing ? 'Syncing...' : `Just now (${syncTimer}s)`}</span>
-            </div>
+            <LiveSyncBadge onSync={handleAutoSync} />
           </div>
           <p className="text-xs sm:text-sm text-on-surface-variant">
             Real-time clinical drug-drug, dosing, renal clearance, and interaction screening feed.
@@ -393,7 +409,7 @@ export default function Dashboard() {
                 className="p-2 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-colors"
                 title="Refresh feed"
               >
-                <span className={`material-symbols-outlined text-[18px] ${isSyncing ? 'animate-spin' : ''}`}>
+                <span className={`material-symbols-outlined text-[18px] ${isBatchSyncing ? 'animate-spin' : ''}`}>
                   refresh
                 </span>
               </button>

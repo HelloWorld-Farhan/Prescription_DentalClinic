@@ -323,10 +323,10 @@ export default function Login() {
                 y: [0, -20, 0]
               }}
               transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute -top-24 left-1/4 -translate-x-1/2 w-[550px] h-[380px] bg-primary/15 rounded-full blur-3xl pointer-events-none -z-10"
+              className="absolute -top-24 left-1/4 -translate-x-1/2 w-[340px] sm:w-[550px] h-[260px] sm:h-[380px] bg-primary/15 rounded-full blur-2xl sm:blur-3xl pointer-events-none -z-10 gpu-layer"
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch">
               {/* LEFT COLUMN: Clean Clinician Login Form (7 cols on lg) */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
@@ -334,7 +334,7 @@ export default function Login() {
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 className="lg:col-span-7 flex flex-col justify-between"
               >
-                <div className="bg-surface-container-lowest rounded-2xl sm:rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-4 sm:p-9 flex flex-col gap-4 sm:gap-6">
+                <div className="bg-surface-container-lowest rounded-2xl sm:rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-3.5 sm:p-9 flex flex-col gap-4 sm:gap-6">
                   {/* Top Badge Strip */}
                   <div className="flex items-center justify-between text-on-surface-variant text-[11px] sm:text-xs gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">

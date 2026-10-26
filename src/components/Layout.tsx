@@ -321,7 +321,7 @@ export default function Layout() {
 
       {/* Left Sidebar Navigation */}
       <aside 
-        className={`fixed left-0 top-0 bottom-0 w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-surface-container-high transition-transform duration-300 shadow-xl lg:shadow-none ${
+        className={`fixed left-0 top-0 bottom-0 w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-surface-container-high transition-transform duration-300 ease-out shadow-xl lg:shadow-none gpu-layer ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -456,15 +456,16 @@ export default function Layout() {
             </div>
           </div>
 
-          {/* Center: Prescription AI Status Badge (Prominent across all screen sizes) */}
+          {/* Center: Prescription AI Status Badge (Adaptive for narrow phones) */}
           <div className="flex items-center justify-center min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
-              <span className="material-symbols-outlined text-[17px] sm:text-[18px] text-primary">psychology</span>
-              <span className="font-bold text-on-surface tracking-tight text-xs sm:text-sm">Prescription AI</span>
+            <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
+              <span className="material-symbols-outlined text-[16px] sm:text-[18px] text-primary">psychology</span>
+              <span className="font-bold text-on-surface tracking-tight text-xs sm:text-sm hidden xs:inline">Prescription AI</span>
+              <span className="xs:hidden font-bold text-on-surface text-[11px]">AI</span>
               <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] sm:text-[10px] font-bold">
                 v1.0
               </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" title="Prescription AI Online"></span>
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse" title="Prescription AI Online"></span>
             </div>
           </div>
 

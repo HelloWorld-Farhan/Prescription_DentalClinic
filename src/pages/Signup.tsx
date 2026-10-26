@@ -363,9 +363,9 @@ export default function Signup() {
       </header>
 
       {/* Main */}
-      <main className="flex-1 flex items-center justify-center py-6 sm:py-10 px-4 relative z-10">
+      <main className="flex-1 flex items-center justify-center py-4 sm:py-10 px-3 sm:px-4 relative z-10">
         <div className="w-full max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch">
 
             {/* LEFT: Info Panel */}
             <motion.div
@@ -384,7 +384,7 @@ export default function Signup() {
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
               className="lg:col-span-7 flex flex-col justify-between order-1 lg:order-2"
             >
-              <div className="bg-surface-container-lowest rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-6 sm:p-9 flex flex-col gap-6">
+              <div className="bg-surface-container-lowest rounded-2xl sm:rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-4 sm:p-9 flex flex-col gap-5 sm:gap-6">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4">
                   <div>
