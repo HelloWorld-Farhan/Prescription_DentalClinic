@@ -19,7 +19,9 @@ export default function ForgotPasswordModal({
 }: ForgotPasswordModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [method, setMethod] = useState<'email' | 'sms' | 'previous'>('email');
-  const [accountEmail, setAccountEmail] = useState(initialEmail || OFFICIAL_PRESCRIBER_CREDENTIALS.email);
+  const [accountEmail, setAccountEmail] = useState(initialEmail || '');
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [hasAttemptedStep1, setHasAttemptedStep1] = useState(false);
   const [mobilePhone, setMobilePhone] = useState('+1 (555) 849-2041');
   
   // OTP state
@@ -55,6 +57,10 @@ export default function ForgotPasswordModal({
   useEffect(() => {
     if (isOpen) {
       setStep(1);
+      setMethod('email');
+      setAccountEmail(initialEmail || '');
+      setEmailTouched(false);
+      setHasAttemptedStep1(false);
       setOtp(Array(6).fill(''));
       setOtpError('');
       setResendTimer(60);
@@ -67,7 +73,7 @@ export default function ForgotPasswordModal({
       setResetError('');
       setIsSuccess(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialEmail]);
 
   // Resend countdown timer for Step 2
   useEffect(() => {
@@ -86,16 +92,34 @@ export default function ForgotPasswordModal({
     return () => clearInterval(interval);
   }, [isOpen, step, method, resendTimer]);
 
+  const getEmailValidationError = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (!trimmed) return 'Email address is required.';
+    if (!trimmed.includes('@')) return 'Email must contain an "@" symbol (e.g. name@gmail.com).';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailRegex.test(trimmed)) return 'Please enter a valid domain (e.g. name@gmail.com).';
+    return null;
+  };
+
+  const emailError = (emailTouched || hasAttemptedStep1) ? getEmailValidationError(accountEmail) : null;
+
   // Step 1 -> Step 2
   const handleProceedToVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!accountEmail.trim()) {
-      setResetError('Please enter a valid institutional email or prescriber ID.');
+    setHasAttemptedStep1(true);
+    setEmailTouched(true);
+
+    const err = getEmailValidationError(accountEmail);
+    if (err) {
+      return;
+    }
+
+    if (method === 'sms') {
       return;
     }
 
     setResetError('');
-    if (method === 'email' || method === 'sms') {
+    if (method === 'email') {
       setOtp(Array(6).fill(''));
       setResendTimer(60);
       setCanResend(false);
@@ -274,21 +298,35 @@ export default function ForgotPasswordModal({
             {/* STEP 1: Account & Verification Method Choice */}
             {step === 1 && (
               <form onSubmit={handleProceedToVerify} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold text-on-surface">Institutional Email or Prescriber NPI</label>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-on-surface">Email Address *</label>
                   <div className="relative flex items-center">
                     <span className="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">
-                      badge
+                      mail
                     </span>
                     <input
-                      type="text"
-                      required
+                      type="email"
+                      autoComplete="off"
                       value={accountEmail}
-                      onChange={(e) => setAccountEmail(e.target.value)}
-                      placeholder="prescription@smileclinic.com or NPI# 1092837482"
-                      className="w-full h-10 pl-10 pr-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-xs sm:text-sm font-medium focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all"
+                      onBlur={() => setEmailTouched(true)}
+                      onChange={(e) => {
+                        setAccountEmail(e.target.value);
+                        setResetError('');
+                      }}
+                      placeholder="name@gmail.com"
+                      className={`w-full h-11 pl-10 pr-3 rounded-xl text-on-surface text-xs sm:text-sm font-medium placeholder:text-outline focus:outline-none transition-all ${
+                        emailError
+                          ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
+                          : 'bg-surface-container-low border border-surface-container-high focus:bg-surface-container-lowest focus:border-primary'
+                      }`}
                     />
                   </div>
+                  {emailError && (
+                    <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-0.5 animate-fadeIn">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                      <span>{emailError}</span>
+                    </p>
+                  )}
                   <span className="text-[10px] text-outline">
                     We will verify your clinical profile against the institutional prescriber registry.
                   </span>
@@ -326,32 +364,32 @@ export default function ForgotPasswordModal({
                       </div>
                     </label>
 
-                    {/* Method 2: SMS Mobile OTP */}
-                    <label
-                      onClick={() => setMethod('sms')}
-                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
-                        method === 'sms'
-                          ? 'border-primary bg-primary/5 shadow-xs'
-                          : 'border-surface-container-high bg-surface-container-lowest hover:bg-surface-container-low'
-                      }`}
+                    {/* Method 2: SMS Mobile OTP (Blocked / Coming Soon) */}
+                    <div
+                      className="flex items-start gap-3 p-3 rounded-xl border border-surface-container-high/60 bg-surface-container-low/40 opacity-60 cursor-not-allowed select-none"
                     >
                       <input
                         type="radio"
                         name="recoveryMethod"
-                        checked={method === 'sms'}
-                        onChange={() => setMethod('sms')}
-                        className="mt-0.5 text-primary accent-primary cursor-pointer"
+                        disabled
+                        checked={false}
+                        className="mt-0.5 text-outline accent-outline cursor-not-allowed"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 font-bold text-xs text-on-surface">
-                          <span className="material-symbols-outlined text-[16px] text-primary">sms</span>
-                          <span>SMS Mobile OTP (Clinician Phone)</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-on-surface-variant">
+                            <span className="material-symbols-outlined text-[16px] text-outline">sms</span>
+                            <span>SMS Mobile OTP (Clinician Phone)</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 uppercase tracking-wider shrink-0">
+                            Coming Soon
+                          </span>
                         </div>
-                        <p className="text-[11px] text-on-surface-variant mt-0.5">
-                          Sends a rapid SMS message to registered phone ending in ••41.
+                        <p className="text-[11px] text-outline mt-0.5">
+                          SMS gateway integration in progress. Please use Email Verification.
                         </p>
                       </div>
-                    </label>
+                    </div>
 
                     {/* Method 3: Previous Password Verification */}
                     <label
