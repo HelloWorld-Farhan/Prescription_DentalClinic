@@ -229,7 +229,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
     <AnimatePresence>
       {isOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-6 overflow-y-auto overscroll-contain"
+          className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center p-0 sm:p-4 md:p-6 overflow-hidden overscroll-contain h-[100dvh]"
           style={{ overscrollBehavior: 'contain' }}
         >
           {/* Subtle Backdrop - Closes off background interaction */}
@@ -247,7 +247,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 14 }}
             transition={{ type: 'spring', damping: 26, stiffness: 340 }}
-            className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col my-auto max-h-[96vh] sm:max-h-[92vh]"
+            className="relative w-full max-w-2xl bg-surface-container-lowest border-0 sm:border sm:border-surface-container-high rounded-none sm:rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col h-full sm:h-auto sm:max-h-[90vh] my-auto"
           >
             {/* Modal Header */}
             <div className="p-3.5 sm:p-5 bg-surface-container-low border-b border-surface-container-high shrink-0 space-y-1.5 sm:space-y-2">
@@ -276,8 +276,8 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
 
             {/* Modal Scrollable Body */}
             <div 
-              className="p-3.5 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto overscroll-contain flex-1"
-              style={{ overscrollBehavior: 'contain' }}
+              className="p-3.5 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0"
+              style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
             >
               {/* Prominent Red Banner: Action Required Notice */}
               <div className="p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-900 flex items-start gap-2.5 sm:gap-3 shadow-xs">
@@ -588,8 +588,8 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
               </form>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-3 sm:p-4 bg-surface-container-low border-t border-surface-container-high flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0">
+            {/* Modal Footer - Docked & Always Visible */}
+            <div className="p-3 sm:p-4 bg-surface-container-low border-t border-surface-container-high flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0 shadow-lg sm:shadow-none z-20">
               <span className="text-[11px] sm:text-xs text-on-surface-variant flex items-center justify-center sm:justify-start gap-1.5 text-center">
                 <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-primary">shield</span>
                 <span>Encrypted &amp; HIPAA Safe Harbor Protected</span>
@@ -599,11 +599,11 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
                 type="submit"
                 form="onboardingForm"
                 disabled={isSubmitting}
-                className="w-full sm:w-auto h-10 sm:h-11 px-5 sm:px-6 rounded-xl bg-primary-container text-on-primary font-bold text-xs sm:text-sm shadow-md hover:shadow-lg hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full sm:w-auto h-11 px-5 sm:px-6 rounded-xl bg-primary text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 {isSubmitting ? (
                   <>
-                    <span className="w-3.5 h-3.5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin"></span>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                     <span>Saving Profile...</span>
                   </>
                 ) : (
