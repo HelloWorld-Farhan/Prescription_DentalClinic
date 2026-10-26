@@ -198,7 +198,7 @@ export default function Login() {
       setLoginOtp(Array(6).fill(''));
       setLoginOtpError(null);
       setLoginOtpResendCountdown(60);
-      await authApi.login(clinicalId.trim().toLowerCase(), password, false, getDeviceId());
+      await authApi.resendOtp(clinicalId.trim().toLowerCase());
     } catch (err: any) {
       setLoginOtpError(err.message || 'Failed to resend sign-in code.');
     }
@@ -229,6 +229,16 @@ export default function Login() {
         googleUser.photoUrl,
         getDeviceId()
       );
+
+      if (res.status === 'otp_required') {
+        setClinicalId(googleUser.email);
+        setLoginOtp(Array(6).fill(''));
+        setLoginOtpStatus('idle');
+        setLoginOtpError(null);
+        setShowLoginOtpModal(true);
+        setLoginOtpResendCountdown(60);
+        return;
+      }
 
       if (res.token && res.user) {
         authApi.saveSession(res.token, res.user);
@@ -733,11 +743,11 @@ export default function Login() {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs">
-                    <span className="material-symbols-outlined text-[26px]">devices</span>
+                    <span className="material-symbols-outlined text-[26px]">security</span>
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-on-surface">Device Security Verification</h3>
-                    <p className="text-[11px] text-on-surface-variant mt-0.5">Two-factor check required for unremembered devices</p>
+                    <h3 className="text-base font-bold text-on-surface">Two-Factor Authentication</h3>
+                    <p className="text-[11px] text-on-surface-variant mt-0.5">6-digit verification code required to authorize clinical sign-in</p>
                   </div>
                 </div>
                 <button

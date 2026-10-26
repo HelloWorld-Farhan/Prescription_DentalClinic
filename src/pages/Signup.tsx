@@ -295,6 +295,11 @@ export default function Signup() {
         googleUser.photoUrl
       );
 
+      if (res.status === 'otp_required') {
+        navigate('/login');
+        return;
+      }
+
       if (res.token && res.user) {
         authApi.saveSession(res.token, res.user);
         recordLoginEvent('Success', `Account created/authenticated via 1-Click Google OAuth (${googleUser.email})`);

@@ -150,7 +150,7 @@ export default function Settings() {
       const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
       if (u.twoFactorEnabled !== undefined) return Boolean(u.twoFactorEnabled);
     } catch {}
-    return true;
+    return false;
   });
   const [isToggling2Fa, setIsToggling2Fa] = useState(false);
 
@@ -679,8 +679,12 @@ export default function Settings() {
               </div>
               <div>
                 <span className="text-[11px] uppercase tracking-wider text-outline font-bold">2FA Compliance</span>
-                <div className="text-sm font-bold text-on-surface">100% Enforced</div>
-                <span className="text-[11px] text-primary font-medium">Hardware FIPS 140-3 Bound</span>
+                <div className="text-sm font-bold text-on-surface">
+                  {twoFactorConfigured ? '100% Enforced' : 'Optional / Disabled'}
+                </div>
+                <span className={`text-[11px] font-medium ${twoFactorConfigured ? 'text-primary' : 'text-outline'}`}>
+                  {twoFactorConfigured ? 'Hardware FIPS 140-3 Bound' : 'Direct sign-in active'}
+                </span>
               </div>
             </div>
 
