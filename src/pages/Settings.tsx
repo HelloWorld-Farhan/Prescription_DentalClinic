@@ -151,16 +151,6 @@ export default function Settings() {
   });
   const [isToggling2Fa, setIsToggling2Fa] = useState(false);
 
-  // Detect whether current session is authenticated via Google OAuth
-  const isGoogleUser = useMemo(() => {
-    try {
-      const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
-      return u.authProvider === 'google' || u.role?.toLowerCase() === 'google';
-    } catch {
-      return false;
-    }
-  }, []);
-
   // Active Sessions scoped per email
   const [sessions, setSessions] = useState<ActiveSessionItem[]>(() => getActiveSessions(profile.email));
   const [showTerminateAllModal, setShowTerminateAllModal] = useState(false);
@@ -172,6 +162,24 @@ export default function Settings() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'All' | 'Success' | '2FA Verified' | 'Revoked' | 'Blocked'>('All');
   const [historyPage, setHistoryPage] = useState(1);
   const pageSize = 4;
+
+  // Detect whether current session is authenticated via Google OAuth
+  const isGoogleUser = useMemo(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+      const provider =
+        u.authProvider ||
+        sessionStorage.getItem('rxguard_auth_provider') ||
+        localStorage.getItem('rxguard_auth_provider');
+      if (provider === 'google') return true;
+      if (u.role?.toLowerCase() === 'google') return true;
+      if (u.id?.startsWith('google-') || sessionStorage.getItem('rxguard_prescriber_id')?.startsWith('google-')) return true;
+      if (loginHistory.some((h) => h.details?.toLowerCase().includes('google oauth'))) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  }, [profile.email, loginHistory]);
 
   // Keep sessions and audit history synced whenever clinician email changes
   useEffect(() => {
@@ -767,34 +775,71 @@ export default function Settings() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-[22px]">password</span>
-                    <h3 className="text-base font-bold text-on-surface">Update Clinician Password</h3>
+                    <h3 className="text-base font-bold text-on-surface">Clinician Account Password</h3>
                   </div>
                   <p className="text-xs text-outline mt-0.5">
-                    Authorized security protocol: verify identity via OTP or existing credentials prior to updating password.
+                    {isGoogleUser
+                      ? 'Single Sign-On (OAuth 2.0) credential status & identity security'
+                      : 'Authorized security protocol: verify identity via OTP or existing credentials prior to updating password.'}
                   </p>
                 </div>
-                {isVerificationUnlocked && (
+                {isGoogleUser ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                    Google SSO
+                  </span>
+                ) : isVerificationUnlocked ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
                     <span className="material-symbols-outlined text-[14px]">check_circle</span>
                     Verified
                   </span>
-                )}
+                ) : null}
               </div>
 
-              {!isVerificationUnlocked ? (
-                /* STEP 1: Choose Verification Method */
-                <form onSubmit={handleInitiatePasswordVerification} className="flex flex-col gap-4">
-                  {isGoogleUser && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2.5 text-xs text-blue-900">
-                      <span className="material-symbols-outlined text-blue-600 text-[20px] shrink-0">info</span>
-                      <div>
-                        <span className="font-bold block">Google-Authenticated Clinician Account</span>
-                        <span className="text-[11px] text-blue-800 leading-relaxed block mt-0.5">
-                          You authenticated using Google Sign-In. To establish or update your clinical password, select <strong>Email Passcode</strong> to verify via a 6-digit OTP sent to your Google email address ({profile.email}).
+              {isGoogleUser ? (
+                /* Google Authenticated Account: Password Change is completely Blocked */
+                <div className="p-5 rounded-2xl bg-surface-container-low border border-surface-container-high flex flex-col gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-on-surface">Password Change Disabled</h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                          Managed by Google
                         </span>
                       </div>
+                      <p className="text-xs text-on-surface-variant leading-relaxed">
+                        Your clinician account is authenticated via <strong>1-Click Google Sign-In ({profile.email})</strong>. Because you authenticate using Google OAuth, no separate password exists or is required for this account.
+                      </p>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-surface-container-high/80 text-xs text-on-surface-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 text-outline">
+                      <span className="material-symbols-outlined text-blue-600 text-[18px]">verified_user</span>
+                      <span>Identity credentials &amp; 2FA are managed securely through Google.</span>
+                    </span>
+                    <a
+                      href="https://myaccount.google.com/security"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1 shrink-0"
+                    >
+                      <span>Manage Google Account</span>
+                      <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                    </a>
+                  </div>
+                </div>
+              ) : !isVerificationUnlocked ? (
+                /* STEP 1: Choose Verification Method (for standard accounts) */
+                <form onSubmit={handleInitiatePasswordVerification} className="flex flex-col gap-4">
 
                   <div>
                     <label className="text-xs font-bold text-on-surface block mb-2">

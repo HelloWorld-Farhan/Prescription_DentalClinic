@@ -155,9 +155,8 @@ export function saveActiveSessions(sessions: ActiveSessionItem[], email?: string
 /**
  * Retrieve login and security audit history scoped to the specific clinician email
  */
-export function getLoginHistory(email?: string, clinicianName?: string): LoginHistoryItem[] {
+export function getLoginHistory(email?: string, _clinicianName?: string): LoginHistoryItem[] {
   if (typeof window === 'undefined') return [];
-  const env = detectClientEnvironment();
   const { history: key } = getStorageKeys(email);
 
   try {
@@ -165,33 +164,22 @@ export function getLoginHistory(email?: string, clinicianName?: string): LoginHi
     if (raw) {
       const parsed: LoginHistoryItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Strip phantom fallback entry if real login events exist
+        const hasRealLogin = parsed.some(
+          (p) => !p.details?.startsWith('Interactive clinical session initiated by')
+        );
+        const filtered = hasRealLogin
+          ? parsed.filter(
+              (p) => !p.details?.startsWith('Interactive clinical session initiated by')
+            )
+          : parsed;
+        return filtered;
       }
     }
   } catch {}
 
-  const now = new Date();
-  const formatTime = (d: Date) =>
-    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-
-  const initialRealHistory: LoginHistoryItem[] = [
-    {
-      id: `AUTH-${Math.floor(1000 + Math.random() * 9000)}`,
-      timestamp: `Today at ${formatTime(now)}`,
-      device: env.device,
-      browserOs: env.browserOs,
-      ip: env.ip,
-      location: env.location,
-      status: 'Success',
-      details: `Interactive clinical session initiated by ${clinicianName || 'Authorized Prescriber'}`
-    }
-  ];
-
-  try {
-    localStorage.setItem(key, JSON.stringify(initialRealHistory));
-  } catch {}
-
-  return initialRealHistory;
+  // If no history exists, return empty array without seeding phantom duplicate entries
+  return [];
 }
 
 /**
@@ -223,7 +211,19 @@ export function recordLoginEvent(
   if (typeof window !== 'undefined') {
     try {
       const { history: key } = getStorageKeys(email);
-      const existing = getLoginHistory(email);
+      let existing: LoginHistoryItem[] = [];
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            // Remove phantom auto-seeded entries to ensure clean history
+            existing = parsed.filter(
+              (item) => !item.details?.startsWith('Interactive clinical session initiated by')
+            );
+          }
+        } catch {}
+      }
       const updated = [newItem, ...existing.filter((item) => item.id !== newItem.id)].slice(0, 30);
       localStorage.setItem(key, JSON.stringify(updated));
     } catch {

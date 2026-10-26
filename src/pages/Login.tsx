@@ -255,6 +255,7 @@ export default function Login() {
       }
 
       if (res.token && res.user) {
+        if (!res.user.authProvider) res.user.authProvider = 'google';
         authApi.saveSession(res.token, res.user);
         recordLoginEvent('Success', `Authenticated via 1-Click Google OAuth (${googleUser.email})`, googleUser.email);
         navigate('/dashboard');

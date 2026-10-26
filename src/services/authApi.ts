@@ -420,6 +420,10 @@ export const authApi = {
     sessionStorage.setItem('rxguard_prescriber_role', user.role);
     sessionStorage.setItem('rxguard_prescriber_id', user.id);
     sessionStorage.setItem('rxguard_prescriber_npi', user.id);
+    if (user.authProvider) {
+      sessionStorage.setItem('rxguard_auth_provider', user.authProvider);
+      localStorage.setItem('rxguard_auth_provider', user.authProvider);
+    }
     if (user.phone) sessionStorage.setItem('rxguard_prescriber_phone', user.phone);
     if (user.twoFactorEnabled !== undefined) {
       sessionStorage.setItem('rxguard_two_factor_enabled', String(user.twoFactorEnabled));
@@ -440,7 +444,9 @@ export const authApi = {
     sessionStorage.removeItem('rxguard_prescriber_role');
     sessionStorage.removeItem('rxguard_prescriber_id');
     sessionStorage.removeItem('rxguard_prescriber_npi');
+    sessionStorage.removeItem('rxguard_auth_provider');
     sessionStorage.removeItem('rxguard_two_factor_enabled');
+    localStorage.removeItem('rxguard_auth_provider');
     localStorage.removeItem('smileclinic_jwt_token');
     localStorage.removeItem('smileclinic_auth_user');
   }

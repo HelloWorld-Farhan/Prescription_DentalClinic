@@ -307,6 +307,7 @@ export default function Signup() {
       }
 
       if (res.token && res.user) {
+        if (!res.user.authProvider) res.user.authProvider = 'google';
         authApi.saveSession(res.token, res.user);
         recordLoginEvent('Success', `Account created/authenticated via 1-Click Google OAuth (${googleUser.email})`, googleUser.email);
         navigate('/dashboard');
