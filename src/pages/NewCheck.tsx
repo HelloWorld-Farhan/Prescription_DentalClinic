@@ -319,17 +319,17 @@ export default function NewCheck() {
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-1.5 text-on-surface-variant text-xs mb-1">
-              <span>Clinical Workflow</span>
+              <span>Prescription Workflow</span>
               <span className="material-symbols-outlined text-[13px] text-outline">chevron_right</span>
-              <span className="font-mono text-primary font-bold">Rx-PreCheck Session: {ptKey}</span>
+              <span className="text-primary font-bold">Patient Check • {ptKey}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <h1 className="text-lg sm:text-xl font-extrabold text-on-surface tracking-tight">
-                Safety Check Verification Engine
+                Safety Screening Engine
               </h1>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>FHIR R4 Ingest Active</span>
+                <span>Real-Time Safety Active</span>
               </div>
             </div>
           </div>
@@ -769,21 +769,24 @@ export default function NewCheck() {
               {/* Patient Chart Linker */}
               <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-on-surface">Associated EMR Patient Chart</span>
-                  <span className="text-[11px] text-outline">Cross-checks medical history, GFR, and concurrent regimens</span>
+                  <span className="text-xs font-bold text-on-surface">Patient Medical Record</span>
+                  <span className="text-[11px] text-outline">Cross-checks medical history, allergies &amp; kidney health</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="relative w-full sm:w-auto min-w-[260px]">
                   <select
                     value={selectedPatientId}
                     onChange={(e) => handlePatientSelect(e.target.value)}
-                    className="h-9 px-3 rounded-xl border border-surface-container-high bg-white text-xs font-semibold text-on-surface outline-none cursor-pointer"
+                    className="w-full h-10 pl-3 pr-8 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs font-semibold text-on-surface focus:border-primary outline-none cursor-pointer appearance-none shadow-2xs transition-colors"
                   >
                     {patients.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.mrn}) — {p.age}y • eGFR {p.egfr}
+                        {p.name} ({p.mrn}) • {p.age}y • eGFR {p.egfr}
                       </option>
                     ))}
                   </select>
+                  <span className="material-symbols-outlined text-[18px] text-outline absolute right-2.5 top-2.5 pointer-events-none">
+                    unfold_more
+                  </span>
                 </div>
               </div>
 
@@ -819,11 +822,11 @@ export default function NewCheck() {
 
               <div className="space-y-2.5 text-xs">
                 <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
-                  <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">hub</span>
+                  <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">medication</span>
                   <div>
-                    <div className="font-bold text-on-surface">EMR Active Regimens</div>
+                    <div className="font-bold text-on-surface">Current Medications</div>
                     <div className="text-[11px] text-outline mt-0.5">
-                      Reconciling {activeMeds.length} active drugs on file: <strong>{activeMeds.join(', ')}</strong>.
+                      Checking {activeMeds.length} active medications on file: <strong>{activeMeds.join(', ')}</strong>.
                     </div>
                   </div>
                 </div>
@@ -849,9 +852,9 @@ export default function NewCheck() {
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-primary/5 text-primary text-[11px] font-medium flex items-center gap-2 border border-primary/20">
-                <span className="material-symbols-outlined text-[16px]">lock</span>
-                <span>Protected under HIPAA Safe Harbor de-identification (45 CFR §164.514).</span>
+              <div className="p-3 rounded-xl bg-emerald-50/80 text-emerald-900 text-[11px] font-medium flex items-center gap-2 border border-emerald-200 shadow-2xs">
+                <span className="material-symbols-outlined text-[16px] text-emerald-600 shrink-0">lock</span>
+                <span>Patient health data is securely encrypted &amp; confidential.</span>
               </div>
             </div>
           </aside>

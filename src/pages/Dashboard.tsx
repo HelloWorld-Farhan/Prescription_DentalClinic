@@ -116,7 +116,7 @@ export default function Dashboard() {
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs border border-surface-container-high/60 transition-all">
               <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-primary animate-pulse'}`}></span>
               <span className={`material-symbols-outlined text-[15px] text-primary transition-transform ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
-              <span className="font-medium">Auto-synced via FHIR R4: {isSyncing ? 'Syncing...' : `Just now (${syncTimer}s)`}</span>
+              <span className="font-medium">Live Sync: {isSyncing ? 'Syncing...' : `Just now (${syncTimer}s)`}</span>
             </div>
           </div>
           <p className="text-xs sm:text-sm text-on-surface-variant">
