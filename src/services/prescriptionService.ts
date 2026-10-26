@@ -137,6 +137,7 @@ export class PrescriptionStorage {
     }
     return rules;
   }
+
   static getPatients(): Patient[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.PATIENTS);

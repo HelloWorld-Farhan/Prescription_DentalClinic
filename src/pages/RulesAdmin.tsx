@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VirtualDb } from '../data/virtualDb';
+import { VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, AlertSeverity } from '../types';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
 import CustomDropdown from '../components/CustomDropdown';

@@ -231,12 +231,12 @@ export default function Login() {
                   {/* Top Badge Strip */}
                   <div className="flex items-center justify-between text-on-surface-variant text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                      <span className="font-semibold text-primary">SMART on FHIR v4.0.1 Ready</span>
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="font-semibold text-primary">Secure Clinical Workspace</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm text-outline">verified_user</span>
-                      <span>HIPAA &amp; EPCS Certified</span>
+                    <div className="flex items-center gap-1.5 text-on-surface-variant font-medium">
+                      <span className="material-symbols-outlined text-sm text-primary">lock</span>
+                      <span>256-Bit SSL Encrypted</span>
                     </div>
                   </div>
 
