@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
+import OtpVerificationInput from '../components/OtpVerificationInput';
 import AuthInfoPanel from '../components/AuthInfoPanel';
 import { authApi } from '../services/authApi';
 
@@ -18,7 +19,7 @@ export default function Login() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [authorizedConfirmation, setAuthorizedConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successFlash, setSuccessFlash] = useState<string | null>(() => {
@@ -31,6 +32,35 @@ export default function Login() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+
+  // 2FA Login OTP state (required when Remember Device is unchecked)
+  const [showLoginOtpModal, setShowLoginOtpModal] = useState(false);
+  const [loginOtp, setLoginOtp] = useState<string[]>(Array(6).fill(''));
+  const [loginOtpStatus, setLoginOtpStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
+  const [loginOtpError, setLoginOtpError] = useState<string | null>(null);
+  const [isVerifyingLoginOtp, setIsVerifyingLoginOtp] = useState(false);
+  const [loginOtpResendCountdown, setLoginOtpResendCountdown] = useState(60);
+
+  // Device fingerprint token helper
+  const getDeviceId = (): string => {
+    let id = localStorage.getItem('rxguard_device_token');
+    if (!id) {
+      id = 'dev_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+      localStorage.setItem('rxguard_device_token', id);
+    }
+    return id;
+  };
+
+  // Countdown timer for 2FA login OTP resend
+  useEffect(() => {
+    let timer: any;
+    if (showLoginOtpModal && loginOtpResendCountdown > 0) {
+      timer = setInterval(() => {
+        setLoginOtpResendCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [showLoginOtpModal, loginOtpResendCountdown]);
 
   // Dynamic clinic logo
   const savedLogo = localStorage.getItem('dental_clinic_logo');
@@ -76,7 +106,18 @@ export default function Login() {
 
     try {
       // 1. Attempt API authentication against the backend database
-      const res = await authApi.login(inputEmail, inputPass);
+      const res = await authApi.login(inputEmail, inputPass, rememberDevice, getDeviceId());
+
+      // If Remember Device is unchecked, backend requires step-up 2FA OTP verification
+      if (res.status === 'otp_required') {
+        setLoginOtp(Array(6).fill(''));
+        setLoginOtpStatus('idle');
+        setLoginOtpError(null);
+        setShowLoginOtpModal(true);
+        setLoginOtpResendCountdown(60);
+        return;
+      }
+
       if (res.token && res.user) {
         authApi.saveSession(res.token, res.user);
         if (rememberDevice) {
@@ -111,6 +152,59 @@ export default function Login() {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleVerifyLoginOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const entered = loginOtp.join('');
+    if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
+      setLoginOtpError('Please enter all 6 numeric digits of your sign-in verification code.');
+      setLoginOtpStatus('error');
+      setTimeout(() => setLoginOtpStatus('idle'), 1500);
+      return;
+    }
+
+    setIsVerifyingLoginOtp(true);
+    setLoginOtpStatus('verifying');
+    setLoginOtpError(null);
+
+    try {
+      const res = await authApi.verifyLoginOtp(
+        clinicalId.trim().toLowerCase(),
+        entered,
+        rememberDevice,
+        getDeviceId()
+      );
+      if (res.token && res.user) {
+        setLoginOtpStatus('success');
+        authApi.saveSession(res.token, res.user);
+        if (rememberDevice) {
+          localStorage.setItem('rxguard_authenticated', 'true');
+        }
+        setTimeout(() => {
+          setShowLoginOtpModal(false);
+          navigate('/dashboard');
+        }, 800);
+      }
+    } catch (err: any) {
+      setLoginOtpError(err.message || 'Invalid or expired sign-in code.');
+      setLoginOtpStatus('error');
+      setTimeout(() => setLoginOtpStatus('idle'), 1500);
+    } finally {
+      setIsVerifyingLoginOtp(false);
+    }
+  };
+
+  const handleResendLoginOtp = async () => {
+    if (loginOtpResendCountdown > 0) return;
+    try {
+      setLoginOtp(Array(6).fill(''));
+      setLoginOtpError(null);
+      setLoginOtpResendCountdown(60);
+      await authApi.login(clinicalId.trim().toLowerCase(), password, false, getDeviceId());
+    } catch (err: any) {
+      setLoginOtpError(err.message || 'Failed to resend sign-in code.');
     }
   };
 
@@ -556,6 +650,132 @@ export default function Login() {
           </div>
         </div>
       </footer>
+
+      {/* 2FA Login OTP Verification Modal (Triggered when "Remember this device" is unchecked) */}
+      <AnimatePresence>
+        {showLoginOtpModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLoginOtpModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-6 sm:p-8 z-10 space-y-6"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs">
+                    <span className="material-symbols-outlined text-[26px]">devices</span>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-on-surface">Device Security Verification</h3>
+                    <p className="text-[11px] text-on-surface-variant mt-0.5">Two-factor check required for unremembered devices</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLoginOtpModal(false)}
+                  className="text-outline hover:text-on-surface p-1 cursor-pointer rounded-lg hover:bg-surface-container transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              {/* Destination info */}
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/15">
+                <span className="material-symbols-outlined text-primary text-[20px]">mail</span>
+                <div>
+                  <p className="text-[10px] text-on-surface-variant font-medium uppercase tracking-wider">Passcode sent to</p>
+                  <p className="text-sm font-bold text-on-surface font-mono">{clinicalId}</p>
+                </div>
+              </div>
+
+              {/* Error */}
+              <AnimatePresence>
+                {loginOtpError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2"
+                  >
+                    <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
+                    <span>{loginOtpError}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* OTP Form */}
+              <form onSubmit={handleVerifyLoginOtp} className="space-y-6">
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface mb-3 text-center">
+                    Enter the 6-Digit Verification Code
+                  </label>
+                  <OtpVerificationInput
+                    value={loginOtp}
+                    onChange={(newVal) => {
+                      setLoginOtp(newVal);
+                      setLoginOtpError(null);
+                    }}
+                    status={loginOtpStatus}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-on-surface-variant pt-1">
+                  <span>Didn't receive the passcode?</span>
+                  {loginOtpResendCountdown > 0 ? (
+                    <span className="text-outline font-mono font-medium">Resend in {loginOtpResendCountdown}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendLoginOtp}
+                      className="text-primary font-bold hover:underline cursor-pointer"
+                    >
+                      Resend Code
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginOtpModal(false)}
+                    className="flex-1 py-3 px-4 rounded-xl border border-outline/30 text-on-surface font-semibold text-sm hover:bg-surface-container transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isVerifyingLoginOtp || loginOtp.some(d => !d)}
+                    className="flex-1 py-3 px-4 rounded-xl bg-primary text-white font-semibold text-sm shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isVerifyingLoginOtp ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+                        <span>Verifying...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Complete Sign In</span>
+                        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Forgot Password Modal Dialog */}
       <ForgotPasswordModal

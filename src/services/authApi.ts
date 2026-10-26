@@ -31,7 +31,7 @@ export interface UserProfile {
 }
 
 export interface AuthApiResponse {
-  status: 'success' | 'error';
+  status: 'success' | 'error' | 'otp_required';
   message: string;
   token?: string;
   user?: UserProfile;
@@ -108,16 +108,59 @@ export const authApi = {
   /**
    * Log in with verified email and password
    */
-  async login(email: string, password: string): Promise<AuthApiResponse> {
+  async login(
+    email: string,
+    password: string,
+    remember_device: boolean = true,
+    device_id?: string
+  ): Promise<AuthApiResponse> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password })
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+          remember_device,
+          device_id
+        })
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || data.message || 'Login failed. Please check credentials.');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to connect to clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Verify the 2FA login OTP dispatched when Remember Device is unchecked
+   */
+  async verifyLoginOtp(
+    email: string,
+    otp_code: string,
+    remember_device: boolean = false,
+    device_id?: string
+  ): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-login-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          otp_code: otp_code.trim(),
+          remember_device,
+          device_id
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Invalid or expired sign-in code.');
       }
       return data;
     } catch (err: any) {
