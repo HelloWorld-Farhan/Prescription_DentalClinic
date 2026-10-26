@@ -17,6 +17,36 @@ interface NotificationItem {
   textClass: string;
 }
 
+interface SearchableClinicalItem {
+  id: string;
+  name: string;
+  category: string;
+  icon: string;
+  path: string;
+  type: 'drug' | 'action';
+  badge?: string;
+  subtitle?: string;
+}
+
+const SEARCHABLE_CLINICAL_ITEMS: SearchableClinicalItem[] = [
+  // Dental Rx Drugs & Contraindications
+  { id: 'd1', name: 'Amoxicillin 500mg', category: 'Antibiotic (Dental Prophylaxis)', icon: 'medication', path: '/check', type: 'drug', badge: 'Standard Rx', subtitle: 'First-line odontogenic antibiotic' },
+  { id: 'd2', name: 'Clindamycin 300mg', category: 'Antibiotic (Penicillin Alternative)', icon: 'medication', path: '/check', type: 'drug', badge: 'Penicillin-Allergic', subtitle: 'Cross-checks pseudomembranous colitis risk' },
+  { id: 'd3', name: 'Ibuprofen 600mg', category: 'NSAID (Post-op Analgesic)', icon: 'medication', path: '/check', type: 'drug', badge: 'NSAID', subtitle: 'Renal & GI contraindication safety guard' },
+  { id: 'd4', name: 'Lidocaine 2% + 1:100k Epi', category: 'Local Dental Anesthetic', icon: 'vaccines', path: '/check', type: 'drug', badge: 'Local Block', subtitle: 'Epinephrine cardiovascular cross-check' },
+  { id: 'd5', name: 'Metronidazole 400mg', category: 'Nitroimidazole Antibiotic', icon: 'medication', path: '/check', type: 'drug', badge: 'Periodontal', subtitle: 'Severe disulfiram-like alcohol warning' },
+  { id: 'd6', name: 'Codeine / Acetaminophen', category: 'Opioid Combination Analgesic', icon: 'pill', path: '/check', type: 'drug', badge: 'Controlled', subtitle: 'Respiratory depression & dependency monitoring' },
+  { id: 'd7', name: 'Azithromycin 250mg', category: 'Macrolide Antibiotic', icon: 'medication', path: '/check', type: 'drug', badge: 'Macrolide', subtitle: 'QTc prolongation contraindication alert' },
+  { id: 'd8', name: 'Warfarin / Coumadin', category: 'Anticoagulant Risk Check', icon: 'warning', path: '/check', type: 'drug', badge: 'High Risk', subtitle: 'Major hemorrhage contraindication with NSAIDs' },
+
+  // Clinical Actions & Direct Navigation
+  { id: 'a1', name: 'Start New Safety Check', category: 'Prescription Screening', icon: 'add_circle', path: '/check', type: 'action', badge: 'Action', subtitle: 'Analyze patient vitals & multi-drug regimen' },
+  { id: 'a2', name: 'View Active Contraindication Alerts', category: 'Safety Alerts Queue', icon: 'warning', path: '/alerts', type: 'action', badge: 'Alerts', subtitle: 'Review active red-flag overrides & reviews' },
+  { id: 'a3', name: 'Inspect HIPAA Audit Trail', category: 'Notarized Ledger', icon: 'verified', path: '/audit-log', type: 'action', badge: 'Compliance', subtitle: 'Immutable cryptographically signed audit logs' },
+  { id: 'a4', name: 'Search Dental Rules & Knowledgebase', category: 'Rule Calibrations', icon: 'database', path: '/rules', type: 'action', badge: 'Database', subtitle: '24 clinical decision interaction rules' },
+  { id: 'a5', name: 'Clinician Profile & Session Security', category: 'Account Settings', icon: 'settings', path: '/settings', type: 'action', badge: 'Settings', subtitle: 'Manage sessions, audit history, and credentials' },
+];
+
 const initialNotifications: NotificationItem[] = [];
 
 export default function Layout() {
@@ -24,6 +54,12 @@ export default function Layout() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+
+  // Global Medication & Clinical Command Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -140,9 +176,29 @@ export default function Layout() {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
         setProfileOpen(false);
       }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Global Keyboard Shortcuts (Cmd/Ctrl + K and Escape)
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchOpen(true);
+      }
+      if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+        searchInputRef.current?.blur();
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
   useEffect(() => {
@@ -168,6 +224,35 @@ export default function Layout() {
     { name: 'Rules & Data', path: '/rules', icon: 'database' },
   ];
 
+
+  const getPageInfo = (pathname: string) => {
+    if (pathname.startsWith('/check') || pathname.startsWith('/dashboard/check')) {
+      return { title: 'Prescription Safety Check', icon: 'add_circle' };
+    }
+    if (pathname.startsWith('/alerts') || pathname.startsWith('/dashboard/alerts')) {
+      return { title: 'Alerts & Overrides Queue', icon: 'warning' };
+    }
+    if (pathname.startsWith('/audit-log') || pathname.startsWith('/dashboard/audit-log')) {
+      return { title: 'HIPAA Notarized Audit Trail', icon: 'verified' };
+    }
+    if (pathname.startsWith('/rules') || pathname.startsWith('/dashboard/rules')) {
+      return { title: 'Rules & Interaction Database', icon: 'database' };
+    }
+    if (pathname.startsWith('/settings') || pathname.startsWith('/dashboard/settings')) {
+      return { title: 'Clinician Settings & Security', icon: 'settings' };
+    }
+    return { title: 'Clinical Safety Dashboard', icon: 'grid_view' };
+  };
+
+  const pageInfo = getPageInfo(location.pathname);
+
+  const filteredSearchItems = searchQuery.trim()
+    ? SEARCHABLE_CLINICAL_ITEMS.filter((item) =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.subtitle && item.subtitle.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : SEARCHABLE_CLINICAL_ITEMS.slice(0, 6);
 
   const handleLogout = () => {
     sessionStorage.removeItem('rxguard_authenticated');
@@ -266,20 +351,158 @@ export default function Layout() {
       {/* Top Header & Content Container */}
       <div className="lg:pl-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
         {/* Fixed Header */}
-        <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-surface-container-high">
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 text-on-surface hover:bg-surface-container rounded-xl mr-2 cursor-pointer"
-            aria-label="Open navigation menu"
-          >
-            <span className="material-symbols-outlined text-2xl">menu</span>
-          </button>
+        <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-surface-container-high gap-2 sm:gap-4">
+          {/* Left: Mobile Menu + Active Module Context */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 text-on-surface hover:bg-surface-container rounded-xl cursor-pointer shrink-0"
+              aria-label="Open navigation menu"
+            >
+              <span className="material-symbols-outlined text-2xl">menu</span>
+            </button>
 
+            {/* Clinical Page Title & Status (Desktop & Tablet) */}
+            <div className="hidden sm:flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-2xs">
+                <span className="material-symbols-outlined text-[19px]">
+                  {pageInfo.icon}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-bold text-on-surface block leading-tight truncate">
+                  {pageInfo.title}
+                </span>
+                <span className="text-[10px] text-outline flex items-center gap-1 font-medium leading-none mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Smile Clinic CDS
+                </span>
+              </div>
+            </div>
+          </div>
 
+          {/* Center: Global Medication & Clinical Command Search Bar */}
+          <div className="flex-1 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg relative" ref={searchContainerRef}>
+            <div className="relative flex items-center">
+              <span className="material-symbols-outlined absolute left-3 text-outline text-[18px] pointer-events-none">
+                search
+              </span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchOpen(true);
+                }}
+                onFocus={() => setIsSearchOpen(true)}
+                placeholder="Search medications, contraindications, or checks..."
+                className="w-full h-9 pl-9 pr-12 rounded-xl bg-surface-container-low border border-surface-container-high focus:bg-surface-container-lowest focus:border-primary focus:ring-2 focus:ring-primary/20 text-xs text-on-surface placeholder:text-outline font-medium transition-all"
+              />
+              <div className="absolute right-2.5 hidden sm:flex items-center pointer-events-none">
+                <kbd className="text-[10px] bg-surface-container-high text-outline px-1.5 py-0.5 rounded border border-surface-container-highest font-mono">
+                  ⌘K
+                </kbd>
+              </div>
+            </div>
+
+            {/* Interactive Search Dropdown */}
+            <AnimatePresence>
+              {isSearchOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-11 left-0 right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-50 divide-y divide-surface-container-low"
+                >
+                  <div className="p-2.5 px-3 bg-surface-container-low flex items-center justify-between text-[11px] font-bold text-outline">
+                    <span>{searchQuery.trim() ? `Search Results (${filteredSearchItems.length})` : 'Quick Clinical Actions & Medications'}</span>
+                    <span className="text-[10px] font-normal">Press Esc to exit</span>
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto divide-y divide-surface-container-low/60">
+                    {filteredSearchItems.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-outline flex flex-col items-center gap-1.5">
+                        <span className="material-symbols-outlined text-2xl text-outline/60">search_off</span>
+                        <span>No medications or clinical records matching "{searchQuery}"</span>
+                      </div>
+                    ) : (
+                      filteredSearchItems.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            navigate(item.path);
+                            setIsSearchOpen(false);
+                            setSearchQuery('');
+                          }}
+                          className="w-full p-2.5 px-3 text-left hover:bg-surface-container-low flex items-center justify-between gap-3 transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              item.type === 'action'
+                                ? 'bg-primary/10 text-primary'
+                                : item.badge === 'High Risk'
+                                ? 'bg-rose-50 text-rose-600'
+                                : 'bg-surface-container text-on-surface'
+                            }`}>
+                              <span className="material-symbols-outlined text-[16px]">{item.icon}</span>
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-on-surface block truncate">
+                                {item.name}
+                              </span>
+                              <span className="text-[10px] text-outline block truncate">
+                                {item.subtitle || item.category}
+                              </span>
+                            </div>
+                          </div>
+
+                          {item.badge && (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                              item.badge === 'High Risk'
+                                ? 'bg-rose-100 text-rose-800'
+                                : item.badge === 'Action'
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-surface-container-high text-on-surface-variant'
+                            }`}>
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="p-2 px-3 bg-surface-container-low text-[10px] text-outline flex items-center justify-between">
+                    <span>Clinical Decision Support Engine • Dental Formulary</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigate('/check');
+                        setIsSearchOpen(false);
+                      }}
+                      className="font-bold text-primary hover:underline"
+                    >
+                      Open New Safety Check →
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Right Header Actions */}
-          <div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* CDS Engine Status Badge (Desktop only) */}
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-[11px] font-semibold text-on-surface-variant">
+              <span className="material-symbols-outlined text-[16px] text-emerald-600">verified_user</span>
+              <span>CDS Engine v2.4</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            </div>
+
             {/* Quick Action Button: New Check */}
             <button
               onClick={() => navigate('/check')}
