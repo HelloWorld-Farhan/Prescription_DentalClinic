@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, modalVariants, buttonTapTransition, EASE } from '../lib/motion';
 import { SafetyCheckRecord } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
 
@@ -51,7 +51,13 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] w-screen h-screen overflow-y-auto bg-slate-950/95 backdrop-blur-md flex flex-col items-center print:bg-white print:p-0 print:overflow-visible print:static">
+        <motion.div
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          variants={modalVariants.backdrop}
+          className="fixed inset-0 z-[100] w-screen h-screen overflow-y-auto bg-slate-950/95 backdrop-blur-md flex flex-col items-center print:bg-white print:p-0 print:overflow-visible print:static"
+        >
           {/* Top Document Controls Bar (Hidden on print) */}
           <header className="sticky top-0 z-40 w-full bg-slate-900/98 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 py-2.5 sm:py-3 shadow-2xl text-slate-100 print:hidden relative">
             {/* Pinned Global Close Button - Always visible, never cut off or scrolled */}
@@ -402,7 +408,7 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
             check={check}
             onPrintFallback={handlePrint}
           />
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body

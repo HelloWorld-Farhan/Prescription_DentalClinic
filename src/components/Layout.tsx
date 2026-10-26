@@ -1,6 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  motion,
+  AnimatePresence,
+  pageTransitionVariants,
+  modalVariants,
+  buttonTapTransition,
+  EASE
+} from '../lib/motion';
 import ErrorBoundary from './ErrorBoundary';
 import FirstTimeOnboardingModal from './FirstTimeOnboardingModal';
 import { UserProfile } from '../services/authApi';
@@ -47,7 +54,7 @@ export default function Layout() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
 
-  // Global Medication & Clinical Command Search State
+  // Global Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -58,7 +65,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Dynamic clinic logo synced across portals
+  // Dynamic clinic logo
   const [clinicLogo, setClinicLogo] = useState<string>(() => {
     return localStorage.getItem('dental_clinic_logo') || '';
   });
@@ -146,7 +153,11 @@ export default function Layout() {
     .slice(0, 2)
     .join('') || 'RX';
 
+  // Close drawers/menus and scroll to top on navigation
   useEffect(() => {
+    setSidebarOpen(false);
+    setNotificationsOpen(false);
+    setProfileOpen(false);
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
@@ -173,7 +184,7 @@ export default function Layout() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Global Keyboard Shortcuts (Cmd/Ctrl + K and Escape)
+  // Keyboard Shortcuts (Cmd/Ctrl + K and Escape)
   useEffect(() => {
     function handleGlobalKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -182,6 +193,9 @@ export default function Layout() {
       }
       if (e.key === 'Escape') {
         setIsSearchOpen(false);
+        setSidebarOpen(false);
+        setNotificationsOpen(false);
+        setProfileOpen(false);
       }
     }
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -218,7 +232,6 @@ export default function Layout() {
     { name: 'Rules & Data', path: '/rules', icon: 'database' },
   ];
 
-
   const getPageInfo = (pathname: string) => {
     if (pathname.startsWith('/check') || pathname.startsWith('/dashboard/check')) {
       return { title: 'Prescription Safety Check', icon: 'add_circle' };
@@ -240,7 +253,6 @@ export default function Layout() {
 
   const pageInfo = getPageInfo(location.pathname);
 
-  // Real clinical records from storage
   const [realChecks, setRealChecks] = useState<SafetyCheckRecord[]>(() => {
     try {
       return PrescriptionStorage.getChecks();
@@ -258,7 +270,6 @@ export default function Layout() {
   const filteredSearchItems: SearchResultItem[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) {
-      // Clean real recent checks: strictly NO mock data!
       return realChecks.slice(0, 5).map(check => ({
         id: check.id,
         name: `${check.patientName} (${check.mrn})`,
@@ -309,135 +320,173 @@ export default function Layout() {
     navigate('/login');
   };
 
-  return (
-    <div className="bg-background min-h-screen text-on-surface font-sans flex flex-col overflow-x-hidden w-full max-w-full">
-      {/* Mobile Backdrop */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Left Sidebar Navigation */}
-      <aside 
-        className={`fixed left-0 top-0 bottom-0 w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-surface-container-high transition-transform duration-300 ease-out shadow-xl lg:shadow-none gpu-layer ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0`}
-      >
-        <div className="flex flex-col">
-          {/* Brand Header */}
-          <div className="px-6 pt-6 pb-4 flex items-center gap-3 border-b border-surface-container-low">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-md overflow-hidden shrink-0">
+  // Shared Sidebar Content (Used for both Desktop fixed and Mobile drawer)
+  const renderSidebarContent = (isMobile: boolean = false) => (
+    <div className="flex flex-col justify-between h-full">
+      <div className="flex flex-col">
+        {/* Brand Header */}
+        <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-surface-container-low">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs overflow-hidden shrink-0">
               {clinicLogo ? (
                 <img src={clinicLogo} alt="Clinic Logo" className="w-full h-full object-contain p-1" />
               ) : (
                 <span className="material-symbols-outlined text-[24px] text-primary">dentistry</span>
               )}
             </div>
-            <div>
-              <span className="text-lg font-bold tracking-tight text-primary block leading-tight">Smile Clinic</span>
+            <div className="min-w-0">
+              <span className="text-lg font-bold tracking-tight text-primary block leading-tight truncate">Smile Clinic</span>
               <span className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider">Prescription Portal</span>
             </div>
           </div>
-
-          {/* Navigation Clinical Search Bar */}
-          <div className="px-3 pt-3 pb-1">
+          {isMobile && (
             <button
-              type="button"
-              onClick={() => {
-                setIsSearchOpen(true);
-                setSidebarOpen(false);
-              }}
-              className="w-full h-9 px-3 rounded-xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high text-xs text-outline flex items-center justify-between transition-all cursor-pointer group shadow-2xs"
-              title="Search clinical records or actions (⌘K)"
+              onClick={() => setSidebarOpen(false)}
+              className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors duration-150 cursor-pointer"
+              aria-label="Close menu"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="material-symbols-outlined text-[17px] text-outline group-hover:text-primary transition-colors">
-                  search
-                </span>
-                <span className="truncate font-medium text-outline group-hover:text-on-surface">
-                  {searchQuery.trim() ? searchQuery : 'Search records...'}
-                </span>
-              </div>
-              <kbd className="text-[10px] bg-surface-container-high text-outline px-1.5 py-0.5 rounded border border-surface-container-highest font-mono shrink-0">
-                ⌘K
-              </kbd>
+              <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="p-3 space-y-1 mt-1">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
-              return (
-                <motion.button
-                  key={item.name}
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    navigate(item.path);
-                    setSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center px-4 py-3 rounded-xl transition-all text-xs font-semibold ${
-                    isActive
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
-                  }`}
-                >
-                  <span className={`material-symbols-outlined mr-3 text-[20px] ${isActive ? 'text-white' : 'text-on-surface-variant'}`}>
-                    {item.icon}
-                  </span>
-                  {item.name}
-                </motion.button>
-              );
-            })}
-          </nav>
+          )}
         </div>
 
-        {/* Sidebar Footer - Clinician Card & Logout */}
-        <div className="p-4 space-y-3 border-t border-surface-container-high">
-          {/* Clinician Card */}
-          <div className="p-2.5 bg-surface-container-lowest rounded-xl border border-surface-container-high flex items-center gap-2.5 shadow-xs">
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/10 text-primary flex items-center justify-center shrink-0 font-bold text-xs ring-1 ring-primary/20">
-              {prescriberInitials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-on-surface truncate">{prescriberName}</div>
-              <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active Prescriber
-              </div>
-            </div>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-error hover:bg-error-container/40 transition-all font-semibold text-xs cursor-pointer"
+        {/* Navigation Clinical Search Bar */}
+        <div className="px-3 pt-3 pb-1">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSearchOpen(true);
+              if (isMobile) setSidebarOpen(false);
+            }}
+            className="w-full h-9 px-3 rounded-xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high text-xs text-outline flex items-center justify-between transition-colors duration-150 cursor-pointer group shadow-2xs"
+            title="Search clinical records or actions (⌘K)"
           >
-            <span className="material-symbols-outlined text-[16px]">logout</span>
-            Lock / Log Out
-          </motion.button>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-[17px] text-outline group-hover:text-primary transition-colors duration-150">
+                search
+              </span>
+              <span className="truncate font-medium text-outline group-hover:text-on-surface">
+                {searchQuery.trim() ? searchQuery : 'Search records...'}
+              </span>
+            </div>
+            <kbd className="text-[10px] bg-surface-container-high text-outline px-1.5 py-0.5 rounded border border-surface-container-highest font-mono shrink-0">
+              ⌘K
+            </kbd>
+          </button>
         </div>
+
+        {/* Navigation Links with Shared layoutId Pill */}
+        <nav className="p-3 space-y-1 mt-1">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+            return (
+              <button
+                key={item.name}
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                className={`relative w-full flex items-center px-4 py-3 rounded-xl transition-colors duration-150 text-xs font-semibold select-none cursor-pointer ${
+                  isActive
+                    ? 'text-white'
+                    : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
+                }`}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="activeSidebarItem"
+                    className="absolute inset-0 bg-primary rounded-xl shadow-xs"
+                    transition={{ duration: 0.25, ease: EASE }}
+                  />
+                )}
+                <span className={`material-symbols-outlined mr-3 text-[20px] relative z-10 ${isActive ? 'text-white' : 'text-on-surface-variant'}`}>
+                  {item.icon}
+                </span>
+                <span className="relative z-10">{item.name}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Sidebar Footer - Clinician Card & Logout */}
+      <div className="p-4 space-y-3 border-t border-surface-container-high">
+        <div className="p-2.5 bg-surface-container-lowest rounded-xl border border-surface-container-high flex items-center gap-2.5 shadow-2xs">
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/10 text-primary flex items-center justify-center shrink-0 font-bold text-xs ring-1 ring-primary/20">
+            {prescriberInitials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-bold text-on-surface truncate">{prescriberName}</div>
+            <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active Prescriber
+            </div>
+          </div>
+        </div>
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          transition={buttonTapTransition}
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-error hover:bg-error-container/40 transition-colors duration-150 font-semibold text-xs cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-[16px]">logout</span>
+          Lock / Log Out
+        </motion.button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-background min-h-screen text-on-surface font-sans flex flex-col overflow-x-hidden w-full max-w-full">
+      {/* Mobile Sidebar Drawer */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <>
+            <motion.div
+              key="mobile-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <motion.aside
+              key="mobile-drawer"
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ duration: 0.25, ease: EASE }}
+              className="fixed left-0 top-0 bottom-0 w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-surface-container-high shadow-2xl lg:hidden"
+            >
+              {renderSidebarContent(true)}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Fixed Left Sidebar (Persistent, never re-animates on route change) */}
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-surface-container-lowest z-30 flex-col justify-between border-r border-surface-container-high shadow-none">
+        {renderSidebarContent(false)}
       </aside>
 
-      {/* Top Header & Content Container */}
+      {/* Top Header & Main Outlet Area */}
       <div className="lg:pl-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
         {/* Fixed Header */}
         <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-surface-container-high gap-2 sm:gap-4">
           {/* Left: Mobile Menu + Active Module Context */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
-            {/* Mobile Menu Button */}
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              transition={buttonTapTransition}
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 text-on-surface hover:bg-surface-container rounded-xl cursor-pointer shrink-0"
+              className="lg:hidden p-2 text-on-surface hover:bg-surface-container rounded-xl cursor-pointer shrink-0 transition-colors duration-150"
               aria-label="Open navigation menu"
             >
               <span className="material-symbols-outlined text-2xl">menu</span>
-            </button>
+            </motion.button>
 
-            {/* Clinical Page Title & Status (Desktop & Tablet) */}
+            {/* Title & Status */}
             <div className="hidden sm:flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-2xs">
                 <span className="material-symbols-outlined text-[19px]">
@@ -449,14 +498,14 @@ export default function Layout() {
                   {pageInfo.title}
                 </span>
                 <span className="text-[10px] text-outline flex items-center gap-1.5 font-medium leading-none mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                   Prescription AI v1.0 • Active
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Center: Prescription AI Status Badge (Adaptive for narrow phones) */}
+          {/* Center: Prescription AI Status Badge */}
           <div className="flex items-center justify-center min-w-0">
             <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
               <span className="material-symbols-outlined text-[16px] sm:text-[18px] text-primary">psychology</span>
@@ -465,65 +514,70 @@ export default function Layout() {
               <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] sm:text-[10px] font-bold">
                 v1.0
               </span>
-              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse" title="Prescription AI Online"></span>
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
             </div>
           </div>
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Quick Search Button (Available on all screens) */}
-            <button
+            {/* Quick Search Button */}
+            <motion.button
               type="button"
+              whileTap={{ scale: 0.95 }}
+              transition={buttonTapTransition}
               onClick={() => setIsSearchOpen(true)}
-              className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-all cursor-pointer flex items-center justify-center shadow-2xs"
+              className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors duration-150 cursor-pointer flex items-center justify-center shadow-2xs"
               title="Search clinical records or actions (⌘K)"
               aria-label="Search records"
             >
               <span className="material-symbols-outlined text-[19px] sm:text-[20px] text-outline hover:text-primary">search</span>
-            </button>
+            </motion.button>
 
             {/* Quick Action Button: New Check */}
-            <button
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              transition={buttonTapTransition}
               onClick={() => navigate('/check')}
-              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-hover active:scale-95 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-hover transition-colors duration-150 flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
               title="Start New Prescription Safety Check"
             >
               <span className="material-symbols-outlined text-[17px] sm:text-[18px] shrink-0">add_circle</span>
               <span className="text-xs font-bold whitespace-nowrap hidden sm:inline">New Check</span>
-            </button>
+            </motion.button>
 
             {/* Notifications Dropdown */}
             <div className="relative" ref={notifDropdownRef}>
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                transition={buttonTapTransition}
                 onClick={() => {
                   setNotificationsOpen(!notificationsOpen);
                   setProfileOpen(false);
                 }}
-                className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-all relative cursor-pointer"
+                className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors duration-150 relative cursor-pointer"
                 title="Notifications"
                 aria-label="Clinical notifications"
               >
                 <span className="material-symbols-outlined text-[20px] block">notifications</span>
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-2xs">
                     {unreadCount}
                   </span>
                 )}
-              </button>
+              </motion.button>
 
               <AnimatePresence>
                 {notificationsOpen && (
                   <>
-                    {/* Mobile Backdrop for safe touch dismissal */}
                     <div
                       className="fixed inset-0 bg-black/30 backdrop-blur-2xs z-40 sm:hidden"
                       onClick={() => setNotificationsOpen(false)}
                     />
                     <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.15, ease: EASE }}
                       className="fixed top-16 left-3 right-3 max-w-sm mx-auto sm:absolute sm:top-12 sm:left-auto sm:right-0 sm:w-96 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-50"
                     >
                       <div className="p-4 border-b border-surface-container-low flex items-center justify-between">
@@ -576,32 +630,34 @@ export default function Layout() {
 
             {/* Profile Dropdown */}
             <div className="relative" ref={profileDropdownRef}>
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                transition={buttonTapTransition}
                 onClick={() => {
                   setProfileOpen(!profileOpen);
                   setNotificationsOpen(false);
                 }}
-                className="flex items-center gap-1.5 p-1 sm:p-1.5 rounded-xl hover:bg-surface-container-high transition-all cursor-pointer"
+                className="flex items-center gap-1.5 p-1 sm:p-1.5 rounded-xl hover:bg-surface-container-high transition-colors duration-150 cursor-pointer"
                 aria-label="Clinician profile options"
               >
                 <div className="w-8 h-8 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-xs">
                   {prescriberInitials}
                 </div>
                 <span className="material-symbols-outlined text-[18px] text-outline hidden sm:block">arrow_drop_down</span>
-              </button>
+              </motion.button>
 
               <AnimatePresence>
                 {profileOpen && (
                   <>
-                    {/* Mobile Backdrop */}
                     <div
                       className="fixed inset-0 bg-black/30 backdrop-blur-2xs z-40 sm:hidden"
                       onClick={() => setProfileOpen(false)}
                     />
                     <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.15, ease: EASE }}
                       className="fixed top-16 right-3 left-auto w-64 max-w-[calc(100vw-24px)] sm:absolute sm:top-12 sm:right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-2 z-50 space-y-1"
                     >
                       <div className="p-3 border-b border-surface-container-low bg-surface-container-low/30 rounded-t-xl space-y-1.5">
@@ -628,63 +684,68 @@ export default function Layout() {
                           setProfileOpen(false);
                           navigate('/settings');
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors duration-150 cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[18px] text-outline">settings</span>
                         Portal Settings
                       </button>
 
-                    <Link
-                      to="/support"
-                      onClick={() => setProfileOpen(false)}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-primary">support_agent</span>
-                      Support & Helpdesk
-                    </Link>
-
-                    <Link
-                      to="/patient-rights"
-                      onClick={() => setProfileOpen(false)}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-primary">assignment_turned_in</span>
-                      Patient Rights
-                    </Link>
-
-                    <div className="border-t border-surface-container-low pt-1">
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-error hover:bg-error-container/30 transition-colors"
+                      <Link
+                        to="/support"
+                        onClick={() => setProfileOpen(false)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors duration-150"
                       >
-                        <span className="material-symbols-outlined text-[18px]">logout</span>
-                        Lock Session
-                      </button>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+                        <span className="material-symbols-outlined text-[18px] text-primary">support_agent</span>
+                        Support &amp; Helpdesk
+                      </Link>
+
+                      <Link
+                        to="/patient-rights"
+                        onClick={() => setProfileOpen(false)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-on-surface hover:bg-surface-container-high transition-colors duration-150"
+                      >
+                        <span className="material-symbols-outlined text-[18px] text-primary">assignment_turned_in</span>
+                        Patient Rights
+                      </Link>
+
+                      <div className="border-t border-surface-container-low pt-1">
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          transition={buttonTapTransition}
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-error hover:bg-error-container/30 transition-colors duration-150 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">logout</span>
+                          Lock Session
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </header>
 
-        {/* 5. Main Nested Content Route with Fluid Page Transitions */}
+        {/* Content Route with Page Transition */}
         <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto min-h-[calc(100vh-140px)]">
           <ErrorBoundary fallbackTitle="Unable to load this clinical safety view">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-              className="w-full"
-            >
-              <Outlet />
-            </motion.div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={location.pathname}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={pageTransitionVariants}
+                className="w-full"
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
           </ErrorBoundary>
         </main>
 
-        {/* 6. Standard Legal Footer */}
+        {/* Standard Legal Footer */}
         <footer className="w-full bg-surface-container-low py-4 border-t border-surface-container-high px-4 sm:px-6 lg:px-8 mt-auto z-20">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-on-surface-variant text-xs text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-1.5">
@@ -713,23 +774,23 @@ export default function Layout() {
       <AnimatePresence>
         {isSearchOpen && (
           <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 sm:pt-20 px-3 sm:px-4">
-            {/* Backdrop Overlay */}
+            {/* Backdrop */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={modalVariants.backdrop}
               onClick={() => setIsSearchOpen(false)}
-              className="fixed inset-0 bg-black/45 backdrop-blur-xs"
+              className="fixed inset-0 bg-black/50 backdrop-blur-xs"
             />
 
             {/* Modal Dialog Window */}
             <motion.div
               ref={searchContainerRef}
-              initial={{ opacity: 0, y: -16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -16, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={modalVariants.panel}
               className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col max-h-[82vh] divide-y divide-surface-container-low"
             >
               {/* Search Bar Input */}
@@ -750,7 +811,7 @@ export default function Layout() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high cursor-pointer"
+                    className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high cursor-pointer transition-colors duration-150"
                     title="Clear search"
                   >
                     <span className="material-symbols-outlined text-[16px]">close</span>
@@ -795,15 +856,17 @@ export default function Layout() {
                   </div>
                 ) : (
                   filteredSearchItems.map((item) => (
-                    <button
+                    <motion.button
                       key={item.id}
                       type="button"
+                      whileTap={{ scale: 0.99 }}
+                      transition={buttonTapTransition}
                       onClick={() => {
                         navigate(item.path);
                         setIsSearchOpen(false);
                         setSearchQuery('');
                       }}
-                      className="w-full p-3 text-left hover:bg-surface-container-low flex items-center justify-between gap-3 transition-colors cursor-pointer"
+                      className="w-full p-3 text-left hover:bg-surface-container-low flex items-center justify-between gap-3 transition-colors duration-150 cursor-pointer"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
@@ -837,7 +900,7 @@ export default function Layout() {
                           {item.badge}
                         </span>
                       )}
-                    </button>
+                    </motion.button>
                   ))
                 )}
               </div>

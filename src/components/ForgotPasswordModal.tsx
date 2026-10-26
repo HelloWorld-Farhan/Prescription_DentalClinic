@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, modalVariants, buttonTapTransition, EASE } from '../lib/motion';
 import OtpVerificationInput from './OtpVerificationInput';
 import PasswordStrengthMeter from './PasswordStrengthMeter';
 import { authApi } from '../services/authApi';
@@ -266,19 +266,20 @@ export default function ForgotPasswordModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
         {/* Backdrop */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          variants={modalVariants.backdrop}
           onClick={onClose}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs"
         />
 
         {/* Modal Window Container */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 16 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 16 }}
-          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          variants={modalVariants.panel}
           className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col"
         >
           {/* Top Clinical Header Strip */}

@@ -1,11 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  motion,
+  AnimatePresence,
+  fadeUpVariants,
+  staggerVariants,
+  toastVariants,
+  buttonTapTransition,
+  EASE
+} from '../lib/motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
 import { SafetyCheckRecord, DrugInteractionAlert } from '../types';
 import PrintableReportModal from '../components/PrintableReportModal';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CustomDropdown from '../components/CustomDropdown';
+import AnimatedCounter from '../components/AnimatedCounter';
 
 interface LiveSyncBadgeProps {
   onSync: () => void;
@@ -31,8 +40,8 @@ const LiveSyncBadge = function LiveSyncBadge({ onSync }: LiveSyncBadgeProps) {
   }, [onSync]);
 
   return (
-    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs border border-surface-container-high/60 transition-all select-none gpu-layer">
-      <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-ping' : 'bg-primary animate-pulse'}`}></span>
+    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs shadow-xs border border-surface-container-high/60 transition-colors duration-150 select-none">
+      <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500' : 'bg-primary'}`}></span>
       <span className={`material-symbols-outlined text-[15px] text-primary transition-transform ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
       <span className="font-medium">Live Sync: {isSyncing ? 'Syncing...' : `Just now (${seconds}s)`}</span>
     </div>
@@ -45,6 +54,12 @@ export default function Dashboard() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, []);
+
+  const hasMountedRef = useRef(false);
+  useEffect(() => {
+    hasMountedRef.current = true;
+  }, []);
+
   const [selectedUnit, setSelectedUnit] = useState('All Units');
   const [timeRange, setTimeRange] = useState('Today');
   const [searchFilter, setSearchFilter] = useState('');
@@ -58,7 +73,6 @@ export default function Dashboard() {
   const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
   const highSeverityCount = checks.filter(c => c.alerts.some(a => a.severity === 'contraindicated' && !a.overridden)).length;
   const inQueueCount = checks.filter(c => c.overallStatus === 'Requires Review' || c.overallStatus === 'Contraindicated').length;
-  const unableToAssessCount = checks.filter(c => c.alerts.some(a => a.severity === 'moderate' || a.severity === 'minor')).length;
   const rulesCount = VirtualDb.getRules().length;
   const priorityAlerts = checks
     .flatMap(c => (c.alerts || []).map(a => ({ check: c, alert: a })))
@@ -107,23 +121,6 @@ export default function Dashboard() {
     }, 800);
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.05 }
-    }
-  };
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { type: 'spring' as const, stiffness: 350, damping: 26 }
-    }
-  };
-
   return (
     <div className="flex flex-col w-full gap-6">
       {/* 1. TOP CONTEXT & FILTER BAR */}
@@ -140,26 +137,34 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Quick shift / dept / time filter */}
+        {/* Quick shift / dept / time filter with sliding layoutId indicator */}
         <div className="flex items-center gap-2 flex-wrap max-w-full">
           <div className="w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 max-w-full">
             <div className="inline-flex p-1 bg-surface-container-high rounded-xl text-on-surface whitespace-nowrap">
-              {units.map((unit) => (
-                <motion.button
-                  type="button"
-                  key={unit}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedUnit(unit)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap ${
-                    selectedUnit === unit
-                      ? 'bg-surface-container-lowest text-primary shadow-xs font-bold'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  {unit}
-                </motion.button>
-              ))}
+              {units.map((unit) => {
+                const isSelected = selectedUnit === unit;
+                return (
+                  <button
+                    type="button"
+                    key={unit}
+                    onClick={() => setSelectedUnit(unit)}
+                    className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors duration-150 ${
+                      isSelected
+                        ? 'text-primary font-bold'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    {isSelected && (
+                      <motion.div
+                        layoutId="activeUnitTab"
+                        className="absolute inset-0 bg-surface-container-lowest rounded-lg shadow-2xs"
+                        transition={{ duration: 0.2, ease: EASE }}
+                      />
+                    )}
+                    <span className="relative z-10">{unit}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="h-6 w-px bg-surface-container-highest mx-1 hidden sm:block"></div>
@@ -178,26 +183,28 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* 2. FOUR STAT CARDS (Cascading Spring Entrance) */}
+      {/* 2. FOUR STAT CARDS */}
       <motion.section
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+        variants={hasMountedRef.current ? undefined : staggerVariants}
+        initial={hasMountedRef.current ? false : "initial"}
+        animate={hasMountedRef.current ? false : "animate"}
         className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-w-0 max-w-full"
       >
         {/* Card 1: Checks Today */}
         <motion.div
-          variants={cardVariants}
-          whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-primary/50 cursor-pointer"
+          variants={fadeUpVariants}
+          whileHover={{ y: -2 }}
+          transition={{ duration: 0.2, ease: EASE }}
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-primary/50 cursor-pointer transition-colors duration-150"
           onClick={() => navigate('/check')}
         >
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Checks Today</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">{checks.length}</span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">
+                  <AnimatedCounter value={checks.length} />
+                </span>
                 <span className="inline-flex items-center text-xs text-primary font-bold">
                   <span className="material-symbols-outlined text-[14px]">
                     {checks.length > 0 ? 'trending_up' : 'check_circle'}
@@ -206,12 +213,11 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:scale-105 group-hover:bg-primary group-hover:text-on-primary transition-colors shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors duration-150 shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">fact_check</span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-surface-container">
-            {/* Mini sparkline */}
             <div className="flex items-end gap-1 h-5 mb-2 opacity-80">
               <div className="w-full bg-primary-fixed-dim rounded-t" style={{ height: checks.length > 0 ? '40%' : '15%' }}></div>
               <div className="w-full bg-primary-fixed-dim rounded-t" style={{ height: checks.length > 0 ? '60%' : '15%' }}></div>
@@ -230,11 +236,11 @@ export default function Dashboard() {
                   e.stopPropagation();
                   navigate('/check');
                 }}
-                className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary hover:text-on-primary transition-colors text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
+                className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary hover:text-on-primary transition-colors duration-150 text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
                 title="Start New Safety Check"
               >
                 <span>New Check</span>
-                <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
+                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
               </button>
             </div>
           </div>
@@ -242,17 +248,19 @@ export default function Dashboard() {
 
         {/* Card 2: Alerts In Queue */}
         <motion.div
-          variants={cardVariants}
-          whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#975A16]/50 cursor-pointer"
+          variants={fadeUpVariants}
+          whileHover={{ y: -2 }}
+          transition={{ duration: 0.2, ease: EASE }}
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#975A16]/50 cursor-pointer transition-colors duration-150"
           onClick={() => navigate('/alerts')}
         >
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Alerts In Queue</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">{inQueueCount}</span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">
+                  <AnimatedCounter value={inQueueCount} />
+                </span>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
                   inQueueCount > 0 ? 'bg-[#FEF3C7] text-[#975A16]' : 'bg-emerald-100 text-emerald-800'
                 }`}>
@@ -260,7 +268,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center text-[#975A16] group-hover:scale-105 group-hover:bg-[#975A16] group-hover:text-white transition-colors shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center text-[#975A16] group-hover:bg-[#975A16] group-hover:text-white transition-colors duration-150 shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">pending_actions</span>
             </div>
           </div>
@@ -274,24 +282,23 @@ export default function Dashboard() {
                 e.stopPropagation();
                 navigate('/alerts');
               }}
-              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#975A16] bg-[#FEF3C7] hover:bg-[#975A16] hover:text-white transition-colors text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
+              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#975A16] bg-[#FEF3C7] hover:bg-[#975A16] hover:text-white transition-colors duration-150 text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
               title="Open Alerts Queue"
             >
               <span>View Queue</span>
-              <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
             </button>
           </div>
         </motion.div>
 
         {/* Card 3: High-Severity Open */}
         <motion.div
-          variants={cardVariants}
-          whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-error/50 relative overflow-hidden cursor-pointer"
+          variants={fadeUpVariants}
+          whileHover={{ y: -2 }}
+          transition={{ duration: 0.2, ease: EASE }}
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-error/50 relative overflow-hidden cursor-pointer transition-colors duration-150"
           onClick={() => navigate('/alerts?q=contraindicated')}
         >
-          <div className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full bg-error-container/30 pointer-events-none"></div>
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] uppercase tracking-wider text-outline font-bold">High-Severity Open</span>
@@ -299,7 +306,7 @@ export default function Dashboard() {
                 <span className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
                   highSeverityCount > 0 ? 'text-error' : 'text-on-surface'
                 }`}>
-                  {highSeverityCount}
+                  <AnimatedCounter value={highSeverityCount} />
                 </span>
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
                   highSeverityCount > 0 ? 'bg-[#FFDAD6] text-[#BA1A1A]' : 'bg-emerald-100 text-emerald-800'
@@ -311,7 +318,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FFDAD6] flex items-center justify-center text-[#BA1A1A] group-hover:scale-105 group-hover:bg-[#BA1A1A] group-hover:text-white transition-colors shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-[#FFDAD6] flex items-center justify-center text-[#BA1A1A] group-hover:bg-[#BA1A1A] group-hover:text-white transition-colors duration-150 shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">warning</span>
             </div>
           </div>
@@ -325,35 +332,37 @@ export default function Dashboard() {
                 e.stopPropagation();
                 navigate('/alerts?q=contraindicated');
               }}
-              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#BA1A1A] bg-[#FFDAD6] hover:bg-[#BA1A1A] hover:text-white transition-colors text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
+              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#BA1A1A] bg-[#FFDAD6] hover:bg-[#BA1A1A] hover:text-white transition-colors duration-150 text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
               title="Inspect Urgent Contraindicated Alerts"
             >
               <span>Inspect Urgent</span>
-              <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
             </button>
           </div>
         </motion.div>
 
         {/* Card 4: Rules & Clinical Data */}
         <motion.div
-          variants={cardVariants}
-          whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#553C9A]/50 cursor-pointer"
+          variants={fadeUpVariants}
+          whileHover={{ y: -2 }}
+          transition={{ duration: 0.2, ease: EASE }}
+          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#553C9A]/50 cursor-pointer transition-colors duration-150"
           onClick={() => navigate('/rules')}
         >
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Rules &amp; Data</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">{rulesCount}</span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">
+                  <AnimatedCounter value={rulesCount} />
+                </span>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#FAF5FF] text-[#553C9A] font-bold">
                   <span className="material-symbols-outlined text-[13px]">verified</span>
                   <span>Active Rules</span>
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#553C9A] group-hover:scale-105 group-hover:bg-[#553C9A] group-hover:text-white transition-colors shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#553C9A] group-hover:bg-[#553C9A] group-hover:text-white transition-colors duration-150 shadow-2xs">
               <span className="material-symbols-outlined text-[22px]">database</span>
             </div>
           </div>
@@ -367,11 +376,11 @@ export default function Dashboard() {
                 e.stopPropagation();
                 navigate('/rules');
               }}
-              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#553C9A] bg-[#FAF5FF] hover:bg-[#553C9A] hover:text-white transition-colors text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
+              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#553C9A] bg-[#FAF5FF] hover:bg-[#553C9A] hover:text-white transition-colors duration-150 text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
               title="Manage Clinical CDS Rules & Data"
             >
               <span>Rules &amp; Data</span>
-              <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
             </button>
           </div>
         </motion.div>
@@ -379,7 +388,7 @@ export default function Dashboard() {
 
       {/* 3. 2-COLUMN MAIN CONTENT (8 cols Left / 4 cols Right) */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-w-0 max-w-full">
-        {/* LEFT COLUMN (8 cols): Recent Checks Table */}
+        {/* LEFT COLUMN: Recent Checks Table */}
         <div className="lg:col-span-8 flex flex-col gap-4 bg-surface-container-lowest rounded-2xl p-4 sm:p-6 shadow-xs border border-surface-container-high/60 min-w-0 max-w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container">
             <div>
@@ -402,17 +411,19 @@ export default function Dashboard() {
                   className="bg-transparent text-xs outline-none text-on-surface placeholder:text-outline w-36 sm:w-44"
                 />
               </div>
-              <button
+              <motion.button
                 type="button"
+                whileTap={{ scale: 0.95 }}
+                transition={buttonTapTransition}
                 onClick={handleBatchSync}
                 aria-label="Refresh check feed"
-                className="p-2 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-colors"
+                className="p-2 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-colors duration-150 cursor-pointer"
                 title="Refresh feed"
               >
                 <span className={`material-symbols-outlined text-[18px] ${isBatchSyncing ? 'animate-spin' : ''}`}>
                   refresh
                 </span>
-              </button>
+              </motion.button>
             </div>
           </div>
 
@@ -443,10 +454,10 @@ export default function Dashboard() {
                         </p>
                         <motion.button
                           type="button"
-                          whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
+                          transition={buttonTapTransition}
                           onClick={() => navigate('/check')}
-                          className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer"
+                          className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover transition-colors duration-150"
                         >
                           <span className="material-symbols-outlined text-[16px]">add_circle</span>
                           <span>Start New Safety Check</span>
@@ -460,14 +471,14 @@ export default function Dashboard() {
                     const hasMajor = check.alerts.some(a => a.severity === 'major');
 
                     return (
-                      <tr key={check.id} className="hover:bg-surface-container-low/60 transition-colors">
+                      <tr key={check.id} className="hover:bg-surface-container-low/60 transition-colors duration-150">
                         <td className="py-3 px-2">
                           <div className="flex items-center gap-1 font-mono font-bold text-xs text-primary">
                             <span>{check.checkNumber}</span>
                             <button
                               type="button"
                               onClick={() => navigator.clipboard.writeText(check.checkNumber)}
-                              className="text-outline hover:text-primary"
+                              className="text-outline hover:text-primary transition-colors duration-150 cursor-pointer"
                               title="Copy ID"
                             >
                               <span className="material-symbols-outlined text-[13px]">content_copy</span>
@@ -533,22 +544,26 @@ export default function Dashboard() {
 
                         <td className="py-3 px-2 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
+                            <motion.button
                               type="button"
+                              whileTap={{ scale: 0.98 }}
+                              transition={buttonTapTransition}
                               onClick={() => setActiveReportCheck(check)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors duration-150 text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
                               title="Open Clinical Decision Report"
                             >
                               <span className="material-symbols-outlined text-[15px] text-primary">description</span>
                               <span>Report</span>
-                            </button>
-                            <button
+                            </motion.button>
+                            <motion.button
                               type="button"
+                              whileTap={{ scale: 0.98 }}
+                              transition={buttonTapTransition}
                               onClick={() => handleInspect(check)}
-                              className="px-3 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors text-xs font-bold cursor-pointer"
+                              className="px-3 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors duration-150 text-xs font-bold cursor-pointer"
                             >
                               Inspect
-                            </button>
+                            </motion.button>
                           </div>
                         </td>
                       </tr>
@@ -568,7 +583,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => navigate('/audit-log')}
-                className="text-xs text-primary hover:underline font-bold flex items-center gap-1"
+                className="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer transition-colors duration-150"
               >
                 <span>View Full Audit Registry</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -577,51 +592,57 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN (4 cols): Action CTA & Critical Review Queue */}
+        {/* RIGHT COLUMN: Action CTA & Critical Review Queue */}
         <div className="lg:col-span-4 flex flex-col gap-5 min-w-0 max-w-full">
           {/* CTAs Card */}
           <div className="flex flex-col gap-2.5">
             <motion.button
               type="button"
-              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
+              transition={buttonTapTransition}
               onClick={() => navigate('/check')}
-              className="w-full flex items-center justify-center gap-2 bg-primary-container text-on-primary py-3 px-4 rounded-xl shadow-sm hover:bg-primary transition-colors group text-sm font-bold cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 bg-primary-container text-on-primary py-3 px-4 rounded-xl shadow-sm hover:bg-primary transition-colors duration-150 group text-sm font-bold cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[20px] transition-transform group-hover:scale-110">
+              <span className="material-symbols-outlined text-[20px]">
                 add_circle
               </span>
               <span>Start New Safety Check</span>
             </motion.button>
             <div className="grid grid-cols-2 gap-2">
-              <button
+              <motion.button
                 type="button"
+                whileTap={{ scale: 0.98 }}
+                transition={buttonTapTransition}
                 onClick={handleBatchSync}
-                className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container shadow-xs text-xs font-semibold border border-surface-container-high transition-colors cursor-pointer"
+                className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container shadow-xs text-xs font-semibold border border-surface-container-high transition-colors duration-150 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">cloud_download</span>
                 <span>Batch EHR Sync</span>
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 type="button"
+                whileTap={{ scale: 0.98 }}
+                transition={buttonTapTransition}
                 onClick={() => navigate('/check')}
-                className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container shadow-xs text-xs font-semibold border border-surface-container-high transition-colors cursor-pointer"
+                className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container shadow-xs text-xs font-semibold border border-surface-container-high transition-colors duration-150 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
                 <span>Scan Rx Barcode</span>
-              </button>
+              </motion.button>
             </div>
-            <button
+            <motion.button
               type="button"
+              whileTap={{ scale: 0.98 }}
+              transition={buttonTapTransition}
               onClick={() => navigate('/report')}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-surface-container-low text-secondary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-surface-container-low text-secondary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors duration-150 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px] text-primary">description</span>
               <span>Open Printable CDS Verification Report</span>
-            </button>
+            </motion.button>
           </div>
 
-          {/* High Priority Queue Card (Dynamic & Clean Initial Phase) */}
+          {/* High Priority Queue Card */}
           <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col gap-3">
             <div className="flex items-center justify-between pb-2 border-b border-surface-container">
               <div className="flex items-center gap-2">
@@ -657,7 +678,7 @@ export default function Dashboard() {
               priorityAlerts.map(({ check, alert }) => (
                 <div
                   key={alert.id}
-                  className="bg-surface-container-low rounded-xl p-3 flex flex-col gap-1 hover:bg-surface-container border border-surface-container-high/40 transition-colors"
+                  className="bg-surface-container-low rounded-xl p-3 flex flex-col gap-1 hover:bg-surface-container border border-surface-container-high/40 transition-colors duration-150"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -714,9 +735,10 @@ export default function Dashboard() {
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            variants={toastVariants}
             className="fixed top-20 right-6 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-emerald-500 backdrop-blur-md"
           >
             <span className="material-symbols-outlined text-[20px] text-emerald-200">verified</span>

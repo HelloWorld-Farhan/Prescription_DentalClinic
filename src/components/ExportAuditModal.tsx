@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, modalVariants, buttonTapTransition, EASE } from '../lib/motion';
 
 export interface AuditLogItem {
   id: string;
@@ -125,19 +125,20 @@ export default function ExportAuditModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
           {/* Backdrop */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            variants={modalVariants.backdrop}
             onClick={handleModalClose}
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm cursor-pointer"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs cursor-pointer"
           />
 
           {/* Dialog Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 12 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            variants={modalVariants.panel}
             className="relative w-full max-w-lg bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col"
           >
             {/* Header */}

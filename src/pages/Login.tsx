@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  motion,
+  AnimatePresence,
+  fadeUpVariants,
+  fadeVariants,
+  bannerVariants,
+  modalVariants,
+  popCheckVariants,
+  buttonTapTransition,
+  EASE
+} from '../lib/motion';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import OtpVerificationInput from '../components/OtpVerificationInput';
 import AuthInfoPanel from '../components/AuthInfoPanel';
@@ -74,7 +84,7 @@ export default function Login() {
   const getEmailError = (val: string): string | null => {
     const trimmed = val.trim();
     if (!trimmed) return 'Email address is required.';
-    if (/^NPI#?\s*\d{8,12}$/i.test(trimmed)) return null; // Allow valid NPI license format
+    if (/^NPI#?\s*\d{8,12}$/i.test(trimmed)) return null;
     if (!trimmed.includes('@')) return 'Email must contain an "@" symbol (e.g. name@gmail.com).';
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     if (!emailRegex.test(trimmed)) return 'Please enter a valid domain (e.g. name@gmail.com).';
@@ -110,10 +120,8 @@ export default function Login() {
     setErrorMessage(null);
 
     try {
-      // 1. Attempt API authentication against the backend database
       const res = await authApi.login(inputEmail, inputPass, rememberDevice, getDeviceId());
 
-      // If Remember Device is unchecked, backend requires step-up 2FA OTP verification
       if (res.status === 'otp_required') {
         setLoginOtp(Array(6).fill(''));
         setLoginOtpStatus('idle');
@@ -140,48 +148,35 @@ export default function Login() {
       const errMsg = apiErr.message || 'Invalid credentials. No registered clinician account matches these credentials.';
       setErrorMessage(errMsg);
 
-      // If account is locked due to 3 failed attempts, record audit event and pop open Reset Password modal
       if (errMsg.toLowerCase().includes('account locked') || errMsg.toLowerCase().includes('3 failed login attempts')) {
         recordLoginEvent('Blocked', errMsg, inputEmail);
         setTimeout(() => {
           setShowForgotPasswordModal(true);
         }, 1100);
-      } else if (errMsg.toLowerCase().includes('not verified')) {
-        // Unverified account: backend dispatched verification code to their email
-        setTimeout(() => {
-          setShowLoginOtpModal(true);
-        }, 800);
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleVerifyLoginOtp = async (e?: React.FormEvent, directCode?: string) => {
+  const handleVerifyLoginOtp = async (e?: React.FormEvent, customCode?: string) => {
     if (e) e.preventDefault();
-    const entered = directCode || loginOtp.join('');
-    if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
-      setLoginOtpError('Please enter all 6 numeric digits of your sign-in verification code.');
-      setLoginOtpStatus('error');
-      setTimeout(() => setLoginOtpStatus('idle'), 1500);
+    const finalCode = customCode || loginOtp.join('');
+    if (finalCode.length < 6) {
+      setLoginOtpError('Please enter the complete 6-digit passcode.');
       return;
     }
 
     setIsVerifyingLoginOtp(true);
-    setLoginOtpStatus('verifying');
     setLoginOtpError(null);
+    setLoginOtpStatus('verifying');
 
     try {
-      const res = await authApi.verifyLoginOtp(
-        clinicalId.trim().toLowerCase(),
-        entered,
-        rememberDevice,
-        getDeviceId()
-      );
+      const res = await authApi.verifyLoginOtp(clinicalId.trim().toLowerCase(), finalCode, rememberDevice, getDeviceId());
       if (res.token && res.user) {
         setLoginOtpStatus('success');
         authApi.saveSession(res.token, res.user);
-        recordLoginEvent('2FA Verified', `Two-Factor sign-in OTP challenge verified (${res.user.fullName})`, res.user.email);
+        recordLoginEvent('Success', `2FA Step-up verified session (${res.user.fullName})`, res.user.email);
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
           localStorage.setItem('smileclinic_remembered_email', clinicalId.trim().toLowerCase());
@@ -192,7 +187,7 @@ export default function Login() {
         setTimeout(() => {
           setShowLoginOtpModal(false);
           navigate('/dashboard');
-        }, 1200);
+        }, 400);
       }
     } catch (err: any) {
       setLoginOtpError(err.message || 'Invalid or expired sign-in code.');
@@ -232,7 +227,6 @@ export default function Login() {
       setErrorMessage(null);
       const googleUser = await signInWithGooglePopup();
       if (!googleUser) {
-        // User closed or dismissed the popup
         return;
       }
 
@@ -269,9 +263,9 @@ export default function Login() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      initial="initial"
+      animate="animate"
+      variants={fadeVariants}
       className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden"
     >
       {/* Global Clinical Header */}
@@ -310,35 +304,26 @@ export default function Login() {
         </div>
       </header>
 
-      {/* Main 2-Column Split Viewport: Left = Login Form, Right = Prescription Video */}
+      {/* Main 2-Column Split Viewport: Left = Login Form, Right = Info Panel */}
       <main className="flex-1 flex items-center justify-center py-4 sm:py-10 px-2.5 sm:px-4 relative z-10">
         <div className="w-full max-w-6xl mx-auto">
-          {/* High-Modern Floating Ambient Teal & Cyan Orbs */}
+          {/* Static Soft Clinical Ambient Background Gradient */}
           <div className="relative">
-            <motion.div
-              animate={{
-                scale: [1, 1.1, 1],
-                opacity: [0.2, 0.4, 0.2],
-                x: [0, 20, 0],
-                y: [0, -20, 0]
-              }}
-              transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute -top-24 left-1/4 -translate-x-1/2 w-[340px] sm:w-[550px] h-[260px] sm:h-[380px] bg-primary/15 rounded-full blur-2xl sm:blur-3xl pointer-events-none -z-10 gpu-layer"
-            />
+            <div className="absolute -top-24 left-1/4 -translate-x-1/2 w-[340px] sm:w-[550px] h-[260px] sm:h-[380px] bg-primary/10 rounded-full blur-2xl sm:blur-3xl pointer-events-none -z-10" />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch">
-              {/* LEFT COLUMN: Clean Clinician Login Form (7 cols on lg) */}
+              {/* LEFT COLUMN: Clean Clinician Login Form */}
               <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                initial="initial"
+                animate="animate"
+                variants={fadeUpVariants}
                 className="lg:col-span-7 flex flex-col justify-between"
               >
                 <div className="bg-surface-container-lowest rounded-2xl sm:rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-3.5 sm:p-9 flex flex-col gap-4 sm:gap-6">
                   {/* Top Badge Strip */}
                   <div className="flex items-center justify-between text-on-surface-variant text-[11px] sm:text-xs gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                       <span className="font-semibold text-primary truncate">Secure Clinical Workspace</span>
                     </div>
                     <div className="flex items-center gap-1 text-on-surface-variant/90 font-medium shrink-0">
@@ -364,17 +349,23 @@ export default function Login() {
 
                   {/* Success Flash Notification */}
                   {successFlash && (
-                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2">
+                    <motion.div
+                      initial="initial"
+                      animate="animate"
+                      variants={bannerVariants}
+                      className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2"
+                    >
                       <span className="material-symbols-outlined text-sm shrink-0 mt-0.5 text-emerald-600">check_circle</span>
                       <span>{successFlash}</span>
-                    </div>
+                    </motion.div>
                   )}
 
                   {/* Error / Lockout Alert */}
                   {errorMessage && (
                     <motion.div
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial="initial"
+                      animate="animate"
+                      variants={bannerVariants}
                       className={`p-3.5 rounded-xl border text-xs font-medium flex items-start gap-2.5 shadow-xs ${
                         errorMessage.toLowerCase().includes('account locked')
                           ? 'bg-rose-100/90 border-rose-300 text-rose-950 font-semibold'
@@ -399,11 +390,6 @@ export default function Login() {
                         {errorMessage.toLowerCase().includes('account locked') && (
                           <p className="mt-1 text-[11px] text-rose-800 font-normal">
                             A one-time reset code has been sent to your email. Opening reset window...
-                          </p>
-                        )}
-                        {errorMessage.toLowerCase().includes('not verified') && (
-                          <p className="mt-1 text-[11px] text-teal-800 font-semibold">
-                            Opening email verification window... Please enter the 6-digit code sent to your email.
                           </p>
                         )}
                         {(errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('no registered')) && (
@@ -450,7 +436,7 @@ export default function Login() {
                             setErrorMessage(null);
                           }}
                           placeholder="name@gmail.com"
-                          className={`w-full h-11 pl-10 pr-3 rounded-xl text-on-surface text-sm placeholder:text-outline focus:outline-none transition-all ${
+                          className={`w-full h-11 pl-10 pr-3 rounded-xl text-on-surface text-sm placeholder:text-outline focus:outline-none transition-colors duration-150 ${
                             emailError
                               ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
                               : 'bg-surface-container-low border border-surface-container-high focus:bg-surface-container-lowest focus:border-primary'
@@ -458,10 +444,15 @@ export default function Login() {
                         />
                       </div>
                       {emailError && (
-                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-0.5 animate-fadeIn">
+                        <motion.p
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, ease: EASE }}
+                          className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-0.5"
+                        >
                           <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
                           <span>{emailError}</span>
-                        </p>
+                        </motion.p>
                       )}
                     </div>
 
@@ -493,7 +484,7 @@ export default function Login() {
                             setErrorMessage(null);
                           }}
                           placeholder="••••••••••••"
-                          className={`w-full h-11 pl-10 pr-10 rounded-xl text-on-surface text-sm placeholder:text-outline focus:outline-none transition-all ${
+                          className={`w-full h-11 pl-10 pr-10 rounded-xl text-on-surface text-sm placeholder:text-outline focus:outline-none transition-colors duration-150 ${
                             passwordError
                               ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
                               : 'bg-surface-container-low border border-surface-container-high focus:bg-surface-container-lowest focus:border-primary'
@@ -503,22 +494,36 @@ export default function Login() {
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           aria-label="Toggle password visibility"
-                          className="absolute right-3 text-outline hover:text-on-surface p-1 rounded cursor-pointer"
+                          className="absolute right-3 text-outline hover:text-on-surface p-1 rounded cursor-pointer transition-colors duration-150"
                         >
-                          <span className="material-symbols-outlined text-lg">
-                            {showPassword ? 'visibility' : 'visibility_off'}
-                          </span>
+                          <AnimatePresence mode="wait" initial={false}>
+                            <motion.span
+                              key={showPassword ? 'vis' : 'invis'}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              className="material-symbols-outlined text-lg"
+                            >
+                              {showPassword ? 'visibility' : 'visibility_off'}
+                            </motion.span>
+                          </AnimatePresence>
                         </button>
                       </div>
                       {passwordError && (
-                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-0.5 animate-fadeIn">
+                        <motion.p
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, ease: EASE }}
+                          className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-0.5"
+                        >
                           <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
                           <span>{passwordError}</span>
-                        </p>
+                        </motion.p>
                       )}
                     </div>
 
-                    {/* Remember Device */}
+                    {/* Remember Device Checkbox */}
                     <div className="flex items-center justify-between pt-0.5">
                       <label className="flex items-center gap-2.5 cursor-pointer select-none group">
                         <div className="relative shrink-0">
@@ -528,25 +533,24 @@ export default function Login() {
                             onChange={(e) => setRememberDevice(e.target.checked)}
                             className="sr-only"
                           />
-                          <motion.div
-                            animate={rememberDevice ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                            transition={{ duration: 0.2 }}
-                            className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
+                          <div
+                            className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors duration-150 ${
                               rememberDevice
-                                ? 'bg-primary border-primary text-white shadow-xs'
+                                ? 'bg-primary border-primary text-white shadow-2xs'
                                 : 'bg-white border-outline/50 group-hover:border-primary/60'
                             }`}
                           >
                             {rememberDevice && (
-                              <motion.span
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="material-symbols-outlined text-white text-[13px] font-bold"
-                              >
-                                check
-                              </motion.span>
+                              <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <motion.path
+                                  d="M20 6L9 17L4 12"
+                                  initial="initial"
+                                  animate="animate"
+                                  variants={popCheckVariants}
+                                />
+                              </svg>
                             )}
-                          </motion.div>
+                          </div>
                         </div>
                         <span className="text-xs text-on-surface-variant group-hover:text-on-surface font-medium transition-colors">
                           Remember me on this workstation
@@ -556,7 +560,7 @@ export default function Login() {
 
                     {/* Clinician Authorization Confirmation Card */}
                     <div
-                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                      className={`p-3.5 sm:p-4 rounded-2xl border transition-colors duration-150 ${
                         checkboxError
                           ? 'bg-rose-50/60 border-rose-400 shadow-xs'
                           : authorizedConfirmation
@@ -575,27 +579,26 @@ export default function Login() {
                             }}
                             className="sr-only"
                           />
-                          <motion.div
-                            animate={authorizedConfirmation ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                            transition={{ duration: 0.22 }}
-                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                          <div
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors duration-150 ${
                               authorizedConfirmation
-                                ? 'bg-emerald-600 border-emerald-600 shadow-xs'
+                                ? 'bg-emerald-600 border-emerald-600 shadow-2xs'
                                 : checkboxError
                                 ? 'bg-white border-rose-400'
                                 : 'bg-white border-outline/50 group-hover:border-primary/60'
                             }`}
                           >
                             {authorizedConfirmation && (
-                              <motion.span
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="material-symbols-outlined text-white text-[14px] font-bold"
-                              >
-                                check
-                              </motion.span>
+                              <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <motion.path
+                                  d="M20 6L9 17L4 12"
+                                  initial="initial"
+                                  animate="animate"
+                                  variants={popCheckVariants}
+                                />
+                              </svg>
                             )}
-                          </motion.div>
+                          </div>
                         </div>
                         <div className="flex-1">
                           <span className={`text-xs leading-relaxed font-medium transition-colors block ${
@@ -610,10 +613,15 @@ export default function Login() {
                         </div>
                       </label>
                       {checkboxError && (
-                        <p className="text-[11px] text-rose-600 font-semibold flex items-center gap-1.5 mt-2.5 pt-2 border-t border-rose-200 animate-fadeIn">
+                        <motion.p
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, ease: EASE }}
+                          className="text-[11px] text-rose-600 font-semibold flex items-center gap-1.5 mt-2.5 pt-2 border-t border-rose-200"
+                        >
                           <span className="material-symbols-outlined text-[15px] shrink-0">error</span>
                           <span>{checkboxError}</span>
-                        </p>
+                        </motion.p>
                       )}
                     </div>
 
@@ -621,12 +629,12 @@ export default function Login() {
                     <div className="flex flex-col gap-2 pt-1">
                       <motion.button
                         type="submit"
-                        whileHover={!isLoading ? { scale: 1.015, y: -1 } : {}}
-                        whileTap={!isLoading ? { scale: 0.985 } : {}}
+                        whileTap={!isLoading ? { scale: 0.98 } : undefined}
+                        transition={buttonTapTransition}
                         disabled={isLoading}
-                        className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 select-none ${
+                        className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors duration-150 select-none ${
                           !isLoading
-                            ? 'bg-primary hover:bg-primary-hover text-white shadow-md hover:shadow-lg cursor-pointer'
+                            ? 'bg-primary hover:bg-primary-hover text-white shadow-sm cursor-pointer'
                             : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
                         }`}
                       >
@@ -655,12 +663,12 @@ export default function Login() {
                         type="button"
                         onClick={handleGoogleAuth}
                         disabled={isGoogleLoading || isLoading}
-                        whileHover={{ scale: isGoogleLoading ? 1 : 1.015, y: isGoogleLoading ? 0 : -1 }}
-                        whileTap={{ scale: isGoogleLoading ? 1 : 0.985 }}
-                        className={`w-full h-11 rounded-xl font-semibold text-xs sm:text-sm border shadow-xs transition-all duration-200 flex items-center justify-center gap-2.5 select-none ${
+                        whileTap={!isGoogleLoading && !isLoading ? { scale: 0.98 } : undefined}
+                        transition={buttonTapTransition}
+                        className={`w-full h-11 rounded-xl font-semibold text-xs sm:text-sm border shadow-2xs transition-colors duration-150 flex items-center justify-center gap-2.5 select-none ${
                           isGoogleLoading
                             ? 'bg-surface-container-low text-on-surface-variant border-surface-container-high cursor-wait'
-                            : 'bg-white hover:bg-surface-container-low text-on-surface border-surface-container-high hover:border-outline/40 hover:shadow-sm cursor-pointer'
+                            : 'bg-white hover:bg-surface-container-low text-on-surface border-surface-container-high hover:border-outline/40 cursor-pointer'
                         }`}
                       >
                         {isGoogleLoading ? (
@@ -705,11 +713,11 @@ export default function Login() {
                 </div>
               </motion.div>
 
-              {/* RIGHT COLUMN: Animated Info Panel */}
+              {/* RIGHT COLUMN: Info Panel */}
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1, ease: EASE }}
                 className="lg:col-span-5 flex flex-col h-full"
               >
                 <AuthInfoPanel variant="login" />
@@ -735,23 +743,24 @@ export default function Login() {
         </div>
       </footer>
 
-      {/* 2FA Login OTP Verification Modal (Triggered when "Remember this device" is unchecked) */}
+      {/* 2FA Login OTP Verification Modal */}
       <AnimatePresence>
         {showLoginOtpModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={modalVariants.backdrop}
               onClick={() => setShowLoginOtpModal(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={modalVariants.panel}
               className="relative w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-6 sm:p-8 z-10 space-y-6"
             >
               {/* Header */}
@@ -768,7 +777,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowLoginOtpModal(false)}
-                  className="text-outline hover:text-on-surface p-1 cursor-pointer rounded-lg hover:bg-surface-container transition-colors"
+                  className="text-outline hover:text-on-surface p-1 cursor-pointer rounded-lg hover:bg-surface-container transition-colors duration-150"
                 >
                   <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
@@ -787,9 +796,10 @@ export default function Login() {
               <AnimatePresence>
                 {loginOtpError && (
                   <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    variants={bannerVariants}
                     className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2"
                   >
                     <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
@@ -824,7 +834,7 @@ export default function Login() {
                       type="button"
                       disabled={isResendingLoginOtp}
                       onClick={handleResendLoginOtp}
-                      className="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
+                      className="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1.5 disabled:opacity-60 transition-colors duration-150"
                     >
                       {isResendingLoginOtp && (
                         <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
@@ -835,17 +845,21 @@ export default function Login() {
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <button
+                  <motion.button
                     type="button"
+                    whileTap={{ scale: 0.98 }}
+                    transition={buttonTapTransition}
                     onClick={() => setShowLoginOtpModal(false)}
-                    className="flex-1 py-3 px-4 rounded-xl border border-outline/30 text-on-surface font-semibold text-sm hover:bg-surface-container transition-colors cursor-pointer"
+                    className="flex-1 py-3 px-4 rounded-xl border border-outline/30 text-on-surface font-semibold text-sm hover:bg-surface-container transition-colors duration-150 cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
                     type="submit"
+                    whileTap={!isVerifyingLoginOtp && !loginOtp.some(d => !d) ? { scale: 0.98 } : undefined}
+                    transition={buttonTapTransition}
                     disabled={isVerifyingLoginOtp || loginOtp.some(d => !d)}
-                    className="flex-1 py-3 px-4 rounded-xl bg-primary text-white font-semibold text-sm shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="flex-1 py-3 px-4 rounded-xl bg-primary text-white font-semibold text-sm shadow-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isVerifyingLoginOtp ? (
                       <>
@@ -858,7 +872,7 @@ export default function Login() {
                         <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                       </>
                     )}
-                  </button>
+                  </motion.button>
                 </div>
               </form>
             </motion.div>

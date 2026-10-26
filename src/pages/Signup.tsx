@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
+import {
+  motion,
+  AnimatePresence,
+  fadeUpVariants,
+  fadeVariants,
+  bannerVariants,
+  modalVariants,
+  popCheckVariants,
+  buttonTapTransition,
+  EASE
+} from '../lib/motion';
 import OtpVerificationInput from '../components/OtpVerificationInput';
 import AuthInfoPanel from '../components/AuthInfoPanel';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
@@ -90,15 +100,12 @@ export default function Signup() {
   const hasCapital = /[A-Z]/.test(password);
   const hasMin2Numbers = (password.match(/\d/g) || []).length >= 2;
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-  const passwordsMatch = password.length > 0 && password === confirmPassword;
   const isPasswordValid = isMin8Chars && hasCapital && hasMin2Numbers && hasSpecial;
 
   // Smart Auto Country Code Detection on typing/pasting
   const handlePhoneChange = (rawInput: string) => {
     let cleanInput = rawInput;
     const trimmed = rawInput.trim();
-
-    // Check international dial prefix match (+91, +1, +44, etc.)
     const sortedCountries = [...COUNTRIES].sort((a, b) => b.dial.length - a.dial.length);
 
     if (trimmed.startsWith('+')) {
@@ -111,7 +118,6 @@ export default function Signup() {
       }
     } else {
       const allDigits = trimmed.replace(/\D/g, '');
-      // If user pasted something like 919876543210 or 14155552671
       if (allDigits.length >= 11) {
         for (const country of sortedCountries) {
           const dialDigits = country.dial.replace('+', '');
@@ -259,7 +265,7 @@ export default function Signup() {
       setOtpStatus('success');
       setTimeout(() => {
         navigate('/dashboard');
-      }, 1000);
+      }, 400);
     } catch (err: any) {
       setOtpStatus('error');
       setOtpError(err.message || 'Invalid or expired code.');
@@ -290,7 +296,6 @@ export default function Signup() {
       setSignupError(null);
       const googleUser = await signInWithGooglePopup();
       if (!googleUser) {
-        // User closed or dismissed the popup
         return;
       }
 
@@ -321,25 +326,22 @@ export default function Signup() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      initial="initial"
+      animate="animate"
+      variants={fadeVariants}
       className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary relative overflow-hidden"
     >
       {/* Header */}
       <header className="h-16 w-full bg-surface-container-lowest/90 backdrop-blur-xl shadow-xs border-b border-surface-container-high z-30">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
           <Link to="/login" className="flex items-center gap-2.5 group">
-            <motion.div
-              whileHover={{ scale: 1.05, rotate: 2 }}
-              className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs overflow-hidden"
-            >
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs overflow-hidden">
               {savedLogo ? (
                 <img src={savedLogo} alt="Clinic Logo" className="w-full h-full object-cover" />
               ) : (
                 <span className="material-symbols-outlined text-[24px]">shield_with_heart</span>
               )}
-            </motion.div>
+            </div>
             <div className="flex flex-col">
               <span className="font-bold text-lg text-primary tracking-tight leading-none">Smile Clinic</span>
               <span className="text-[10px] text-outline font-medium tracking-wider uppercase">Smile Clinic Portal</span>
@@ -369,9 +371,9 @@ export default function Signup() {
 
             {/* LEFT: Info Panel */}
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.1, ease: EASE }}
               className="lg:col-span-5 flex flex-col h-full order-2 lg:order-1"
             >
               <AuthInfoPanel variant="signup" />
@@ -379,9 +381,9 @@ export default function Signup() {
 
             {/* RIGHT: Registration Form */}
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+              initial="initial"
+              animate="animate"
+              variants={fadeUpVariants}
               className="lg:col-span-7 flex flex-col justify-between order-1 lg:order-2"
             >
               <div className="bg-surface-container-lowest rounded-2xl sm:rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-4 sm:p-9 flex flex-col gap-5 sm:gap-6">
@@ -407,9 +409,10 @@ export default function Signup() {
                 <AnimatePresence>
                   {signupError && (
                     <motion.div
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      variants={bannerVariants}
                       className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2.5 shadow-xs"
                     >
                       <span className="material-symbols-outlined text-base shrink-0 mt-0.5 text-rose-600">error</span>
@@ -433,7 +436,7 @@ export default function Signup() {
                 {/* Form */}
                 <form onSubmit={handleInitiateSignup} className="space-y-4">
 
-                  {/* Full Name — full width */}
+                  {/* Full Name */}
                   <div>
                     <label className="block text-xs font-semibold text-on-surface mb-1">
                       Full Legal Name &amp; Title *
@@ -447,21 +450,26 @@ export default function Signup() {
                         setSignupError(null);
                       }}
                       placeholder="Dr. Arthur Vance, MD"
-                      className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all ${
+                      className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-colors duration-150 ${
                         nameError
                           ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
                           : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
                       }`}
                     />
                     {nameError && (
-                      <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                      <motion.p
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: EASE }}
+                        className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1"
+                      >
                         <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
                         <span>{nameError}</span>
-                      </p>
+                      </motion.p>
                     )}
                   </div>
 
-                  {/* Email — full width */}
+                  {/* Email */}
                   <div>
                     <label className="block text-xs font-semibold text-on-surface mb-1">
                       Email Address *
@@ -480,7 +488,7 @@ export default function Signup() {
                           setSignupError(null);
                         }}
                         placeholder="name@gmail.com"
-                        className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all ${
+                        className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-colors duration-150 ${
                           emailError
                             ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
                             : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
@@ -488,10 +496,15 @@ export default function Signup() {
                       />
                     </div>
                     {emailError && (
-                      <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                      <motion.p
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: EASE }}
+                        className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1"
+                      >
                         <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
                         <span>{emailError}</span>
-                      </p>
+                      </motion.p>
                     )}
                   </div>
 
@@ -512,7 +525,7 @@ export default function Signup() {
                           type="button"
                           id="country-picker-btn"
                           onClick={() => setShowCountryPicker((p) => !p)}
-                          className="h-full min-w-[88px] flex items-center gap-1.5 px-3 py-2.5 bg-surface-container-low rounded-xl border border-surface-container-high hover:border-primary focus:border-primary focus:outline-none transition-all text-xs font-semibold text-on-surface cursor-pointer"
+                          className="h-full min-w-[88px] flex items-center gap-1.5 px-3 py-2.5 bg-surface-container-low rounded-xl border border-surface-container-high hover:border-primary focus:border-primary focus:outline-none transition-colors duration-150 text-xs font-semibold text-on-surface cursor-pointer"
                         >
                           <span className="text-base leading-none">{selectedCountry.flag}</span>
                           <span className="text-on-surface-variant font-mono">{selectedCountry.dial}</span>
@@ -524,10 +537,10 @@ export default function Signup() {
                         <AnimatePresence>
                           {showCountryPicker && (
                             <motion.div
-                              initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                              initial={{ opacity: 0, y: -4, scale: 0.98 }}
                               animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                              transition={{ duration: 0.15 }}
+                              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                              transition={{ duration: 0.15, ease: EASE }}
                               className="absolute top-full left-0 mt-1 z-50 w-56 bg-surface-container-lowest rounded-xl border border-surface-container-high shadow-xl overflow-hidden"
                             >
                               <div className="max-h-52 overflow-y-auto py-1">
@@ -539,7 +552,7 @@ export default function Signup() {
                                       setSelectedCountry(c);
                                       setShowCountryPicker(false);
                                     }}
-                                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium hover:bg-surface-container-low transition-colors cursor-pointer ${
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium hover:bg-surface-container-low transition-colors duration-150 cursor-pointer ${
                                       selectedCountry.code === c.code ? 'text-primary bg-primary/5' : 'text-on-surface'
                                     }`}
                                   >
@@ -561,7 +574,7 @@ export default function Signup() {
                         onBlur={() => setPhoneTouched(true)}
                         onChange={(e) => handlePhoneChange(e.target.value)}
                         placeholder={selectedCountry.code === 'IN' ? '98765 43210' : '555 234 5678'}
-                        className={`flex-1 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all font-mono ${
+                        className={`flex-1 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-colors duration-150 font-mono ${
                           phoneError
                             ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
                             : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
@@ -569,10 +582,15 @@ export default function Signup() {
                       />
                     </div>
                     {phoneError && (
-                      <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                      <motion.p
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: EASE }}
+                        className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1"
+                      >
                         <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
                         <span>{phoneError}</span>
-                      </p>
+                      </motion.p>
                     )}
                   </div>
 
@@ -592,7 +610,7 @@ export default function Signup() {
                             setSignupError(null);
                           }}
                           placeholder="••••••••••••"
-                          className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all ${
+                          className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-colors duration-150 ${
                             passwordError
                               ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
                               : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
@@ -601,18 +619,32 @@ export default function Signup() {
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface p-0.5 cursor-pointer"
+                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface p-0.5 cursor-pointer transition-colors duration-150"
                         >
-                          <span className="material-symbols-outlined text-[18px]">
-                            {showPassword ? 'visibility' : 'visibility_off'}
-                          </span>
+                          <AnimatePresence mode="wait" initial={false}>
+                            <motion.span
+                              key={showPassword ? 'vis' : 'invis'}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              className="material-symbols-outlined text-[18px]"
+                            >
+                              {showPassword ? 'visibility' : 'visibility_off'}
+                            </motion.span>
+                          </AnimatePresence>
                         </button>
                       </div>
                       {passwordError && (
-                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                        <motion.p
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, ease: EASE }}
+                          className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1"
+                        >
                           <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
                           <span>{passwordError}</span>
-                        </p>
+                        </motion.p>
                       )}
                     </div>
 
@@ -630,7 +662,7 @@ export default function Signup() {
                             setSignupError(null);
                           }}
                           placeholder="••••••••••••"
-                          className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all ${
+                          className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-colors duration-150 ${
                             confirmPasswordError
                               ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
                               : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
@@ -639,30 +671,44 @@ export default function Signup() {
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface p-0.5 cursor-pointer"
+                          className="absolute right-3 top-2.5 text-outline hover:text-on-surface p-0.5 cursor-pointer transition-colors duration-150"
                         >
-                          <span className="material-symbols-outlined text-[18px]">
-                            {showConfirmPassword ? 'visibility' : 'visibility_off'}
-                          </span>
+                          <AnimatePresence mode="wait" initial={false}>
+                            <motion.span
+                              key={showConfirmPassword ? 'vis' : 'invis'}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              className="material-symbols-outlined text-[18px]"
+                            >
+                              {showConfirmPassword ? 'visibility' : 'visibility_off'}
+                            </motion.span>
+                          </AnimatePresence>
                         </button>
                       </div>
                       {confirmPasswordError && (
-                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                        <motion.p
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, ease: EASE }}
+                          className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1"
+                        >
                           <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
                           <span>{confirmPasswordError}</span>
-                        </p>
+                        </motion.p>
                       )}
                     </div>
                   </div>
 
-                  {/* Animated password strength + criteria */}
+                  {/* Password strength */}
                   <div className="bg-surface-container-low p-3.5 rounded-2xl border border-surface-container-high/60">
                     <PasswordStrengthMeter password={password} confirmPassword={confirmPassword} />
                   </div>
 
                   {/* Attestation confirmation card */}
                   <div
-                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-colors duration-150 ${
                       termsError
                         ? 'bg-rose-50/60 border-rose-400 shadow-xs'
                         : agreedTerms
@@ -671,7 +717,6 @@ export default function Signup() {
                     }`}
                   >
                     <label className="flex items-start gap-3 cursor-pointer select-none group">
-                      {/* Custom checkbox visual */}
                       <div className="relative shrink-0 mt-0.5">
                         <input
                           type="checkbox"
@@ -682,27 +727,26 @@ export default function Signup() {
                           }}
                           className="sr-only"
                         />
-                        <motion.div
-                          animate={agreedTerms ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                          transition={{ duration: 0.22 }}
-                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                        <div
+                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors duration-150 ${
                             agreedTerms
-                              ? 'bg-emerald-600 border-emerald-600 shadow-xs'
+                              ? 'bg-emerald-600 border-emerald-600 shadow-2xs'
                               : termsError
                               ? 'bg-white border-rose-400'
                               : 'bg-white border-outline/50 group-hover:border-primary/60'
                           }`}
                         >
                           {agreedTerms && (
-                            <motion.span
-                              initial={{ scale: 0, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="material-symbols-outlined text-white text-[14px] font-bold"
-                            >
-                              check
-                            </motion.span>
+                            <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <motion.path
+                                d="M20 6L9 17L4 12"
+                                initial="initial"
+                                animate="animate"
+                                variants={popCheckVariants}
+                              />
+                            </svg>
                           )}
-                        </motion.div>
+                        </div>
                       </div>
                       <div className="flex-1">
                         <span className={`text-xs leading-relaxed font-medium transition-colors block ${
@@ -718,23 +762,28 @@ export default function Signup() {
                     </label>
 
                     {termsError && (
-                      <p className="text-[11px] text-rose-600 font-semibold flex items-center gap-1.5 mt-2.5 pt-2 border-t border-rose-200 animate-fadeIn">
+                      <motion.p
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: EASE }}
+                        className="text-[11px] text-rose-600 font-semibold flex items-center gap-1.5 mt-2.5 pt-2 border-t border-rose-200"
+                      >
                         <span className="material-symbols-outlined text-[15px] shrink-0">error</span>
                         <span>{termsError}</span>
-                      </p>
+                      </motion.p>
                     )}
                   </div>
 
                   {/* Submit */}
                   <motion.button
-                    whileHover={{ scale: isSubmitting ? 1 : 1.015, y: isSubmitting ? 0 : -1 }}
-                    whileTap={{ scale: isSubmitting ? 1 : 0.985 }}
+                    whileTap={!isSubmitting ? { scale: 0.98 } : undefined}
+                    transition={buttonTapTransition}
                     type="submit"
                     disabled={isSubmitting}
-                    className={`w-full py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 shadow-md transition-all cursor-pointer ${
+                    className={`w-full py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 shadow-sm transition-colors duration-150 cursor-pointer ${
                       isSubmitting
                         ? 'bg-primary/80 text-white cursor-wait opacity-90'
-                        : 'bg-primary hover:bg-primary-hover text-white hover:shadow-lg'
+                        : 'bg-primary hover:bg-primary-hover text-white'
                     }`}
                   >
                     {isSubmitting ? (
@@ -765,12 +814,12 @@ export default function Signup() {
                     type="button"
                     onClick={handleGoogleSignup}
                     disabled={isGoogleLoading || isSubmitting}
-                    whileHover={{ scale: isGoogleLoading ? 1 : 1.015, y: isGoogleLoading ? 0 : -1 }}
-                    whileTap={{ scale: isGoogleLoading ? 1 : 0.985 }}
-                    className={`w-full h-11 rounded-xl font-semibold text-xs sm:text-sm border shadow-xs transition-all duration-200 flex items-center justify-center gap-2.5 select-none ${
+                    whileTap={!isGoogleLoading && !isSubmitting ? { scale: 0.98 } : undefined}
+                    transition={buttonTapTransition}
+                    className={`w-full h-11 rounded-xl font-semibold text-xs sm:text-sm border shadow-2xs transition-colors duration-150 flex items-center justify-center gap-2.5 select-none ${
                       isGoogleLoading
                         ? 'bg-surface-container-low text-on-surface-variant border-surface-container-high cursor-wait'
-                        : 'bg-white hover:bg-surface-container-low text-on-surface border-surface-container-high hover:border-outline/40 hover:shadow-sm cursor-pointer'
+                        : 'bg-white hover:bg-surface-container-low text-on-surface border-surface-container-high hover:border-outline/40 cursor-pointer'
                     }`}
                   >
                     {isGoogleLoading ? (
@@ -801,7 +850,6 @@ export default function Signup() {
               </div>
             </motion.div>
 
-
           </div>
         </div>
       </main>
@@ -826,18 +874,19 @@ export default function Signup() {
         {showOtpModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={modalVariants.backdrop}
               onClick={() => setShowOtpModal(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              variants={modalVariants.panel}
               className="relative w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-6 sm:p-8 z-10 space-y-6"
             >
               {/* Modal header */}
@@ -854,7 +903,7 @@ export default function Signup() {
                 <button
                   type="button"
                   onClick={() => setShowOtpModal(false)}
-                  className="text-outline hover:text-on-surface p-1 cursor-pointer rounded-lg hover:bg-surface-container transition-colors"
+                  className="text-outline hover:text-on-surface p-1 cursor-pointer rounded-lg hover:bg-surface-container transition-colors duration-150"
                 >
                   <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
@@ -873,9 +922,10 @@ export default function Signup() {
               <AnimatePresence>
                 {otpError && (
                   <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    variants={bannerVariants}
                     className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2"
                   >
                     <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
@@ -896,53 +946,51 @@ export default function Signup() {
                     }}
                     onComplete={(code) => handleVerifyOtp(undefined, code)}
                     status={otpStatus}
-                    errorMessage={otpError || undefined}
                     disabled={isVerifying || otpStatus === 'success'}
                   />
                 </div>
 
-                {/* Resend & Timer */}
-                <div className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60">
-                  <span className="text-on-surface-variant text-[11px]">
-                    Didn't receive the email?
-                  </span>
+                <div className="flex items-center justify-between text-xs text-on-surface-variant pt-1">
+                  <span>Didn't receive the email?</span>
                   {resendCountdown > 0 ? (
-                    <span className="text-outline text-[11px] font-mono">
-                      Resend in {resendCountdown}s
-                    </span>
+                    <span className="text-outline font-mono font-medium">Resend in {resendCountdown}s</span>
                   ) : (
                     <button
                       type="button"
                       onClick={handleResendOtp}
-                      className="text-primary font-bold text-[11px] hover:underline cursor-pointer"
+                      className="text-primary font-bold hover:underline cursor-pointer transition-colors duration-150"
                     >
                       Resend Code
                     </button>
                   )}
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowOtpModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
+                <div className="flex gap-3 pt-2">
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
+                    type="button"
+                    whileTap={{ scale: 0.98 }}
+                    transition={buttonTapTransition}
+                    onClick={() => setShowOtpModal(false)}
+                    className="flex-1 py-3 px-4 rounded-xl border border-outline/30 text-on-surface font-semibold text-sm hover:bg-surface-container transition-colors duration-150 cursor-pointer"
+                  >
+                    Back to Form
+                  </motion.button>
+                  <motion.button
                     type="submit"
-                    disabled={isVerifying || otpStatus === 'success'}
-                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                    whileTap={!isVerifying && !emailOtp.some(d => !d) ? { scale: 0.98 } : undefined}
+                    transition={buttonTapTransition}
+                    disabled={isVerifying || emailOtp.some(d => !d)}
+                    className="flex-1 py-3 px-4 rounded-xl bg-primary text-white font-semibold text-sm shadow-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isVerifying ? (
-                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+                        <span>Verifying...</span>
+                      </>
                     ) : (
                       <>
-                        <span className="material-symbols-outlined text-[16px]">verified_user</span>
-                        <span>Verify &amp; Activate Account</span>
+                        <span>Confirm &amp; Proceed</span>
+                        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                       </>
                     )}
                   </motion.button>

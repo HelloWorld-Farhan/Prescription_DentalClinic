@@ -427,7 +427,7 @@ export default function NewCheck() {
                       {isCurrent && (
                         <motion.div
                           layoutId="stepper-active-pill"
-                          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                           className="absolute inset-0 bg-surface-container-lowest rounded-xl border border-primary/30 shadow-xs"
                         />
                       )}

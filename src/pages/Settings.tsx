@@ -1441,7 +1441,7 @@ export default function Settings() {
               initial={{ opacity: 0, scale: 0.94, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 16 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 320 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               className="w-full max-w-xl bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden"
             >
               {/* Modal Header */}
@@ -1673,7 +1673,7 @@ export default function Settings() {
                   : { opacity: 1, scale: 1, y: 0 }
               }
               exit={{ opacity: 0, scale: 0.92, y: 16 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 320 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               className={`w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border overflow-hidden transition-colors ${
                 isOtpSuccess
                   ? 'border-emerald-500 shadow-emerald-500/10'
@@ -1762,7 +1762,7 @@ export default function Settings() {
                     <motion.div
                       initial={{ scale: 0, rotate: -45 }}
                       animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: 'spring', damping: 14, stiffness: 200 }}
+                      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                       className="w-16 h-16 rounded-full bg-emerald-100 border-2 border-emerald-500 text-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20"
                     >
                       <motion.svg

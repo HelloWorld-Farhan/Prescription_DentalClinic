@@ -1,69 +1,125 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { MotionConfig, AnimatePresence, motion, EASE } from './lib/motion';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from './components/Layout';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import ForgotPassword from './pages/ForgotPassword';
-import Dashboard from './pages/Dashboard';
-import NewCheck from './pages/NewCheck';
-import Alerts from './pages/Alerts';
-import AuditLog from './pages/AuditLog';
-import RulesAdmin from './pages/RulesAdmin';
-import Settings from './pages/Settings';
-import Report from './pages/Report';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
-import PatientRights from './pages/PatientRights';
-import Support from './pages/Support';
+
+// Lazy-load clinical route pages
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const NewCheck = lazy(() => import('./pages/NewCheck'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const AuditLog = lazy(() => import('./pages/AuditLog'));
+const RulesAdmin = lazy(() => import('./pages/RulesAdmin'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Report = lazy(() => import('./pages/Report'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const PatientRights = lazy(() => import('./pages/PatientRights'));
+const Support = lazy(() => import('./pages/Support'));
+
+function RouteSkeleton() {
+  return (
+    <div className="w-full max-w-7xl mx-auto p-4 lg:p-8 space-y-6 animate-fadeIn">
+      <div className="h-8 w-64 bg-surface-container rounded-xl skeleton-shimmer" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-28 bg-surface-container-low rounded-2xl border border-surface-container-high skeleton-shimmer" />
+        ))}
+      </div>
+      <div className="h-64 bg-surface-container-low rounded-2xl border border-surface-container-high skeleton-shimmer" />
+    </div>
+  );
+}
+
+function TopLoadingBar() {
+  const [loading, setLoading] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setLoading(true);
+    const timer = setTimeout(() => setLoading(false), 250);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
+  return (
+    <AnimatePresence>
+      {loading && (
+        <motion.div
+          initial={{ scaleX: 0, opacity: 1 }}
+          animate={{ scaleX: 1, opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25, ease: EASE }}
+          style={{ originX: 0 }}
+          className="fixed top-0 left-0 right-0 h-[2px] bg-primary z-[9999] pointer-events-none"
+        />
+      )}
+    </AnimatePresence>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <>
+      <TopLoadingBar />
+      <ScrollToTop />
+      <Suspense fallback={<RouteSkeleton />}>
+        <Routes>
+          {/* Entry / Landing Route */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+
+          {/* Fullscreen Printable Report */}
+          <Route path="/report" element={<Report />} />
+
+          {/* Legal & Support */}
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/patient-rights" element={<PatientRights />} />
+          <Route path="/support" element={<Support />} />
+
+          {/* Legacy redirects */}
+          <Route path="/dashboard/support" element={<Navigate to="/support" replace />} />
+          <Route path="/dashboard/privacy-policy" element={<Navigate to="/privacy-policy" replace />} />
+          <Route path="/dashboard/terms-of-service" element={<Navigate to="/terms-of-service" replace />} />
+          <Route path="/dashboard/patient-rights" element={<Navigate to="/patient-rights" replace />} />
+
+          {/* Authenticated Layout Routes */}
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/check" element={<NewCheck />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/audit-log" element={<AuditLog />} />
+            <Route path="/rules" element={<RulesAdmin />} />
+            <Route path="/settings" element={<Settings />} />
+
+            {/* Subroutes under /dashboard/ */}
+            <Route path="/dashboard/check" element={<NewCheck />} />
+            <Route path="/dashboard/alerts" element={<Alerts />} />
+            <Route path="/dashboard/audit-log" element={<AuditLog />} />
+            <Route path="/dashboard/rules" element={<RulesAdmin />} />
+            <Route path="/dashboard/settings" element={<Settings />} />
+            <Route path="/dashboard/report" element={<Report />} />
+          </Route>
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
+    </>
+  );
+}
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <ScrollToTop />
-      <Routes>
-        {/* Entry / Landing Route - Opens Login Screen First */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-
-        {/* Dedicated Fullscreen Printable Clinical Report */}
-        <Route path="/report" element={<Report />} />
-
-        {/* Informational & Support Routes */}
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-of-service" element={<TermsOfService />} />
-        <Route path="/patient-rights" element={<PatientRights />} />
-        <Route path="/support" element={<Support />} />
-
-        {/* Legacy Dashboard clean redirects */}
-        <Route path="/dashboard/support" element={<Navigate to="/support" replace />} />
-        <Route path="/dashboard/privacy-policy" element={<Navigate to="/privacy-policy" replace />} />
-        <Route path="/dashboard/terms-of-service" element={<Navigate to="/terms-of-service" replace />} />
-        <Route path="/dashboard/patient-rights" element={<Navigate to="/patient-rights" replace />} />
-
-        {/* Authenticated Layout Routes */}
-        <Route element={<Layout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/check" element={<NewCheck />} />
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/audit-log" element={<AuditLog />} />
-          <Route path="/rules" element={<RulesAdmin />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/report" element={<Report />} />
-
-          {/* Subroutes under /dashboard/ */}
-          <Route path="/dashboard/check" element={<NewCheck />} />
-          <Route path="/dashboard/alerts" element={<Alerts />} />
-          <Route path="/dashboard/audit-log" element={<AuditLog />} />
-          <Route path="/dashboard/rules" element={<RulesAdmin />} />
-          <Route path="/dashboard/settings" element={<Settings />} />
-          <Route path="/dashboard/report" element={<Report />} />
-        </Route>
-
-        {/* Fallback - Redirect to Login */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.25, ease: EASE }}>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </MotionConfig>
   );
 }
