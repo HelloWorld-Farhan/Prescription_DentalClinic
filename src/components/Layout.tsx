@@ -80,6 +80,7 @@ export default function Layout() {
     { name: 'New Safety Check', path: '/check', icon: 'add_circle' },
     { name: 'Alerts Queue', path: '/alerts', icon: 'warning' },
     { name: 'Audit Log', path: '/audit-log', icon: 'verified' },
+    { name: 'Rules & Data', path: '/rules', icon: 'database' },
   ];
 
 

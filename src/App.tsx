@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import NewCheck from './pages/NewCheck';
 import Alerts from './pages/Alerts';
 import AuditLog from './pages/AuditLog';
+import RulesAdmin from './pages/RulesAdmin';
 import Settings from './pages/Settings';
 import Report from './pages/Report';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -47,7 +48,7 @@ export default function App() {
           <Route path="/check" element={<NewCheck />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/audit-log" element={<AuditLog />} />
-          <Route path="/rules" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/rules" element={<RulesAdmin />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/report" element={<Report />} />
 
@@ -55,7 +56,7 @@ export default function App() {
           <Route path="/dashboard/check" element={<NewCheck />} />
           <Route path="/dashboard/alerts" element={<Alerts />} />
           <Route path="/dashboard/audit-log" element={<AuditLog />} />
-          <Route path="/dashboard/rules" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard/rules" element={<RulesAdmin />} />
           <Route path="/dashboard/settings" element={<Settings />} />
           <Route path="/dashboard/report" element={<Report />} />
         </Route>

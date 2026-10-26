@@ -322,7 +322,7 @@ export default function Dashboard() {
           whileHover={{ y: -4, scale: 1.01 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#553C9A]/50 cursor-pointer"
-          onClick={() => navigate('/alerts')}
+          onClick={() => navigate('/rules')}
         >
           <div className="flex items-start justify-between">
             <div>
@@ -347,12 +347,12 @@ export default function Dashboard() {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate('/alerts');
+                navigate('/rules');
               }}
               className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#553C9A] bg-[#FAF5FF] hover:bg-[#553C9A] hover:text-white transition-colors text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
-              title="Review Alert Queue"
+              title="Manage Clinical CDS Rules"
             >
-              <span>Review Alerts</span>
+              <span>CDS Rules</span>
               <span className="material-symbols-outlined text-[14px] transition-transform group-hover/btn:translate-x-0.5">arrow_forward</span>
             </button>
           </div>

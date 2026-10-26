@@ -104,7 +104,7 @@ export default function SyncKnowledgeModal({
       setLogs([
         '[INIT] Gateway readiness check complete.',
         '[INFO] Ready to establish mTLS 1.3 link to licensed knowledge feeds.',
-        '[INFO] Current active suite: v4.2.1-prod (Zero-Drift invariant active).'
+        '[INFO] Knowledge synchronization service active.'
       ]);
     }
   }, [isOpen]);
@@ -163,7 +163,7 @@ export default function SyncKnowledgeModal({
           currentVersion: e.targetVersion
         }))
       );
-      addLog('SUCCESS: All 4 clinical engines synchronized & verified against FDA SaMD invariants.');
+      addLog('SUCCESS: All clinical knowledge engines synchronized and verified.');
       addLog('Engine Health: 100% Invariant. Zero-Drift safety enforcement verified.');
 
       onSyncComplete?.('v2025.02-B', 'Just now');
@@ -196,9 +196,6 @@ export default function SyncKnowledgeModal({
                   <h2 className="text-base sm:text-lg font-bold text-on-surface">
                     Synchronize Clinical Knowledge Bases
                   </h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
-                    CDS v4.2.1
-                  </span>
                 </div>
                 <p className="text-xs text-on-surface-variant">
                   Update licensed pharmacopeias, verify cryptographic checksums, and re-compile AST rules.
@@ -336,7 +333,7 @@ export default function SyncKnowledgeModal({
 
                     <div className="flex items-center justify-between text-[11px] text-on-surface-variant pt-1 border-t border-surface-container">
                       <span className="font-mono">{engine.currentVersion}</span>
-                      <span className="text-primary font-medium">+{engine.recordsUpdated} rules</span>
+                      <span className="text-primary font-medium">Standard Feed</span>
                     </div>
                   </div>
                 ))}
@@ -377,8 +374,8 @@ export default function SyncKnowledgeModal({
           {/* Footer Actions */}
           <div className="px-6 py-3.5 border-t border-surface-container-high bg-surface-container-low/60 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2 text-outline text-[11px]">
-              <span className="material-symbols-outlined text-[16px] text-emerald-600">verified_user</span>
-              <span>21 CFR Part 11 and FDA SaMD Class II Validation</span>
+              <span className="material-symbols-outlined text-[16px] text-primary">verified</span>
+              <span>Encrypted Clinical Knowledge Sync</span>
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
