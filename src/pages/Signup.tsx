@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import OtpVerificationInput from '../components/OtpVerificationInput';
 import AuthInfoPanel from '../components/AuthInfoPanel';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 export interface RegisteredPrescriber {
   fullName: string;
@@ -412,33 +413,9 @@ export default function Signup() {
                     </div>
                   </div>
 
-                  {/* Password criteria */}
-                  <div className="bg-surface-container-low p-3.5 rounded-2xl border border-surface-container-high/60 space-y-1.5">
-                    <span className="font-bold text-[11px] text-on-surface block">Password Standards (EPCS):</span>
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      {[
-                        { ok: isMin8Chars,    label: '8+ Characters'      },
-                        { ok: hasCapital,     label: '1 Uppercase Letter' },
-                        { ok: hasMin2Numbers, label: '2 Numbers'          },
-                        { ok: hasSpecial,     label: '1 Special Symbol'   },
-                      ].map(({ ok, label }) => (
-                        <div key={label} className={`flex items-center gap-1.5 transition-colors ${ok ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                          <span className="material-symbols-outlined text-[15px]">
-                            {ok ? 'check_circle' : 'radio_button_unchecked'}
-                          </span>
-                          <span>{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Passwords match indicator */}
-                    {confirmPassword.length > 0 && (
-                      <div className={`flex items-center gap-1.5 text-[11px] mt-1 ${passwordsMatch ? 'text-emerald-700 font-semibold' : 'text-rose-600'}`}>
-                        <span className="material-symbols-outlined text-[15px]">
-                          {passwordsMatch ? 'check_circle' : 'cancel'}
-                        </span>
-                        <span>{passwordsMatch ? 'Passwords match' : 'Passwords do not match'}</span>
-                      </div>
-                    )}
+                  {/* Animated password strength + criteria */}
+                  <div className="bg-surface-container-low p-3.5 rounded-2xl border border-surface-container-high/60">
+                    <PasswordStrengthMeter password={password} confirmPassword={confirmPassword} />
                   </div>
 
                   {/* Attestation checkbox — styled */}

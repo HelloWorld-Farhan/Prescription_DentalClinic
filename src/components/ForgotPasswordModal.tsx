@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OFFICIAL_PRESCRIBER_CREDENTIALS } from '../pages/Login';
 import OtpVerificationInput from './OtpVerificationInput';
+import PasswordStrengthMeter from './PasswordStrengthMeter';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -633,45 +634,9 @@ export default function ForgotPasswordModal({
                   </div>
                 </div>
 
-                {/* Real-time Password Criteria Checklist */}
-                <div className="bg-surface-container-low p-3.5 rounded-xl border border-surface-container-high/60 flex flex-col gap-1.5 text-xs">
-                  <span className="font-bold text-[11px] text-on-surface">Compliance Standards:</span>
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[15px]">
-                        {hasMinLength ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>Min 8 characters</span>
-                    </div>
-
-                    <div className={`flex items-center gap-1.5 ${hasUppercase ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[15px]">
-                        {hasUppercase ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>1 Uppercase letter</span>
-                    </div>
-
-                    <div className={`flex items-center gap-1.5 ${hasMin2Numbers ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[15px]">
-                        {hasMin2Numbers ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>2 Numbers minimum</span>
-                    </div>
-
-                    <div className={`flex items-center gap-1.5 ${hasSymbol ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[15px]">
-                        {hasSymbol ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>1 Special symbol</span>
-                    </div>
-
-                    <div className={`col-span-2 flex items-center gap-1.5 ${passwordsMatch ? 'text-emerald-700 font-semibold' : 'text-outline'}`}>
-                      <span className="material-symbols-outlined text-[15px]">
-                        {passwordsMatch ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span>Passwords match exactly</span>
-                    </div>
-                  </div>
+                {/* Animated password strength + criteria */}
+                <div className="bg-surface-container-low p-3.5 rounded-xl border border-surface-container-high/60">
+                  <PasswordStrengthMeter password={newPassword} confirmPassword={confirmPassword} />
                 </div>
 
                 {resetError && (
