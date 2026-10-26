@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import AuthInfoPanel from '../components/AuthInfoPanel';
+import { authApi } from '../services/authApi';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ export default function Login() {
   const passwordError = (passwordTouched || hasAttemptedSubmit) ? getPasswordError(password) : null;
   const checkboxError = (hasAttemptedSubmit && !authorizedConfirmation) ? 'Please confirm clinician authorization before signing in.' : null;
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setHasAttemptedSubmit(true);
     setClinicalIdTouched(true);
@@ -70,31 +71,41 @@ export default function Login() {
     const inputEmail = clinicalId.trim().toLowerCase();
     const inputPass = password;
 
-    // Check Registered Prescribers
-    const registeredPrescribers = JSON.parse(
-      localStorage.getItem('smileclinic_registered_prescribers') || '[]'
-    );
-    const registered = registeredPrescribers.find(
-      (p: any) => p.email.toLowerCase() === inputEmail && p.password === inputPass
-    );
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    if (registered) {
-      setIsLoading(true);
-      setTimeout(() => {
-        sessionStorage.setItem('rxguard_authenticated', 'true');
+    try {
+      // 1. Attempt API authentication against the backend database
+      const res = await authApi.login(inputEmail, inputPass);
+      if (res.token && res.user) {
+        authApi.saveSession(res.token, res.user);
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
         }
-        sessionStorage.setItem('rxguard_prescriber_name', registered.fullName);
-        sessionStorage.setItem('rxguard_prescriber_role', registered.role || 'Clinical Prescriber');
-        sessionStorage.setItem('rxguard_prescriber_npi', registered.npiLicense || registered.phone || 'NPI Verified');
-        sessionStorage.setItem('rxguard_prescriber_email', registered.email);
         navigate('/dashboard');
-      }, 400);
-    } else {
+        return;
+      }
+    } catch (apiErr: any) {
+      // 2. Demo credentials fallback if offline or using demo clinician
+      if (
+        (inputEmail === 'rxguard@smileclinic.com' || inputEmail === 'doctor@smileclinic.com') &&
+        (inputPass === 'RxGuard@Smile2026#' || inputPass === 'Doctor@Smile2026#')
+      ) {
+        sessionStorage.setItem('rxguard_authenticated', 'true');
+        sessionStorage.setItem('rxguard_prescriber_name', 'Dr. Sarah Lin, PharmD');
+        sessionStorage.setItem('rxguard_prescriber_role', 'Clinical Prescriber');
+        sessionStorage.setItem('rxguard_prescriber_npi', 'RX-774021');
+        sessionStorage.setItem('rxguard_prescriber_email', inputEmail);
+        navigate('/dashboard');
+        return;
+      }
+
       setErrorMessage(
+        apiErr.message ||
         'Invalid credentials. No registered clinician account matches these credentials. Please check your details or enroll as a prescriber below.'
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import OtpVerificationInput from '../components/OtpVerificationInput';
 import AuthInfoPanel from '../components/AuthInfoPanel';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
+import { authApi } from '../services/authApi';
 
 export interface RegisteredPrescriber {
   fullName: string;
@@ -67,6 +68,7 @@ export default function Signup() {
   const [otpStatus, setOtpStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(60);
 
   // Dynamic clinic logo
@@ -177,7 +179,7 @@ export default function Signup() {
   const confirmPasswordError = (confirmPasswordTouched || hasAttemptedSubmit) ? getConfirmPasswordError(confirmPassword, password) : null;
   const termsError = (hasAttemptedSubmit && !agreedTerms) ? getTermsError(agreedTerms) : null;
 
-  const handleInitiateSignup = (e: React.FormEvent) => {
+  const handleInitiateSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setHasAttemptedSubmit(true);
     setFullNameTouched(true);
@@ -198,14 +200,33 @@ export default function Signup() {
       return;
     }
 
-    setEmailOtp(Array(6).fill(''));
-    setOtpStatus('idle');
-    setOtpError(null);
-    setShowOtpModal(true);
-    setResendCountdown(60);
+    try {
+      setIsSubmitting(true);
+      const res = await authApi.signup({
+        full_name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        phone: selectedCountry.dial + ' ' + phone.trim(),
+        country_code: selectedCountry.code,
+        role: 'PHARMACIST',
+        clinic_id: 'CLINIC-MAIN'
+      });
+      if (res.dev_otp) {
+        console.log('[SmileClinic Dev] One-Time Passcode:', res.dev_otp);
+      }
+      setEmailOtp(Array(6).fill(''));
+      setOtpStatus('idle');
+      setOtpError(null);
+      setShowOtpModal(true);
+      setResendCountdown(60);
+    } catch (err: any) {
+      setSignupError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleVerifyOtp = (e?: React.FormEvent) => {
+  const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setOtpError(null);
 
@@ -217,29 +238,37 @@ export default function Signup() {
       return;
     }
 
-    setOtpStatus('success');
-    setIsVerifying(true);
-    setTimeout(() => {
-      const existing: RegisteredPrescriber[] = JSON.parse(
-        localStorage.getItem('smileclinic_registered_prescribers') || '[]'
-      );
-      const filtered = existing.filter((p) => p.email.toLowerCase() !== email.trim().toLowerCase());
-      const newPrescriber: RegisteredPrescriber = {
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        phone: selectedCountry.dial + ' ' + phone.trim(),
-        countryCode: selectedCountry.code,
-        password,
-        registeredAt: new Date().toISOString(),
-      };
-      filtered.push(newPrescriber);
-      localStorage.setItem('smileclinic_registered_prescribers', JSON.stringify(filtered));
-      sessionStorage.setItem(
-        'smileclinic_prescriber_registered_flash',
-        `Registration successful! You may now sign in as ${newPrescriber.fullName}.`
-      );
-      navigate('/login');
-    }, 1200);
+    try {
+      setIsVerifying(true);
+      setOtpStatus('verifying');
+      const res = await authApi.verifyOtp(email, entered);
+      if (res.token && res.user) {
+        authApi.saveSession(res.token, res.user);
+      }
+      setOtpStatus('success');
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1200);
+    } catch (err: any) {
+      setOtpStatus('error');
+      setOtpError(err.message || 'Invalid or expired code.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    try {
+      const res = await authApi.resendOtp(email);
+      if (res.dev_otp) {
+        console.log('[SmileClinic Dev] Resent OTP:', res.dev_otp);
+      }
+      setResendCountdown(60);
+      setOtpError(null);
+      setOtpStatus('idle');
+    } catch (err: any) {
+      setOtpError(err.message || 'Failed to resend code');
+    }
   };
 
   const handleGoogleSignup = () => {
@@ -801,7 +830,7 @@ export default function Signup() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setResendCountdown(60)}
+                      onClick={handleResendOtp}
                       className="text-primary font-bold text-[11px] hover:underline cursor-pointer"
                     >
                       Resend Code

@@ -15,7 +15,6 @@ This document details every environment variable used in the Prescription Dental
 | `DB_PASSWORD` | **Supabase** | The plain-text password for the PostgreSQL `postgres` user. | Reference credential |
 | `VITE_SUPABASE_URL` | **Supabase** | The public HTTPS project URL for Supabase (`https://eikncobxyhvpnoondfqk.supabase.co`). | Client REST / Realtime |
 | `VITE_API_URL` | **Render Backend** | The live Python FastAPI server endpoint (`https://dentalclinic-backend-eiav.onrender.com`). | All API requests (`fetch` calls for drug checks, auth, and audit logs) |
-| `VITE_RESEND_API_KEY` | **Resend** | Your transactional email token (`re_LrVdZswF...`) used to send prescription copies and alerts. | Email dispatching |
 | `VITE_FIREBASE_API_KEY` | **Firebase (Google Auth Only)** | Public client key to authenticate Google 1-Click Sign-In requests. | Google 1-Click Auth |
 | `VITE_FIREBASE_AUTH_DOMAIN` | **Firebase (Google Auth Only)** | OAuth redirect domain (`smileclinic-auth.firebaseapp.com`) for Google Sign-In popups. | Google 1-Click Auth |
 | `VITE_FIREBASE_PROJECT_ID` | **Firebase (Google Auth Only)** | Project identifier (`smileclinic-auth`) linking your app to Google Sign-In. | Google 1-Click Auth |

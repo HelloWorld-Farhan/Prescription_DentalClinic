@@ -1,0 +1,162 @@
+/**
+ * Smile Clinic RxGuard — Authentication API Service
+ * Connects frontend Signup, OTP Verification, and Login to the FastAPI Backend
+ */
+
+const API_BASE_URL = (
+  (import.meta as any).env?.VITE_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:8000'
+    : 'https://dentalclinic-backend-eiav.onrender.com')
+).replace(/\/$/, '');
+
+export interface SignupPayload {
+  full_name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  country_code?: string;
+  role?: string;
+  license_number?: string;
+  clinic_id?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  licenseNumber?: string;
+  clinicId?: string;
+}
+
+export interface AuthApiResponse {
+  status: 'success' | 'error';
+  message: string;
+  token?: string;
+  user?: UserProfile;
+  dev_otp?: string;
+}
+
+export const authApi = {
+  /**
+   * Register a new clinician account and trigger OTP dispatch
+   */
+  async signup(payload: SignupPayload): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Registration failed');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server. Please ensure the backend server is running on port 8000.');
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Verify the 6-digit OTP code and retrieve session JWT token
+   */
+  async verifyOtp(email: string, otp_code: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), otp_code: otp_code.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Invalid or expired OTP code');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server. Please check connection.');
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Resend a fresh 6-digit OTP to the clinician's email
+   */
+  async resendOtp(email: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/resend-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Failed to resend code');
+      }
+      return data;
+    } catch (err: any) {
+      throw err;
+    }
+  },
+
+  /**
+   * Log in with verified email and password
+   */
+  async login(email: string, password: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Login failed. Please check credentials.');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to connect to clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Persist session JWT and clinician profile
+   */
+  saveSession(token: string, user: UserProfile): void {
+    if (typeof window === 'undefined') return;
+    sessionStorage.setItem('rxguard_authenticated', 'true');
+    sessionStorage.setItem('rxguard_jwt_token', token);
+    sessionStorage.setItem('rxguard_prescriber_name', user.fullName);
+    sessionStorage.setItem('rxguard_prescriber_email', user.email);
+    sessionStorage.setItem('rxguard_prescriber_role', user.role);
+    if (user.licenseNumber) {
+      sessionStorage.setItem('rxguard_prescriber_npi', user.licenseNumber);
+    }
+    localStorage.setItem('smileclinic_jwt_token', token);
+    localStorage.setItem('smileclinic_auth_user', JSON.stringify(user));
+  },
+
+  /**
+   * Clear session on logout
+   */
+  clearSession(): void {
+    if (typeof window === 'undefined') return;
+    sessionStorage.removeItem('rxguard_authenticated');
+    sessionStorage.removeItem('rxguard_jwt_token');
+    sessionStorage.removeItem('rxguard_prescriber_name');
+    sessionStorage.removeItem('rxguard_prescriber_email');
+    sessionStorage.removeItem('rxguard_prescriber_role');
+    sessionStorage.removeItem('rxguard_prescriber_npi');
+    localStorage.removeItem('smileclinic_jwt_token');
+    localStorage.removeItem('smileclinic_auth_user');
+  }
+};
