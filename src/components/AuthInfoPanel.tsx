@@ -64,7 +64,7 @@ export default function AuthInfoPanel({ variant }: { variant: 'login' | 'signup'
     : 'from-cyan-500/25 to-teal-500/25';
 
   return (
-    <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/10 min-h-[580px] bg-gradient-to-br from-[#060f1a] via-[#091c2b] to-[#030c12] flex flex-col justify-between p-6 sm:p-8 text-white">
+    <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/10 h-full min-h-[580px] w-full bg-gradient-to-br from-[#060f1a] via-[#091c2b] to-[#030c12] flex flex-col justify-between p-6 sm:p-8 text-white">
 
       {/* Ambient orbs */}
       <motion.div

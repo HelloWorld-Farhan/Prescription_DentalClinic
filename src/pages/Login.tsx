@@ -432,7 +432,7 @@ export default function Login() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-                className="lg:col-span-5"
+                className="lg:col-span-5 flex flex-col h-full"
               >
                 <AuthInfoPanel variant="login" />
               </motion.div>

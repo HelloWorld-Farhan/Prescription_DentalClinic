@@ -205,21 +205,11 @@ export default function Signup() {
         <div className="w-full max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
 
-            {/* LEFT: Info Panel */}
+            {/* LEFT: Registration Form */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="lg:col-span-5"
-            >
-              <AuthInfoPanel variant="signup" />
-            </motion.div>
-
-            {/* RIGHT: Registration Form */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
               className="lg:col-span-7 flex flex-col justify-between"
             >
               <div className="bg-surface-container-lowest rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-6 sm:p-9 flex flex-col gap-6">
@@ -456,8 +446,7 @@ export default function Signup() {
                       </motion.div>
                     </div>
                     <span className={`text-xs leading-relaxed transition-colors ${agreedTerms ? 'text-emerald-800 font-medium' : 'text-on-surface-variant'}`}>
-                      I certify that all licensing and institutional clinical credentials provided are authentic and active under{' '}
-                      <strong>45 CFR §164</strong> and <strong>State Pharmacy Board regulations</strong>.
+                      I confirm that all details provided are accurate and I agree to the clinical terms and privacy policy.
                     </span>
                   </motion.label>
 
@@ -480,6 +469,16 @@ export default function Signup() {
                   </div>
                 </form>
               </div>
+            </motion.div>
+
+            {/* RIGHT: Info Panel */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+              className="lg:col-span-5 flex flex-col h-full"
+            >
+              <AuthInfoPanel variant="signup" />
             </motion.div>
           </div>
         </div>
