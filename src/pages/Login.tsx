@@ -100,10 +100,15 @@ export default function Login() {
         return;
       }
 
-      setErrorMessage(
-        apiErr.message ||
-        'Invalid credentials. No registered clinician account matches these credentials. Please check your details or enroll as a prescriber below.'
-      );
+      const errMsg = apiErr.message || 'Invalid credentials. No registered clinician account matches these credentials.';
+      setErrorMessage(errMsg);
+
+      // If account is locked due to 3 failed attempts, automatically pop open the Reset Password modal on Step 2 (OTP code)
+      if (errMsg.toLowerCase().includes('account locked') || errMsg.toLowerCase().includes('3 failed login attempts')) {
+        setTimeout(() => {
+          setShowForgotPasswordModal(true);
+        }, 1100);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -224,12 +229,39 @@ export default function Login() {
                     </div>
                   )}
 
-                  {/* Error Message */}
+                  {/* Error / Lockout Alert */}
                   {errorMessage && (
-                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2">
-                      <span className="material-symbols-outlined text-sm shrink-0 mt-0.5">error</span>
-                      <span>{errorMessage}</span>
-                    </div>
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`p-3.5 rounded-xl border text-xs font-medium flex items-start gap-2.5 shadow-xs ${
+                        errorMessage.toLowerCase().includes('account locked')
+                          ? 'bg-rose-100/90 border-rose-300 text-rose-950 font-semibold'
+                          : errorMessage.toLowerCase().includes('rate limit')
+                          ? 'bg-purple-50 border-purple-200 text-purple-900'
+                          : errorMessage.toLowerCase().includes('attempt')
+                          ? 'bg-amber-50 border-amber-300 text-amber-900'
+                          : 'bg-rose-50 border-rose-200 text-rose-800'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5">
+                        {errorMessage.toLowerCase().includes('account locked')
+                          ? 'lock_person'
+                          : errorMessage.toLowerCase().includes('rate limit')
+                          ? 'timer'
+                          : errorMessage.toLowerCase().includes('attempt')
+                          ? 'warning'
+                          : 'error'}
+                      </span>
+                      <div className="flex-1">
+                        <p className="leading-relaxed">{errorMessage}</p>
+                        {errorMessage.toLowerCase().includes('account locked') && (
+                          <p className="mt-1 text-[11px] text-rose-800 font-normal">
+                            A one-time reset code has been sent to your email. Opening reset window...
+                          </p>
+                        )}
+                      </div>
+                    </motion.div>
                   )}
 
                   {/* Credentials Form */}
@@ -531,6 +563,7 @@ export default function Login() {
         onClose={() => setShowForgotPasswordModal(false)}
         onSuccess={handlePasswordResetSuccess}
         initialEmail={clinicalId}
+        initialStep={errorMessage?.toLowerCase().includes('account locked') ? 2 : 1}
       />
     </motion.div>
   );

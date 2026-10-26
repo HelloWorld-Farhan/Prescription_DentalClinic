@@ -129,6 +129,56 @@ export const authApi = {
   },
 
   /**
+   * Request password reset OTP to clinician email
+   */
+  async forgotPassword(email: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Password reset request failed');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Reset password with verified 6-digit OTP
+   */
+  async resetPassword(email: string, otp_code: string, new_password: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          otp_code: otp_code.trim(),
+          new_password
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Password reset failed');
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
    * Persist session JWT and clinician profile
    */
   saveSession(token: string, user: UserProfile): void {

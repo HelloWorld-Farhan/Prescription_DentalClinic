@@ -2,21 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import OtpVerificationInput from './OtpVerificationInput';
 import PasswordStrengthMeter from './PasswordStrengthMeter';
+import { authApi } from '../services/authApi';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (email: string) => void;
   initialEmail?: string;
+  initialStep?: 1 | 2 | 3;
 }
 
 export default function ForgotPasswordModal({
   isOpen,
   onClose,
   onSuccess,
-  initialEmail = ''
+  initialEmail = '',
+  initialStep = 1
 }: ForgotPasswordModalProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [method, setMethod] = useState<'email' | 'sms' | 'previous'>('email');
   const [accountEmail, setAccountEmail] = useState(initialEmail || '');
   const [emailTouched, setEmailTouched] = useState(false);
@@ -55,7 +58,7 @@ export default function ForgotPasswordModal({
   // Reset modal state on open
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
+      setStep(initialStep || 1);
       setMethod('email');
       setAccountEmail(initialEmail || '');
       setEmailTouched(false);
@@ -72,7 +75,7 @@ export default function ForgotPasswordModal({
       setResetError('');
       setIsSuccess(false);
     }
-  }, [isOpen, initialEmail]);
+  }, [isOpen, initialEmail, initialStep]);
 
   // Resend countdown timer for Step 2
   useEffect(() => {
@@ -103,7 +106,7 @@ export default function ForgotPasswordModal({
   const emailError = (emailTouched || hasAttemptedStep1) ? getEmailValidationError(accountEmail) : null;
 
   // Step 1 -> Step 2
-  const handleProceedToVerify = (e: React.FormEvent) => {
+  const handleProceedToVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setHasAttemptedStep1(true);
     setEmailTouched(true);
@@ -113,86 +116,59 @@ export default function ForgotPasswordModal({
       return;
     }
 
-    if (method === 'sms') {
-      return;
-    }
-
-    const registeredPrescribers = JSON.parse(
-      localStorage.getItem('smileclinic_registered_prescribers') || '[]'
-    );
-    const existingUser = registeredPrescribers.find(
-      (p: any) => p.email.toLowerCase() === accountEmail.trim().toLowerCase()
-    );
-    if (!existingUser) {
-      setResetError('No registered clinician account found for this email address.');
-      return;
-    }
-    if (existingUser.phone) {
-      setMobilePhone(existingUser.phone);
-    }
-
+    setIsSubmitting(true);
     setResetError('');
-    if (method === 'email') {
-      setOtp(Array(6).fill(''));
-      setResendTimer(60);
-      setCanResend(false);
-      setStep(2);
-    } else {
-      // previous password verification
-      setStep(2);
+
+    try {
+      if (method === 'email') {
+        await authApi.forgotPassword(accountEmail.trim().toLowerCase());
+        setOtp(Array(6).fill(''));
+        setResendTimer(60);
+        setCanResend(false);
+        setStep(2);
+      } else {
+        setStep(2);
+      }
+    } catch (apiErr: any) {
+      setResetError(apiErr.message || 'Unable to request password reset code. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Resend code trigger (1 time per 60 sec countdown)
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (!canResend) return;
-    setOtp(Array(6).fill(''));
-    setResendTimer(60);
-    setCanResend(false);
-    setResendCount((c) => c + 1);
-    setOtpError('');
+    try {
+      await authApi.forgotPassword(accountEmail.trim().toLowerCase());
+      setOtp(Array(6).fill(''));
+      setResendTimer(60);
+      setCanResend(false);
+      setResendCount((c) => c + 1);
+      setOtpError('');
+    } catch (err: any) {
+      setOtpError(err.message || 'Failed to resend code');
+    }
   };
 
   // Step 2 -> Step 3
   const handleConfirmVerification = (e: React.FormEvent) => {
     e.preventDefault();
-    if (method === 'email' || method === 'sms') {
-      const entered = otp.join('');
-      if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
-        setOtpError('Please enter all 6 numeric digits of the security verification code.');
-        setOtpStatus('error');
-        setTimeout(() => setOtpStatus('idle'), 1500);
-        return;
-      }
-      setOtpError('');
-      setOtpStatus('success');
-      setIsSubmitting(true);
-      setTimeout(() => {
-        setIsSubmitting(false);
-        setStep(3);
-        setOtpStatus('idle');
-      }, 1200);
-    } else {
-      // Validate previous password
-      const input = previousPasswordInput.trim();
-      const registeredPrescribers = JSON.parse(
-        localStorage.getItem('smileclinic_registered_prescribers') || '[]'
-      );
-      const matched = registeredPrescribers.find(
-        (p: any) => p.email.toLowerCase() === accountEmail.trim().toLowerCase() && p.password === input
-      );
-
-      if (matched) {
-        setPrevPassError('');
-        setIsSubmitting(true);
-        setTimeout(() => {
-          setIsSubmitting(false);
-          setStep(3);
-        }, 400);
-      } else {
-        setPrevPassError('Previous password does not match records for this account.');
-      }
+    const entered = otp.join('');
+    if (entered.length < 6 || !/^\d{6}$/.test(entered)) {
+      setOtpError('Please enter all 6 numeric digits of the security verification code.');
+      setOtpStatus('error');
+      setTimeout(() => setOtpStatus('idle'), 1500);
+      return;
     }
+    setOtpError('');
+    setOtpStatus('success');
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setStep(3);
+      setOtpStatus('idle');
+    }, 600);
   };
 
   // Step 3 Password Criteria
@@ -205,7 +181,7 @@ export default function ForgotPasswordModal({
   const isPasswordValid = hasMinLength && hasUppercase && hasMin2Numbers && hasSymbol && passwordsMatch;
 
   // Final Step: Save New Password
-  const handleSaveNewPassword = (e: React.FormEvent) => {
+  const handleSaveNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isPasswordValid) {
       setResetError('Please satisfy all password safety criteria before updating.');
@@ -213,36 +189,25 @@ export default function ForgotPasswordModal({
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      // Update registered prescribers in localStorage
-      const registeredPrescribers = JSON.parse(
-        localStorage.getItem('smileclinic_registered_prescribers') || '[]'
-      );
-      const emailLower = accountEmail.trim().toLowerCase();
-      const idx = registeredPrescribers.findIndex(
-        (p: any) => p.email.toLowerCase() === emailLower
+    setResetError('');
+
+    try {
+      await authApi.resetPassword(
+        accountEmail.trim().toLowerCase(),
+        otp.join(''),
+        newPassword
       );
 
-      if (idx !== -1) {
-        registeredPrescribers[idx].password = newPassword;
-        localStorage.setItem(
-          'smileclinic_registered_prescribers',
-          JSON.stringify(registeredPrescribers)
-        );
-      } else {
-        setIsSubmitting(false);
-        setResetError('Account could not be found to update password.');
-        return;
-      }
-
-      setIsSubmitting(false);
       setIsSuccess(true);
-
       setTimeout(() => {
         onSuccess(accountEmail);
         onClose();
       }, 1400);
-    }, 500);
+    } catch (err: any) {
+      setResetError(err.message || 'Password reset failed. Please ensure the code is correct.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
