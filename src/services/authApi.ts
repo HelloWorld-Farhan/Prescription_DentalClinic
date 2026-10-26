@@ -409,6 +409,36 @@ export const authApi = {
   },
 
   /**
+   * Fetch current clinical profile status from backend to sync cross-device completion
+   */
+  async getProfileStatus(email: string): Promise<{ status: string; profileCompleted: boolean; user?: UserProfile }> {
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail) return { status: 'error', profileCompleted: false };
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/profile-status?email=${encodeURIComponent(cleanEmail)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) {
+        return { status: 'error', profileCompleted: false };
+      }
+      const data = await res.json();
+      if (data && data.profileCompleted) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`profile_completed_${cleanEmail}`, 'true');
+          if (data.user) {
+            localStorage.setItem('smileclinic_auth_user', JSON.stringify(data.user));
+          }
+        }
+      }
+      return data;
+    } catch {
+      const isLocalDone = typeof window !== 'undefined' && localStorage.getItem(`profile_completed_${email.trim().toLowerCase()}`) === 'true';
+      return { status: 'offline', profileCompleted: isLocalDone };
+    }
+  },
+
+  /**
    * Persist session JWT and clinician profile
    */
   saveSession(token: string, user: UserProfile): void {
@@ -430,6 +460,9 @@ export const authApi = {
     }
     if (token) localStorage.setItem('smileclinic_jwt_token', token);
     localStorage.setItem('smileclinic_auth_user', JSON.stringify(user));
+    if (user.profileCompleted) {
+      localStorage.setItem(`profile_completed_${user.email.toLowerCase()}`, 'true');
+    }
   },
 
   /**

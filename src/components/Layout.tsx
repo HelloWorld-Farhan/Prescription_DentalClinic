@@ -10,7 +10,7 @@ import {
 } from '../lib/motion';
 import ErrorBoundary from './ErrorBoundary';
 import FirstTimeOnboardingModal from './FirstTimeOnboardingModal';
-import { UserProfile } from '../services/authApi';
+import { authApi, UserProfile } from '../services/authApi';
 import { PrescriptionStorage } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
 
@@ -108,12 +108,46 @@ export default function Layout() {
       setShowOnboarding(false);
       return;
     }
+
+    // 1. Immediate local cache check
     const isDoneLocal = localStorage.getItem(`profile_completed_${email}`) === 'true';
     const isDoneServer = Boolean(currentUser?.profileCompleted || storedUser?.profileCompleted);
     if (isDoneLocal || isDoneServer) {
       setShowOnboarding(false);
     }
-  }, [currentUser?.email, currentUser?.profileCompleted]);
+
+    // 2. Query backend database to guarantee cross-device synchronization
+    let isCancelled = false;
+    const syncProfileStatus = async () => {
+      try {
+        const res = await authApi.getProfileStatus(email);
+        if (isCancelled) return;
+        if (res && res.profileCompleted) {
+          setShowOnboarding(false);
+          localStorage.setItem(`profile_completed_${email}`, 'true');
+          if (res.user) {
+            setCurrentUser(res.user);
+            localStorage.setItem('smileclinic_auth_user', JSON.stringify(res.user));
+          }
+        }
+      } catch {
+        // Resilience: network timeout keeps existing state
+      }
+    };
+
+    syncProfileStatus();
+
+    // 3. Re-verify when window or browser tab gains focus (e.g. submitted on phone and switched back to laptop)
+    const handleFocus = () => {
+      syncProfileStatus();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [currentUser?.email]);
 
   const prescriberName =
     currentUser?.fullName ||
