@@ -163,6 +163,18 @@ export default function Layout() {
     document.body.scrollTop = 0;
   }, [location.pathname]);
 
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [sidebarOpen]);
+
   useEffect(() => {
     const handleLogoUpdate = () => {
       setClinicLogo(localStorage.getItem('dental_clinic_logo') || '');
@@ -325,7 +337,7 @@ export default function Layout() {
     <div className="flex flex-col justify-between h-full">
       <div className="flex flex-col">
         {/* Brand Header */}
-        <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-surface-container-low">
+        <div className="px-4 sm:px-5 pt-5 pb-4 flex items-center justify-between border-b border-surface-container-low gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shadow-xs overflow-hidden shrink-0">
               {clinicLogo ? (
@@ -335,18 +347,26 @@ export default function Layout() {
               )}
             </div>
             <div className="min-w-0">
-              <span className="text-lg font-bold tracking-tight text-primary block leading-tight truncate">Smile Clinic</span>
-              <span className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider">Prescription Portal</span>
+              <span className="text-base sm:text-lg font-bold tracking-tight text-primary block leading-tight truncate">Smile Clinic</span>
+              <span className="text-[11px] font-medium text-on-surface-variant uppercase tracking-wider block truncate">Prescription Portal</span>
             </div>
           </div>
           {isMobile && (
-            <button
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.92 }}
+              transition={buttonTapTransition}
               onClick={() => setSidebarOpen(false)}
-              className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors duration-150 cursor-pointer"
-              aria-label="Close menu"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setSidebarOpen(false);
+              }}
+              className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high active:bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors duration-150 cursor-pointer shrink-0 shadow-2xs"
+              aria-label="Close navigation menu"
+              title="Close menu"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
+            </motion.button>
           )}
         </div>
 
@@ -394,7 +414,7 @@ export default function Layout() {
               >
                 {isActive && (
                   <motion.div
-                    layoutId="activeSidebarItem"
+                    layoutId={isMobile ? "activeMobileSidebarItem" : "activeSidebarItem"}
                     className="absolute inset-0 bg-primary rounded-xl shadow-xs"
                     transition={{ duration: 0.25, ease: EASE }}
                   />
@@ -448,8 +468,10 @@ export default function Layout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2, ease: EASE }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
+              className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 lg:hidden cursor-pointer touch-none"
               onClick={() => setSidebarOpen(false)}
+              onPointerDown={() => setSidebarOpen(false)}
+              aria-hidden="true"
             />
             <motion.aside
               key="mobile-drawer"
@@ -457,7 +479,16 @@ export default function Layout() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ duration: 0.25, ease: EASE }}
-              className="fixed left-0 top-0 bottom-0 w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-surface-container-high shadow-2xl lg:hidden"
+              drag="x"
+              dragDirectionLock
+              dragConstraints={{ left: -320, right: 0 }}
+              dragElastic={{ left: 0.05, right: 0 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.x < -40 || info.velocity.x < -200) {
+                  setSidebarOpen(false);
+                }
+              }}
+              className="fixed left-0 top-0 bottom-0 w-72 sm:w-80 max-w-[85vw] bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-surface-container-high shadow-2xl lg:hidden touch-pan-y"
             >
               {renderSidebarContent(true)}
             </motion.aside>
@@ -479,11 +510,13 @@ export default function Layout() {
             <motion.button
               whileTap={{ scale: 0.95 }}
               transition={buttonTapTransition}
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => setSidebarOpen((prev) => !prev)}
               className="lg:hidden p-2 text-on-surface hover:bg-surface-container rounded-xl cursor-pointer shrink-0 transition-colors duration-150"
-              aria-label="Open navigation menu"
+              aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
             >
-              <span className="material-symbols-outlined text-2xl">menu</span>
+              <span className="material-symbols-outlined text-2xl">
+                {sidebarOpen ? 'close' : 'menu'}
+              </span>
             </motion.button>
 
             {/* Title & Status */}
