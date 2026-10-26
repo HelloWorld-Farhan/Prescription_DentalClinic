@@ -596,28 +596,60 @@ export default function Layout() {
             </div>
           </div>
 
-          {/* Center: Prescription AI Status Badge */}
-          <div className="flex items-center justify-center min-w-0">
-            <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
-              <span className="material-symbols-outlined text-[16px] sm:text-[18px] text-primary">psychology</span>
-              <span className="font-bold text-on-surface tracking-tight text-xs sm:text-sm hidden xs:inline">Prescription AI</span>
-              <span className="xs:hidden font-bold text-on-surface text-[11px]">AI</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] sm:text-[10px] font-bold">
+          {/* Prominent Clinical Search Bar on Medium & Large Screens */}
+          <div className="hidden md:flex flex-1 max-w-sm lg:max-w-md xl:max-w-xl mx-2 lg:mx-6 items-center min-w-0">
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="w-full h-10 px-3.5 rounded-xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high hover:border-primary/40 text-xs text-outline flex items-center justify-between transition-all duration-150 cursor-pointer group shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              title="Search clinical records, patients, drugs, or actions (⌘K)"
+              aria-label="Search clinical records"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="material-symbols-outlined text-[19px] text-outline group-hover:text-primary transition-colors duration-150 shrink-0">
+                  search
+                </span>
+                <span className="truncate font-medium text-outline group-hover:text-on-surface">
+                  {searchQuery.trim() ? searchQuery : 'Search patients, medications, MRN, or safety checks...'}
+                </span>
+              </div>
+              <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-bold text-outline bg-surface-container-high rounded border border-surface-container-highest shrink-0 group-hover:text-on-surface">
+                ⌘K
+              </kbd>
+            </button>
+          </div>
+
+          {/* Center: Mobile Prescription AI Status Badge (< md screens) */}
+          <div className="flex md:hidden items-center justify-center min-w-0">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
+              <span className="material-symbols-outlined text-[16px] text-primary">psychology</span>
+              <span className="font-bold text-on-surface text-[11px]">AI</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] font-bold">
                 v1.0
               </span>
-              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
             </div>
           </div>
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Quick Search Button */}
+            {/* Desktop Prescription AI Badge (on wide screens >= xl) */}
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs mr-1">
+              <span className="material-symbols-outlined text-[17px] text-primary">psychology</span>
+              <span className="font-bold text-on-surface text-xs">Prescription AI</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[10px] font-bold">
+                v1.0
+              </span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
+            </div>
+
+            {/* Quick Search Button (Mobile Only, < md) */}
             <motion.button
               type="button"
               whileTap={{ scale: 0.95 }}
               transition={buttonTapTransition}
               onClick={() => setIsSearchOpen(true)}
-              className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors duration-150 cursor-pointer flex items-center justify-center shadow-2xs"
+              className="md:hidden p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors duration-150 cursor-pointer flex items-center justify-center shadow-2xs"
               title="Search clinical records or actions (⌘K)"
               aria-label="Search records"
             >
