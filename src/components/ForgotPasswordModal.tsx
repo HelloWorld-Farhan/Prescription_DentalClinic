@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { OFFICIAL_PRESCRIBER_CREDENTIALS } from '../pages/Login';
 import OtpVerificationInput from './OtpVerificationInput';
 import PasswordStrengthMeter from './PasswordStrengthMeter';
 
@@ -22,7 +21,7 @@ export default function ForgotPasswordModal({
   const [accountEmail, setAccountEmail] = useState(initialEmail || '');
   const [emailTouched, setEmailTouched] = useState(false);
   const [hasAttemptedStep1, setHasAttemptedStep1] = useState(false);
-  const [mobilePhone, setMobilePhone] = useState('+1 (555) 849-2041');
+  const [mobilePhone, setMobilePhone] = useState('');
   
   // OTP state
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
@@ -118,6 +117,20 @@ export default function ForgotPasswordModal({
       return;
     }
 
+    const registeredPrescribers = JSON.parse(
+      localStorage.getItem('smileclinic_registered_prescribers') || '[]'
+    );
+    const existingUser = registeredPrescribers.find(
+      (p: any) => p.email.toLowerCase() === accountEmail.trim().toLowerCase()
+    );
+    if (!existingUser) {
+      setResetError('No registered clinician account found for this email address.');
+      return;
+    }
+    if (existingUser.phone) {
+      setMobilePhone(existingUser.phone);
+    }
+
     setResetError('');
     if (method === 'email') {
       setOtp(Array(6).fill(''));
@@ -162,7 +175,6 @@ export default function ForgotPasswordModal({
     } else {
       // Validate previous password
       const input = previousPasswordInput.trim();
-      const isOfficialPrev = input === OFFICIAL_PRESCRIBER_CREDENTIALS.password;
       const registeredPrescribers = JSON.parse(
         localStorage.getItem('smileclinic_registered_prescribers') || '[]'
       );
@@ -170,7 +182,7 @@ export default function ForgotPasswordModal({
         (p: any) => p.email.toLowerCase() === accountEmail.trim().toLowerCase() && p.password === input
       );
 
-      if (isOfficialPrev || matched || input.length >= 6) {
+      if (matched) {
         setPrevPassError('');
         setIsSubmitting(true);
         setTimeout(() => {
@@ -178,7 +190,7 @@ export default function ForgotPasswordModal({
           setStep(3);
         }, 400);
       } else {
-        setPrevPassError('Previous password does not match clinical records for this account.');
+        setPrevPassError('Previous password does not match records for this account.');
       }
     }
   };
@@ -218,8 +230,9 @@ export default function ForgotPasswordModal({
           JSON.stringify(registeredPrescribers)
         );
       } else {
-        // If updating official demo prescriber, save in updated credentials store
-        localStorage.setItem('smileclinic_custom_prescriber_password', newPassword);
+        setIsSubmitting(false);
+        setResetError('Account could not be found to update password.');
+        return;
       }
 
       setIsSubmitting(false);

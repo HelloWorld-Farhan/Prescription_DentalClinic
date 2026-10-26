@@ -33,6 +33,27 @@ export default function Layout() {
     return localStorage.getItem('dental_clinic_logo') || '';
   });
 
+  const prescriberName =
+    sessionStorage.getItem('rxguard_prescriber_name') ||
+    localStorage.getItem('rxguard_prescriber_name') ||
+    'Authorized Clinician';
+  const prescriberRole =
+    sessionStorage.getItem('rxguard_prescriber_role') ||
+    localStorage.getItem('rxguard_prescriber_role') ||
+    'Clinical Prescriber';
+  const prescriberNpi =
+    sessionStorage.getItem('rxguard_prescriber_npi') ||
+    localStorage.getItem('rxguard_prescriber_npi') ||
+    'NPI Verified';
+  const prescriberInitials = prescriberName
+    .replace(/^Dr\.\s*/i, '')
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0]?.toUpperCase())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('') || 'RX';
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
@@ -156,10 +177,10 @@ export default function Layout() {
           {/* Clinician Card */}
           <div className="p-2.5 bg-surface-container-lowest rounded-xl border border-surface-container-high flex items-center gap-2.5 shadow-xs">
             <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/10 text-primary flex items-center justify-center shrink-0 font-bold text-xs ring-1 ring-primary/20">
-              SL
+              {prescriberInitials}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-on-surface truncate">Dr. Sarah Lin, PharmD</div>
+              <div className="text-xs font-bold text-on-surface truncate">{prescriberName}</div>
               <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active Prescriber
               </div>
@@ -298,7 +319,7 @@ export default function Layout() {
                 aria-label="Clinician profile options"
               >
                 <div className="w-8 h-8 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-xs">
-                  SL
+                  {prescriberInitials}
                 </div>
                 <span className="material-symbols-outlined text-[18px] text-outline hidden sm:block">arrow_drop_down</span>
               </button>
@@ -319,13 +340,13 @@ export default function Layout() {
                     >
                       <div className="p-3 border-b border-surface-container-low">
                         <div className="font-bold text-xs text-on-surface">
-                          {sessionStorage.getItem('rxguard_prescriber_name') || 'Dr. Sarah Lin, PharmD'}
+                          {prescriberName}
                         </div>
                         <div className="text-[10px] text-outline">
-                          {sessionStorage.getItem('rxguard_prescriber_role') || 'Lead Clinical Pharmacist'}
+                          {prescriberRole}
                         </div>
                         <div className="text-[10px] text-primary font-mono mt-0.5">
-                          {sessionStorage.getItem('rxguard_prescriber_npi') || 'NPI-1092837482'}
+                          {prescriberNpi}
                         </div>
                       </div>
 

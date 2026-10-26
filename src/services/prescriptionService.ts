@@ -12,9 +12,23 @@ try {
   localStorage.removeItem('smileclinic_rules');
   localStorage.removeItem('smileclinic_rules_v5');
   localStorage.removeItem('smileclinic_audit');
+  localStorage.removeItem('smileclinic_custom_prescriber_password');
+  localStorage.removeItem('smileclinic_registered_doctors');
 } catch {
   // ignore
 }
+
+const getActiveClinicianName = () => {
+  try {
+    return (
+      sessionStorage.getItem('rxguard_prescriber_name') ||
+      localStorage.getItem('rxguard_prescriber_name') ||
+      'Authorized Clinician'
+    );
+  } catch {
+    return 'Authorized Clinician';
+  }
+};
 
 export const INITIAL_PATIENTS: Patient[] = [];
 export const INITIAL_CHECKS: SafetyCheckRecord[] = [];
@@ -42,7 +56,7 @@ export class PrescriptionStorage {
     this.addAudit({
       id: 'aud-' + Date.now(),
       timestamp: 'Just now',
-      clinicianName: 'Dr. Sarah Lin, PharmD',
+      clinicianName: getActiveClinicianName(),
       action: 'Rule Updated',
       patientMrn: 'Global Rules',
       details: `${newRules.length} rule${newRules.length > 1 ? 's' : ''} added to clinical decision matrix.`,
@@ -58,7 +72,7 @@ export class PrescriptionStorage {
     this.addAudit({
       id: 'aud-' + Date.now(),
       timestamp: 'Just now',
-      clinicianName: 'Dr. Sarah Lin, PharmD',
+      clinicianName: getActiveClinicianName(),
       action: 'Rule Updated',
       patientMrn: 'Global Rules',
       details: `Rule "${rule.drugA} + ${rule.drugB}" created.`,
@@ -82,7 +96,7 @@ export class PrescriptionStorage {
       this.addAudit({
         id: 'aud-' + Date.now(),
         timestamp: 'Just now',
-        clinicianName: 'Dr. Sarah Lin, PharmD',
+        clinicianName: getActiveClinicianName(),
         action: 'Rule Updated',
         patientMrn: 'Global Rules',
         details: `Rule "${rule.drugA} + ${rule.drugB}" set to ${rule.active ? 'ACTIVE' : 'DISABLED'}.`,

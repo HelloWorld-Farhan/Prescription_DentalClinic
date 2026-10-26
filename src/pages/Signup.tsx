@@ -243,27 +243,9 @@ export default function Signup() {
   };
 
   const handleGoogleSignup = () => {
-    const googleUser: RegisteredPrescriber = {
-      fullName: 'Dr. Alex Morgan',
-      email: 'alex.morgan@gmail.com',
-      phone: '+1 555-019-2834',
-      countryCode: 'US',
-      password: 'GoogleOAuth2Verified#2026',
-      registeredAt: new Date().toISOString(),
-    };
-    const existing: RegisteredPrescriber[] = JSON.parse(
-      localStorage.getItem('smileclinic_registered_prescribers') || '[]'
+    setSignupError(
+      'Google OAuth2 registration will connect directly to your real database. Please fill out the registration form below to create your clinician account.'
     );
-    const filtered = existing.filter((p) => p.email.toLowerCase() !== googleUser.email.toLowerCase());
-    filtered.push(googleUser);
-    localStorage.setItem('smileclinic_registered_prescribers', JSON.stringify(filtered));
-
-    sessionStorage.setItem('rxguard_authenticated', 'true');
-    sessionStorage.setItem('rxguard_prescriber_name', googleUser.fullName);
-    sessionStorage.setItem('rxguard_prescriber_role', 'Authorized Prescriber');
-    sessionStorage.setItem('rxguard_prescriber_npi', 'NPI-1092837482');
-    sessionStorage.setItem('rxguard_prescriber_email', googleUser.email);
-    navigate('/dashboard');
   };
 
   return (

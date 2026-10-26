@@ -4,14 +4,6 @@ import { motion } from 'framer-motion';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import AuthInfoPanel from '../components/AuthInfoPanel';
 
-export const OFFICIAL_PRESCRIBER_CREDENTIALS = {
-  email: 'prescription@smileclinic.com',
-  password: 'Prescription@Smile2026#',
-  name: 'Dr. Sarah Lin, PharmD',
-  role: 'Lead Clinical Pharmacist - Inpatient',
-  npi: 'NPI# 1092837482'
-};
-
 export default function Login() {
   const navigate = useNavigate();
 
@@ -25,7 +17,7 @@ export default function Login() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(true);
+  const [rememberDevice, setRememberDevice] = useState(false);
   const [authorizedConfirmation, setAuthorizedConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successFlash, setSuccessFlash] = useState<string | null>(() => {
@@ -78,19 +70,6 @@ export default function Login() {
     const inputEmail = clinicalId.trim().toLowerCase();
     const inputPass = password;
 
-    // Check custom password if prescriber previously reset it
-    const customPass = localStorage.getItem('smileclinic_custom_prescriber_password');
-
-    // Check Official Prescriber Credentials
-    const isOfficialPrescription =
-      inputEmail === OFFICIAL_PRESCRIBER_CREDENTIALS.email.toLowerCase() &&
-      (inputPass === OFFICIAL_PRESCRIBER_CREDENTIALS.password || (customPass && inputPass === customPass));
-
-    // Check legacy rxguard & doctor credentials
-    const isOfficialRxGuard =
-      (inputEmail === 'rxguard@smileclinic.com' && inputPass === 'RxGuard@Smile2026#') ||
-      (inputEmail === 'doctor@smileclinic.com' && inputPass === 'Doctor@Smile2026#');
-
     // Check Registered Prescribers
     const registeredPrescribers = JSON.parse(
       localStorage.getItem('smileclinic_registered_prescribers') || '[]'
@@ -99,42 +78,22 @@ export default function Login() {
       (p: any) => p.email.toLowerCase() === inputEmail && p.password === inputPass
     );
 
-    // Also check registered doctors from Doctor portal if shared
-    const registeredDoctors = JSON.parse(
-      localStorage.getItem('smileclinic_registered_doctors') || '[]'
-    );
-    const registeredDoc = registeredDoctors.find(
-      (d: any) => d.email.toLowerCase() === inputEmail && d.password === inputPass
-    );
-
-    if (isOfficialPrescription || isOfficialRxGuard || registered || registeredDoc) {
+    if (registered) {
       setIsLoading(true);
       setTimeout(() => {
         sessionStorage.setItem('rxguard_authenticated', 'true');
         if (rememberDevice) {
           localStorage.setItem('rxguard_authenticated', 'true');
         }
-        sessionStorage.setItem(
-          'rxguard_prescriber_name',
-          registered ? registered.fullName : registeredDoc ? registeredDoc.name : OFFICIAL_PRESCRIBER_CREDENTIALS.name
-        );
-        sessionStorage.setItem(
-          'rxguard_prescriber_role',
-          registered ? registered.role : 'Clinical Pharmacist'
-        );
-        sessionStorage.setItem(
-          'rxguard_prescriber_npi',
-          registered ? registered.npiLicense : OFFICIAL_PRESCRIBER_CREDENTIALS.npi
-        );
-        sessionStorage.setItem(
-          'rxguard_prescriber_email',
-          inputEmail
-        );
+        sessionStorage.setItem('rxguard_prescriber_name', registered.fullName);
+        sessionStorage.setItem('rxguard_prescriber_role', registered.role || 'Clinical Prescriber');
+        sessionStorage.setItem('rxguard_prescriber_npi', registered.npiLicense || registered.phone || 'NPI Verified');
+        sessionStorage.setItem('rxguard_prescriber_email', registered.email);
         navigate('/dashboard');
       }, 400);
     } else {
       setErrorMessage(
-        'Invalid credentials. Please enter authorized prescriber email and password, or enroll below.'
+        'Invalid credentials. No registered clinician account matches these credentials. Please check your details or enroll as a prescriber below.'
       );
     }
   };
@@ -146,18 +105,9 @@ export default function Login() {
   };
 
   const handleGoogleAuth = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      sessionStorage.setItem('rxguard_authenticated', 'true');
-      if (rememberDevice) {
-        localStorage.setItem('rxguard_authenticated', 'true');
-      }
-      sessionStorage.setItem('rxguard_prescriber_name', 'Dr. Alex Morgan');
-      sessionStorage.setItem('rxguard_prescriber_role', 'Clinical Prescriber');
-      sessionStorage.setItem('rxguard_prescriber_npi', 'NPI-1092837482');
-      sessionStorage.setItem('rxguard_prescriber_email', 'alex.morgan@gmail.com');
-      navigate('/dashboard');
-    }, 450);
+    setErrorMessage(
+      'Google OAuth2 service will be connected directly to your real database. Please sign in with your clinician email and password, or enroll below.'
+    );
   };
 
   return (
