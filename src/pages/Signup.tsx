@@ -14,23 +14,23 @@ export interface RegisteredPrescriber {
   registeredAt: string;
 }
 
-// Country dial codes for the picker
+// Country dial codes for the picker with expected phone length
 const COUNTRIES = [
-  { code: 'IN', dial: '+91',  flag: '🇮🇳', name: 'India'          },
-  { code: 'US', dial: '+1',   flag: '🇺🇸', name: 'United States'   },
-  { code: 'GB', dial: '+44',  flag: '🇬🇧', name: 'United Kingdom'  },
-  { code: 'AU', dial: '+61',  flag: '🇦🇺', name: 'Australia'       },
-  { code: 'CA', dial: '+1',   flag: '🇨🇦', name: 'Canada'          },
-  { code: 'AE', dial: '+971', flag: '🇦🇪', name: 'UAE'             },
-  { code: 'SG', dial: '+65',  flag: '🇸🇬', name: 'Singapore'       },
-  { code: 'PK', dial: '+92',  flag: '🇵🇰', name: 'Pakistan'        },
-  { code: 'BD', dial: '+880', flag: '🇧🇩', name: 'Bangladesh'      },
-  { code: 'LK', dial: '+94',  flag: '🇱🇰', name: 'Sri Lanka'       },
-  { code: 'MY', dial: '+60',  flag: '🇲🇾', name: 'Malaysia'        },
-  { code: 'NP', dial: '+977', flag: '🇳🇵', name: 'Nepal'           },
-  { code: 'DE', dial: '+49',  flag: '🇩🇪', name: 'Germany'         },
-  { code: 'FR', dial: '+33',  flag: '🇫🇷', name: 'France'          },
-  { code: 'NZ', dial: '+64',  flag: '🇳🇿', name: 'New Zealand'     },
+  { code: 'IN', dial: '+91',  flag: '🇮🇳', name: 'India',          min: 10, max: 10 },
+  { code: 'US', dial: '+1',   flag: '🇺🇸', name: 'United States',  min: 10, max: 10 },
+  { code: 'GB', dial: '+44',  flag: '🇬🇧', name: 'United Kingdom', min: 10, max: 11 },
+  { code: 'AU', dial: '+61',  flag: '🇦🇺', name: 'Australia',      min: 9,  max: 10 },
+  { code: 'CA', dial: '+1',   flag: '🇨🇦', name: 'Canada',         min: 10, max: 10 },
+  { code: 'AE', dial: '+971', flag: '🇦🇪', name: 'UAE',            min: 9,  max: 9  },
+  { code: 'SG', dial: '+65',  flag: '🇸🇬', name: 'Singapore',      min: 8,  max: 8  },
+  { code: 'PK', dial: '+92',  flag: '🇵🇰', name: 'Pakistan',       min: 10, max: 10 },
+  { code: 'BD', dial: '+880', flag: '🇧🇩', name: 'Bangladesh',     min: 10, max: 10 },
+  { code: 'LK', dial: '+94',  flag: '🇱🇰', name: 'Sri Lanka',      min: 9,  max: 9  },
+  { code: 'MY', dial: '+60',  flag: '🇲🇾', name: 'Malaysia',       min: 9,  max: 10 },
+  { code: 'NP', dial: '+977', flag: '🇳🇵', name: 'Nepal',          min: 10, max: 10 },
+  { code: 'DE', dial: '+49',  flag: '🇩🇪', name: 'Germany',        min: 10, max: 11 },
+  { code: 'FR', dial: '+33',  flag: '🇫🇷', name: 'France',         min: 9,  max: 9  },
+  { code: 'NZ', dial: '+64',  flag: '🇳🇿', name: 'New Zealand',    min: 9,  max: 10 },
 ];
 
 export default function Signup() {
@@ -52,6 +52,14 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
+
+  // Field Touched Tracking
+  const [fullNameTouched, setFullNameTouched] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [confirmPasswordTouched, setConfirmPasswordTouched] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   // Email OTP Modal State
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -81,26 +89,112 @@ export default function Signup() {
   const passwordsMatch = password.length > 0 && password === confirmPassword;
   const isPasswordValid = isMin8Chars && hasCapital && hasMin2Numbers && hasSpecial;
 
+  // Smart Auto Country Code Detection on typing/pasting
+  const handlePhoneChange = (rawInput: string) => {
+    let cleanInput = rawInput;
+    const trimmed = rawInput.trim();
+
+    // Check international dial prefix match (+91, +1, +44, etc.)
+    const sortedCountries = [...COUNTRIES].sort((a, b) => b.dial.length - a.dial.length);
+
+    if (trimmed.startsWith('+')) {
+      for (const country of sortedCountries) {
+        if (trimmed.startsWith(country.dial)) {
+          setSelectedCountry(country);
+          cleanInput = trimmed.slice(country.dial.length).trim();
+          break;
+        }
+      }
+    } else {
+      const allDigits = trimmed.replace(/\D/g, '');
+      // If user pasted something like 919876543210 or 14155552671
+      if (allDigits.length >= 11) {
+        for (const country of sortedCountries) {
+          const dialDigits = country.dial.replace('+', '');
+          if (allDigits.startsWith(dialDigits) && allDigits.length === dialDigits.length + country.min) {
+            setSelectedCountry(country);
+            cleanInput = allDigits.slice(dialDigits.length);
+            break;
+          }
+        }
+      }
+    }
+
+    setPhone(cleanInput.replace(/[^\d\s\-()]/g, ''));
+    setSignupError(null);
+  };
+
+  // Real-time validation error functions
+  const getNameError = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (!trimmed) return 'Full legal name & title is required.';
+    if (trimmed.length < 2) return 'Full name must be at least 2 characters.';
+    return null;
+  };
+
+  const getEmailError = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (!trimmed) return 'Institutional email address is required.';
+    if (!trimmed.includes('@')) return 'Email must contain an "@" symbol (e.g. doctor@gmail.com).';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailRegex.test(trimmed)) return 'Please enter a valid domain (e.g. name@gmail.com).';
+    return null;
+  };
+
+  const getPhoneError = (val: string, country: typeof selectedCountry): string | null => {
+    const digits = val.replace(/\D/g, '');
+    if (!digits) return 'Mobile phone number is required.';
+    if (digits.length < country.min) {
+      return `Phone number for ${country.name} must be ${country.min === country.max ? country.min : `${country.min}-${country.max}`} digits (currently ${digits.length}).`;
+    }
+    if (digits.length > country.max) {
+      return `Phone number cannot exceed ${country.max} digits for ${country.name}.`;
+    }
+    return null;
+  };
+
+  const getPasswordError = (val: string): string | null => {
+    if (!val) return 'System password is required.';
+    if (!isPasswordValid) return 'Password must fulfill all 4 security criteria below.';
+    return null;
+  };
+
+  const getConfirmPasswordError = (confirmVal: string, pwd: string): string | null => {
+    if (!confirmVal) return 'Please confirm your system password.';
+    if (confirmVal !== pwd) return 'Passwords do not match. Please verify.';
+    return null;
+  };
+
+  const getTermsError = (agreed: boolean): string | null => {
+    if (!agreed) return 'Please confirm clinical credentials and accept terms.';
+    return null;
+  };
+
+  const nameError = (fullNameTouched || hasAttemptedSubmit) ? getNameError(fullName) : null;
+  const emailError = (emailTouched || hasAttemptedSubmit) ? getEmailError(email) : null;
+  const phoneError = (phoneTouched || hasAttemptedSubmit) ? getPhoneError(phone, selectedCountry) : null;
+  const passwordError = (passwordTouched || hasAttemptedSubmit) ? getPasswordError(password) : null;
+  const confirmPasswordError = (confirmPasswordTouched || hasAttemptedSubmit) ? getConfirmPasswordError(confirmPassword, password) : null;
+  const termsError = (hasAttemptedSubmit && !agreedTerms) ? getTermsError(agreedTerms) : null;
+
   const handleInitiateSignup = (e: React.FormEvent) => {
     e.preventDefault();
+    setHasAttemptedSubmit(true);
+    setFullNameTouched(true);
+    setEmailTouched(true);
+    setPhoneTouched(true);
+    setPasswordTouched(true);
+    setConfirmPasswordTouched(true);
     setSignupError(null);
 
-    if (!isPasswordValid) {
-      setSignupError('Password must contain at least 8 characters, 1 uppercase letter, 2 numbers, and 1 special symbol.');
-      return;
-    }
-    if (!passwordsMatch) {
-      setSignupError('Passwords do not match. Please verify your entries.');
-      return;
-    }
-    // Validate bare number (digits only, at least 7)
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (cleanPhone.length < 7) {
-      setSignupError('Please provide a valid phone number.');
-      return;
-    }
-    if (!agreedTerms) {
-      setSignupError('Please confirm the clinical credentials attestation before proceeding.');
+    const nErr = getNameError(fullName);
+    const eErr = getEmailError(email);
+    const pErr = getPhoneError(phone, selectedCountry);
+    const passErr = getPasswordError(password);
+    const cPassErr = getConfirmPasswordError(confirmPassword, password);
+    const tErr = getTermsError(agreedTerms);
+
+    if (nErr || eErr || pErr || passErr || cPassErr || tErr) {
       return;
     }
 
@@ -257,12 +351,25 @@ export default function Signup() {
                     </label>
                     <input
                       type="text"
-                      required
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      onBlur={() => setFullNameTouched(true)}
+                      onChange={(e) => {
+                        setFullName(e.target.value);
+                        setSignupError(null);
+                      }}
                       placeholder="Dr. Arthur Vance, MD"
-                      className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                      className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all ${
+                        nameError
+                          ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
+                          : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
+                      }`}
                     />
+                    {nameError && (
+                      <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                        <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                        <span>{nameError}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Email — full width */}
@@ -276,20 +383,38 @@ export default function Signup() {
                       </span>
                       <input
                         type="email"
-                        required
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="clinician@smileclinic.com"
-                        className="w-full pl-10 pr-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                        onBlur={() => setEmailTouched(true)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setSignupError(null);
+                        }}
+                        placeholder="clinician@smileclinic.com or doctor@gmail.com"
+                        className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all ${
+                          emailError
+                            ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
+                            : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
+                        }`}
                       />
                     </div>
+                    {emailError && (
+                      <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                        <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                        <span>{emailError}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Mobile Phone with Country Code Picker */}
                   <div>
-                    <label className="block text-xs font-semibold text-on-surface mb-1">
-                      Mobile Number *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-on-surface">
+                        Mobile Number *
+                      </label>
+                      <span className="text-[10px] text-outline">
+                        Auto-detects country from +code
+                      </span>
+                    </div>
                     <div className="flex gap-2">
                       {/* Country picker trigger */}
                       <div className="relative">
@@ -342,13 +467,23 @@ export default function Signup() {
                       {/* Phone number input */}
                       <input
                         type="tel"
-                        required
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/[^\d\s\-()]/g, ''))}
+                        onBlur={() => setPhoneTouched(true)}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
                         placeholder={selectedCountry.code === 'IN' ? '98765 43210' : '555 234 5678'}
-                        className="flex-1 px-3.5 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all font-mono"
+                        className={`flex-1 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all font-mono ${
+                          phoneError
+                            ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
+                            : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
+                        }`}
                       />
                     </div>
+                    {phoneError && (
+                      <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                        <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                        <span>{phoneError}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Password row */}
@@ -360,11 +495,18 @@ export default function Signup() {
                       <div className="relative">
                         <input
                           type={showPassword ? 'text' : 'password'}
-                          required
                           value={password}
-                          onChange={(e) => setPassword(e.target.value)}
+                          onBlur={() => setPasswordTouched(true)}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            setSignupError(null);
+                          }}
                           placeholder="••••••••••••"
-                          className="w-full pl-3.5 pr-10 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                          className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all ${
+                            passwordError
+                              ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
+                              : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
+                          }`}
                         />
                         <button
                           type="button"
@@ -376,6 +518,12 @@ export default function Signup() {
                           </span>
                         </button>
                       </div>
+                      {passwordError && (
+                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                          <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                          <span>{passwordError}</span>
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -385,11 +533,18 @@ export default function Signup() {
                       <div className="relative">
                         <input
                           type={showConfirmPassword ? 'text' : 'password'}
-                          required
                           value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          onBlur={() => setConfirmPasswordTouched(true)}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            setSignupError(null);
+                          }}
                           placeholder="••••••••••••"
-                          className="w-full pl-3.5 pr-10 py-2.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface border border-surface-container-high focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
+                          className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none transition-all ${
+                            confirmPasswordError
+                              ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
+                              : 'bg-surface-container-low border border-surface-container-high focus:border-primary focus:bg-surface-container-lowest'
+                          }`}
                         />
                         <button
                           type="button"
@@ -401,6 +556,12 @@ export default function Signup() {
                           </span>
                         </button>
                       </div>
+                      {confirmPasswordError && (
+                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-1 animate-fadeIn">
+                          <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                          <span>{confirmPasswordError}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -409,47 +570,68 @@ export default function Signup() {
                     <PasswordStrengthMeter password={password} confirmPassword={confirmPassword} />
                   </div>
 
-                  {/* Attestation checkbox — styled */}
-                  <motion.label
-                    whileTap={{ scale: 0.995 }}
-                    className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                      agreedTerms
+                  {/* Attestation checkbox — styled with real-time error */}
+                  <div
+                    className={`p-4 rounded-2xl border transition-all ${
+                      termsError
+                        ? 'bg-rose-50/50 border-rose-400'
+                        : agreedTerms
                         ? 'bg-emerald-50 border-emerald-300'
                         : 'bg-surface-container-low border-surface-container-high/60 hover:border-primary/40 hover:bg-surface-container-lowest'
                     }`}
                   >
-                    {/* Custom checkbox visual */}
-                    <div className="relative shrink-0 mt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={agreedTerms}
-                        onChange={(e) => setAgreedTerms(e.target.checked)}
-                        className="sr-only"
-                      />
-                      <motion.div
-                        animate={agreedTerms ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                        transition={{ duration: 0.25 }}
-                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                          agreedTerms
-                            ? 'bg-emerald-500 border-emerald-500'
-                            : 'bg-surface-container border-outline/50'
-                        }`}
-                      >
-                        {agreedTerms && (
-                          <motion.span
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="material-symbols-outlined text-white text-[14px]"
-                          >
-                            check
-                          </motion.span>
-                        )}
-                      </motion.div>
-                    </div>
-                    <span className={`text-xs leading-relaxed transition-colors ${agreedTerms ? 'text-emerald-800 font-medium' : 'text-on-surface-variant'}`}>
-                      I confirm that all details provided are accurate and I agree to the clinical terms and privacy policy.
-                    </span>
-                  </motion.label>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      {/* Custom checkbox visual */}
+                      <div className="relative shrink-0 mt-0.5">
+                        <input
+                          type="checkbox"
+                          checked={agreedTerms}
+                          onChange={(e) => {
+                            setAgreedTerms(e.target.checked);
+                            setSignupError(null);
+                          }}
+                          className="sr-only"
+                        />
+                        <motion.div
+                          animate={agreedTerms ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                          transition={{ duration: 0.25 }}
+                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                            agreedTerms
+                              ? 'bg-emerald-500 border-emerald-500'
+                              : termsError
+                              ? 'bg-white border-rose-400'
+                              : 'bg-surface-container border-outline/50'
+                          }`}
+                        >
+                          {agreedTerms && (
+                            <motion.span
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="material-symbols-outlined text-white text-[14px]"
+                            >
+                              check
+                            </motion.span>
+                          )}
+                        </motion.div>
+                      </div>
+                      <span className={`text-xs leading-relaxed transition-colors ${
+                        termsError
+                          ? 'text-rose-900 font-medium'
+                          : agreedTerms
+                          ? 'text-emerald-800 font-medium'
+                          : 'text-on-surface-variant'
+                      }`}>
+                        I confirm that all details provided are accurate and I agree to the clinical terms and privacy policy.
+                      </span>
+                    </label>
+
+                    {termsError && (
+                      <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-2.5 pt-2 border-t border-rose-200/60 animate-fadeIn">
+                        <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                        <span>{termsError}</span>
+                      </p>
+                    )}
+                  </div>
 
                   {/* Submit */}
                   <motion.button

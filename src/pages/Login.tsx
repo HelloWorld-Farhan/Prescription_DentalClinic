@@ -19,8 +19,11 @@ export default function Login() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, []);
 
-  const [clinicalId, setClinicalId] = useState('');
-  const [password, setPassword] = useState('');
+  const [clinicalId, setClinicalId] = useState(OFFICIAL_PRESCRIBER_CREDENTIALS.email);
+  const [password, setPassword] = useState(OFFICIAL_PRESCRIBER_CREDENTIALS.password);
+  const [clinicalIdTouched, setClinicalIdTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
   const [authorizedConfirmation, setAuthorizedConfirmation] = useState(true);
@@ -39,10 +42,36 @@ export default function Login() {
   // Dynamic clinic logo
   const savedLogo = localStorage.getItem('dental_clinic_logo');
 
+  // Real-time validation helpers
+  const getEmailError = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (!trimmed) return 'Institutional email address or NPI is required.';
+    if (/^NPI#?\s*\d{8,12}$/i.test(trimmed)) return null; // Allow valid NPI license format
+    if (!trimmed.includes('@')) return 'Email must contain an "@" symbol (e.g. name@gmail.com).';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailRegex.test(trimmed)) return 'Please enter a valid domain (e.g. name@gmail.com).';
+    return null;
+  };
+
+  const getPasswordError = (val: string): string | null => {
+    if (!val) return 'System password is required.';
+    if (val.length < 6) return 'Password must be at least 6 characters.';
+    return null;
+  };
+
+  const emailError = (clinicalIdTouched || hasAttemptedSubmit) ? getEmailError(clinicalId) : null;
+  const passwordError = (passwordTouched || hasAttemptedSubmit) ? getPasswordError(password) : null;
+  const checkboxError = (hasAttemptedSubmit && !authorizedConfirmation) ? 'Please confirm clinician authorization before signing in.' : null;
+
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authorizedConfirmation) {
-      setErrorMessage('Please confirm authorization before signing in.');
+    setHasAttemptedSubmit(true);
+    setClinicalIdTouched(true);
+    setPasswordTouched(true);
+
+    const emailErr = getEmailError(clinicalId);
+    const passErr = getPasswordError(password);
+    if (emailErr || passErr || !authorizedConfirmation) {
       return;
     }
 
@@ -242,15 +271,25 @@ export default function Login() {
                           id="clinical-id"
                           type="text"
                           value={clinicalId}
+                          onBlur={() => setClinicalIdTouched(true)}
                           onChange={(e) => {
                             setClinicalId(e.target.value);
                             setErrorMessage(null);
                           }}
                           placeholder="prescription@smileclinic.com or NPI# 1092837482"
-                          required
-                          className="w-full h-11 pl-10 pr-3 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-sm placeholder:text-outline focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all"
+                          className={`w-full h-11 pl-10 pr-3 rounded-xl text-on-surface text-sm placeholder:text-outline focus:outline-none transition-all ${
+                            emailError
+                              ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
+                              : 'bg-surface-container-low border border-surface-container-high focus:bg-surface-container-lowest focus:border-primary'
+                          }`}
                         />
                       </div>
+                      {emailError && (
+                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-0.5 animate-fadeIn">
+                          <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                          <span>{emailError}</span>
+                        </p>
+                      )}
                     </div>
 
                     {/* Password Field */}
@@ -275,13 +314,17 @@ export default function Login() {
                           id="clinical-password"
                           type={showPassword ? 'text' : 'password'}
                           value={password}
+                          onBlur={() => setPasswordTouched(true)}
                           onChange={(e) => {
                             setPassword(e.target.value);
                             setErrorMessage(null);
                           }}
                           placeholder="••••••••••••"
-                          required
-                          className="w-full h-11 pl-10 pr-10 rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface text-sm placeholder:text-outline focus:bg-surface-container-lowest focus:border-primary focus:outline-none transition-all"
+                          className={`w-full h-11 pl-10 pr-10 rounded-xl text-on-surface text-sm placeholder:text-outline focus:outline-none transition-all ${
+                            passwordError
+                              ? 'bg-rose-50/20 border border-rose-400 focus:border-rose-500 focus:bg-white'
+                              : 'bg-surface-container-low border border-surface-container-high focus:bg-surface-container-lowest focus:border-primary'
+                          }`}
                         />
                         <button
                           type="button"
@@ -294,6 +337,12 @@ export default function Login() {
                           </span>
                         </button>
                       </div>
+                      {passwordError && (
+                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-0.5 animate-fadeIn">
+                          <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                          <span>{passwordError}</span>
+                        </p>
+                      )}
                     </div>
 
                     {/* Remember Device */}
@@ -310,29 +359,42 @@ export default function Login() {
                     </div>
 
                     {/* Clinician Authorization Confirmation */}
-                    <div className="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container-high/60">
+                    <div className={`rounded-2xl p-3.5 border transition-all ${
+                      checkboxError
+                        ? 'bg-rose-50/40 border-rose-300'
+                        : 'bg-surface-container-low border-surface-container-high/60'
+                    }`}>
                       <label className="flex items-start gap-2.5 cursor-pointer group">
                         <input
                           type="checkbox"
                           checked={authorizedConfirmation}
-                          onChange={(e) => setAuthorizedConfirmation(e.target.checked)}
+                          onChange={(e) => {
+                            setAuthorizedConfirmation(e.target.checked);
+                            setErrorMessage(null);
+                          }}
                           className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
                         />
                         <span className="text-xs text-on-surface-variant group-hover:text-on-surface transition-colors leading-relaxed">
                           I confirm that I am an authorized clinician accessing Smile Clinic patient records.
                         </span>
                       </label>
+                      {checkboxError && (
+                        <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1 mt-2 pt-1.5 border-t border-rose-200/60 animate-fadeIn">
+                          <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                          <span>{checkboxError}</span>
+                        </p>
+                      )}
                     </div>
 
                     {/* Submit Button */}
                     <div className="flex flex-col gap-2 pt-1">
                       <motion.button
                         type="submit"
-                        whileHover={authorizedConfirmation && !isLoading ? { scale: 1.015, y: -1 } : {}}
-                        whileTap={authorizedConfirmation && !isLoading ? { scale: 0.985 } : {}}
-                        disabled={!authorizedConfirmation || isLoading}
+                        whileHover={!isLoading ? { scale: 1.015, y: -1 } : {}}
+                        whileTap={!isLoading ? { scale: 0.985 } : {}}
+                        disabled={isLoading}
                         className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 select-none ${
-                          authorizedConfirmation && !isLoading
+                          !isLoading
                             ? 'bg-primary hover:bg-primary-hover text-white shadow-md hover:shadow-lg cursor-pointer'
                             : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
                         }`}
