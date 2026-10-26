@@ -63,8 +63,22 @@ export default function Layout() {
     setShowOnboarding(false);
     if (typeof window !== 'undefined') {
       localStorage.setItem(`profile_completed_${updated.email.toLowerCase()}`, 'true');
+      localStorage.setItem('smileclinic_auth_user', JSON.stringify(updated));
     }
   };
+
+  useEffect(() => {
+    const email = (currentUser?.email || storedUser?.email || '').toLowerCase();
+    if (!email) {
+      setShowOnboarding(false);
+      return;
+    }
+    const isDoneLocal = localStorage.getItem(`profile_completed_${email}`) === 'true';
+    const isDoneServer = Boolean(currentUser?.profileCompleted || storedUser?.profileCompleted);
+    if (isDoneLocal || isDoneServer) {
+      setShowOnboarding(false);
+    }
+  }, [currentUser?.email, currentUser?.profileCompleted]);
 
   const prescriberName =
     currentUser?.fullName ||
