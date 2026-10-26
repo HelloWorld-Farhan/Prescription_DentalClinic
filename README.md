@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <strong>Prescription DentalCare Portal (Smile Clinic RxGuard)</strong> is an enterprise clinical decision support and prescription interaction screening web application built for dental clinicians and clinical pharmacists.<br/>
+  <strong>Prescription DentalCare Portal (Smile Clinic)</strong> is an enterprise clinical decision support and prescription interaction screening web application built for dental clinicians and clinical pharmacists.<br/>
   It provides real-time drug-drug interaction screening, beta-lactam allergy cross-sensitivity detection, organ clearance threshold evaluation,<br/>
   interactive pharmacological monographs, signed clinician override tracking, and printable legal clinical review reports.
 </p>
@@ -50,7 +50,7 @@ Before you begin, ensure you have **[Node.js](https://nodejs.org/)** (v18.0.0 or
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/HelloWorld-Farhan/Prescription_DentalClinic.git
+git clone <REPOSITORY_URL>
 cd Prescription_DentalClinic
 ```
 
@@ -66,7 +66,7 @@ npm install
 npm run dev
 ```
 
-> The application will be running live at `http://localhost:5173`.
+> The application will be running live on your configured local development port.
 
 ### Step 4 — Build for Production
 
@@ -130,7 +130,7 @@ Prescription_DentalClinic/
    ```
 
 ### Option 2: Vercel (1-Click Automated)
-1. Import the repository `https://github.com/HelloWorld-Farhan/Prescription_DentalClinic` into Vercel.
+1. Import the project repository into Vercel.
 2. Framework Preset: **Vite**.
 3. Root Directory: `./`.
 4. Click **Deploy**.
