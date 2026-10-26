@@ -11,6 +11,7 @@ import {
 import ErrorBoundary from './ErrorBoundary';
 import FirstTimeOnboardingModal from './FirstTimeOnboardingModal';
 import { authApi, UserProfile } from '../services/authApi';
+import { getDeviceId } from '../services/sessionAudit';
 import { PrescriptionStorage } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
 
@@ -116,12 +117,27 @@ export default function Layout() {
       setShowOnboarding(false);
     }
 
-    // 2. Query backend database to guarantee cross-device synchronization
+    // 2. Query backend database to guarantee cross-device synchronization and remote session revocation check
     let isCancelled = false;
-    const syncProfileStatus = async () => {
+    const syncProfileAndSession = async () => {
       try {
-        const res = await authApi.getProfileStatus(email);
+        const [res, statusRes] = await Promise.all([
+          authApi.getProfileStatus(email),
+          authApi.checkSessionStatus(email, getDeviceId())
+        ]);
         if (isCancelled) return;
+
+        // Check if this workstation was remotely revoked
+        if (statusRes && statusRes.revoked) {
+          authApi.clearSession();
+          sessionStorage.setItem(
+            'smileclinic_session_revoked_flash',
+            'Your workstation session was remotely logged out / revoked from another terminal.'
+          );
+          navigate('/login');
+          return;
+        }
+
         if (res && res.profileCompleted) {
           setShowOnboarding(false);
           localStorage.setItem(`profile_completed_${email}`, 'true');
@@ -135,19 +151,21 @@ export default function Layout() {
       }
     };
 
-    syncProfileStatus();
+    syncProfileAndSession();
 
-    // 3. Re-verify when window or browser tab gains focus (e.g. submitted on phone and switched back to laptop)
+    // 3. Periodic heartbeat (every 15s) and focus re-verification
+    const interval = setInterval(syncProfileAndSession, 15000);
     const handleFocus = () => {
-      syncProfileStatus();
+      syncProfileAndSession();
     };
     window.addEventListener('focus', handleFocus);
 
     return () => {
       isCancelled = true;
+      clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [currentUser?.email]);
+  }, [currentUser?.email, navigate]);
 
   const prescriberName =
     currentUser?.fullName ||

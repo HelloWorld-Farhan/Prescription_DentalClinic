@@ -3,6 +3,8 @@
  * Detects client environment, tracks active sessions, and maintains persistent login audit history.
  */
 
+import { authApi } from './authApi';
+
 export interface ActiveSessionItem {
   id: string;
   name: string;
@@ -11,6 +13,7 @@ export interface ActiveSessionItem {
   badge: string;
   icon: string;
   createdAt?: string;
+  deviceId?: string;
 }
 
 export interface LoginHistoryItem {
@@ -22,6 +25,8 @@ export interface LoginHistoryItem {
   location: string;
   status: 'Success' | '2FA Verified' | 'Revoked' | 'Blocked';
   details?: string;
+  deviceId?: string;
+  isCurrent?: boolean;
 }
 
 // Clean up deprecated legacy global mock keys once on bootstrap
@@ -30,6 +35,19 @@ if (typeof window !== 'undefined') {
     localStorage.removeItem('smileclinic_active_sessions');
     localStorage.removeItem('smileclinic_session_history');
   } catch {}
+}
+
+/**
+ * Stable device fingerprint identifier helper
+ */
+export function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'dev_server_node';
+  let id = localStorage.getItem('rxguard_device_token');
+  if (!id) {
+    id = 'dev_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+    localStorage.setItem('rxguard_device_token', id);
+  }
+  return id;
 }
 
 /**
@@ -59,7 +77,7 @@ function getStorageKeys(email?: string) {
 }
 
 /**
- * Detect client browser, OS, and network metadata
+ * Detect client browser, OS, and network metadata with precision (including Samsung Galaxy models)
  */
 export function detectClientEnvironment(): { device: string; browserOs: string; ip: string; location: string } {
   if (typeof window === 'undefined') {
@@ -72,21 +90,100 @@ export function detectClientEnvironment(): { device: string; browserOs: string; 
   }
 
   const ua = navigator.userAgent;
-  let browser = 'Chrome';
-  if (ua.includes('Edg/')) browser = 'Edge';
-  else if (ua.includes('Firefox/')) browser = 'Firefox';
-  else if (ua.includes('Safari/') && !ua.includes('Chrome/')) browser = 'Safari';
-  else if (ua.includes('Chrome/')) browser = 'Chrome';
 
+  // 1. Precise OS Detection
   let os = 'Windows 11';
-  if (ua.includes('Windows NT 10.0')) os = 'Windows 11';
-  else if (ua.includes('Mac OS X')) os = 'macOS';
-  else if (ua.includes('Android')) os = 'Android';
-  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
-  else if (ua.includes('Linux')) os = 'Linux';
+  if (/Windows NT 10.0/i.test(ua)) {
+    os = 'Windows 11';
+  } else if (/Windows NT 6.3/i.test(ua)) {
+    os = 'Windows 8.1';
+  } else if (/Windows NT 6.1/i.test(ua)) {
+    os = 'Windows 7';
+  } else if (/Mac OS X ([\d_]+)/i.test(ua)) {
+    const v = (ua.match(/Mac OS X ([\d_]+)/i)?.[1] || '').replace(/_/g, '.');
+    os = v ? `macOS ${v}` : 'macOS';
+  } else if (/Android\s*([\d\.]+)?/i.test(ua)) {
+    const v = ua.match(/Android\s*([\d\.]+)/i)?.[1] || '';
+    os = v ? `Android ${v}` : 'Android';
+  } else if (/iPhone OS ([\d_]+)/i.test(ua)) {
+    const v = (ua.match(/iPhone OS ([\d_]+)/i)?.[1] || '').replace(/_/g, '.');
+    os = v ? `iOS ${v}` : 'iOS';
+  } else if (/iPad.*OS ([\d_]+)/i.test(ua)) {
+    const v = (ua.match(/OS ([\d_]+)/i)?.[1] || '').replace(/_/g, '.');
+    os = v ? `iPadOS ${v}` : 'iPadOS';
+  } else if (/Linux/i.test(ua)) {
+    os = 'Linux';
+  }
 
-  const isMobile = /Mobi|Android|iPhone|iPad/i.test(ua);
-  const device = isMobile ? `${os} Mobile Terminal` : `${os} Clinical Workstation`;
+  // 2. Precise Browser Detection
+  let browser = 'Chrome';
+  if (/SamsungBrowser\/([\d\.]+)/i.test(ua)) {
+    browser = 'Samsung Internet';
+  } else if (/EdgA?\/([\d\.]+)/i.test(ua)) {
+    browser = 'Microsoft Edge';
+  } else if (/OPR\/|Opera\//i.test(ua)) {
+    browser = 'Opera';
+  } else if (/Firefox\/([\d\.]+)/i.test(ua)) {
+    browser = 'Firefox';
+  } else if (/Chrome\/([\d\.]+)/i.test(ua)) {
+    browser = /Mobi|Android/i.test(ua) ? 'Chrome Mobile' : 'Chrome';
+  } else if (/Safari\/([\d\.]+)/i.test(ua) && !/Chrome/i.test(ua)) {
+    browser = /iPhone|iPad/i.test(ua) ? 'Safari Mobile' : 'Safari';
+  }
+
+  // 3. Exact Device Model Detection
+  let device = `${os} Clinical Workstation`;
+
+  // Specific Samsung Galaxy Model Matching
+  // SM-S928 = Samsung Galaxy S24 Ultra
+  // SM-S926 = Samsung Galaxy S24+
+  // SM-S921 = Samsung Galaxy S24
+  // SM-S918 = Samsung Galaxy S23 Ultra
+  // SM-S916 = Samsung Galaxy S23+
+  // SM-S911 = Samsung Galaxy S23
+  // SM-S908 = Samsung Galaxy S22 Ultra
+  // SM-G998 = Samsung Galaxy S21 Ultra
+  if (/SM-S928[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S24 Ultra';
+  } else if (/SM-S926[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S24+';
+  } else if (/SM-S921[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S24';
+  } else if (/SM-S918[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S23 Ultra';
+  } else if (/SM-S916[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S23+';
+  } else if (/SM-S911[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S23';
+  } else if (/SM-S908[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S22 Ultra';
+  } else if (/SM-S906[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S22+';
+  } else if (/SM-S901[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S22';
+  } else if (/SM-G998[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy S21 Ultra';
+  } else if (/SM-F9[3-6]6[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy Z Fold';
+  } else if (/SM-F7[2-5]1[A-Z0-9]*/i.test(ua)) {
+    device = 'Samsung Galaxy Z Flip';
+  } else if (/SAMSUNG|SM-[A-Z0-9]+/i.test(ua)) {
+    const smMatch = ua.match(/SM-([A-Z0-9]+)/i);
+    device = smMatch ? `Samsung Galaxy (${smMatch[0]})` : 'Samsung Galaxy Mobile';
+  } else if (/Pixel\s*(\d+[a-zA-Z\s]*)/i.test(ua)) {
+    const pMatch = ua.match(/Pixel\s*(\d+[a-zA-Z\s]*)/i);
+    device = pMatch ? `Google Pixel ${pMatch[1].trim()}` : 'Google Pixel';
+  } else if (/iPhone/i.test(ua)) {
+    device = 'Apple iPhone';
+  } else if (/iPad/i.test(ua)) {
+    device = 'Apple iPad';
+  } else if (/Macintosh|Mac OS X/i.test(ua)) {
+    device = 'Apple Mac Workstation';
+  } else if (/Windows/i.test(ua)) {
+    device = 'Windows 11 Clinical Workstation';
+  } else if (/Linux/i.test(ua)) {
+    device = /Android/i.test(ua) ? 'Android Mobile Terminal' : 'Linux Workstation';
+  }
 
   const location = window.location.hostname.includes('pages.dev')
     ? 'Cloudflare Edge • Verified TLS'
@@ -108,6 +205,7 @@ export function detectClientEnvironment(): { device: string; browserOs: string; 
 export function getActiveSessions(email?: string): ActiveSessionItem[] {
   if (typeof window === 'undefined') return [];
   const env = detectClientEnvironment();
+  const currentDevId = getDeviceId();
   const { sessions: key } = getStorageKeys(email);
 
   try {
@@ -116,7 +214,9 @@ export function getActiveSessions(email?: string): ActiveSessionItem[] {
       const parsed: ActiveSessionItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.map((s) =>
-          s.isCurrent ? { ...s, name: env.device, details: `${env.browserOs} • Verified TLS Encrypted` } : s
+          s.isCurrent || s.deviceId === currentDevId
+            ? { ...s, name: env.device, details: `${env.browserOs} • Verified TLS Encrypted`, isCurrent: true, deviceId: currentDevId }
+            : s
         );
       }
     }
@@ -128,9 +228,12 @@ export function getActiveSessions(email?: string): ActiveSessionItem[] {
       id: 'SES-01',
       name: env.device,
       isCurrent: true,
+      deviceId: currentDevId,
       details: `${env.browserOs} • Verified TLS Encrypted`,
       badge: 'Active Now',
-      icon: env.device.includes('Mobile') ? 'smartphone' : 'desktop_windows'
+      icon: env.device.includes('Samsung') || env.device.includes('iPhone') || env.device.includes('Mobile') || env.device.includes('Pixel')
+        ? 'smartphone'
+        : 'desktop_windows'
     }
   ];
 
@@ -164,26 +267,18 @@ export function getLoginHistory(email?: string, _clinicianName?: string): LoginH
     if (raw) {
       const parsed: LoginHistoryItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Strip phantom fallback entry if real login events exist
-        const hasRealLogin = parsed.some(
+        return parsed.filter(
           (p) => !p.details?.startsWith('Interactive clinical session initiated by')
         );
-        const filtered = hasRealLogin
-          ? parsed.filter(
-              (p) => !p.details?.startsWith('Interactive clinical session initiated by')
-            )
-          : parsed;
-        return filtered;
       }
     }
   } catch {}
 
-  // If no history exists, return empty array without seeding phantom duplicate entries
   return [];
 }
 
 /**
- * Prepend a real event to the email's audit history and persist
+ * Prepend a real event to the email's audit history and persist both locally and to backend PostgreSQL
  */
 export function recordLoginEvent(
   status: 'Success' | '2FA Verified' | 'Revoked' | 'Blocked',
@@ -196,6 +291,8 @@ export function recordLoginEvent(
   const id = `AUTH-${Math.floor(1000 + Math.random() * 9000)}`;
   const now = new Date();
   const timestamp = `Today at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+  const currentDevId = getDeviceId();
+  const userEmail = resolveUserEmail(email);
 
   const newItem: LoginHistoryItem = {
     id,
@@ -205,7 +302,9 @@ export function recordLoginEvent(
     ip: customIp || env.ip,
     location: env.location,
     status,
-    details
+    details,
+    deviceId: currentDevId,
+    isCurrent: true
   };
 
   if (typeof window !== 'undefined') {
@@ -217,17 +316,28 @@ export function recordLoginEvent(
         try {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            // Remove phantom auto-seeded entries to ensure clean history
             existing = parsed.filter(
               (item) => !item.details?.startsWith('Interactive clinical session initiated by')
             );
           }
         } catch {}
       }
-      const updated = [newItem, ...existing.filter((item) => item.id !== newItem.id)].slice(0, 30);
+      const updated = [newItem, ...existing.filter((item) => item.id !== newItem.id)].slice(0, 50);
       localStorage.setItem(key, JSON.stringify(updated));
-    } catch {
-      // Ignore write errors
+    } catch {}
+
+    // Asynchronously record session in backend PostgreSQL database
+    if (userEmail && userEmail !== 'clinician_primary') {
+      authApi.recordSession({
+        email: userEmail,
+        device_id: currentDevId,
+        device_name: newItem.device,
+        browser_os: newItem.browserOs,
+        ip_address: newItem.ip,
+        location: newItem.location,
+        status: newItem.status,
+        details: newItem.details
+      }).catch(() => {});
     }
   }
 

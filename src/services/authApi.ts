@@ -466,6 +466,92 @@ export const authApi = {
   },
 
   /**
+   * Register or update an active workstation session on the backend
+   */
+  async recordSession(payload: {
+    email: string;
+    device_id: string;
+    device_name: string;
+    browser_os: string;
+    ip_address?: string;
+    location?: string;
+    status?: string;
+    details?: string;
+  }): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/record-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Retrieve all active and historical sessions across devices from PostgreSQL
+   */
+  async getSessions(email: string, current_device_id?: string): Promise<{ status: string; sessions: any[]; history: any[] }> {
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const currDev = current_device_id || '';
+      const res = await fetch(
+        `${API_BASE_URL}/api/v1/auth/sessions?email=${encodeURIComponent(cleanEmail)}&current_device_id=${encodeURIComponent(currDev)}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      if (!res.ok) throw new Error('Failed to fetch sessions');
+      return await res.json();
+    } catch {
+      return { status: 'offline', sessions: [], history: [] };
+    }
+  },
+
+  /**
+   * Revoke a specific workstation session remotely
+   */
+  async revokeSession(email: string, device_id?: string, session_id?: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/revoke-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          device_id,
+          session_id
+        })
+      });
+      return await res.json();
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to revoke workstation session');
+    }
+  },
+
+  /**
+   * Heartbeat to verify if this client device has been remotely revoked/logged out
+   */
+  async checkSessionStatus(email: string, device_id: string): Promise<{ valid: boolean; active: boolean; revoked?: boolean; message?: string }> {
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const res = await fetch(
+        `${API_BASE_URL}/api/v1/auth/session-status?email=${encodeURIComponent(cleanEmail)}&device_id=${encodeURIComponent(device_id)}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      if (!res.ok) return { valid: true, active: true, revoked: false };
+      return await res.json();
+    } catch {
+      return { valid: true, active: true, revoked: false };
+    }
+  },
+
+  /**
    * Clear session on logout
    */
   clearSession(): void {

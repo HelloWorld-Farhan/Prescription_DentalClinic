@@ -7,7 +7,8 @@ import {
   getActiveSessions,
   saveActiveSessions,
   getLoginHistory,
-  recordLoginEvent
+  recordLoginEvent,
+  getDeviceId
 } from '../services/sessionAudit';
 
 export interface ClinicalProfile {
@@ -162,6 +163,64 @@ export default function Settings() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'All' | 'Success' | '2FA Verified' | 'Revoked' | 'Blocked'>('All');
   const [historyPage, setHistoryPage] = useState(1);
   const pageSize = 4;
+
+  // Sync real-time sessions and login history from backend PostgreSQL
+  useEffect(() => {
+    let isCancelled = false;
+    const fetchRemoteSessions = async () => {
+      if (!profile.email) return;
+      try {
+        const currentDev = getDeviceId();
+        const data = await authApi.getSessions(profile.email, currentDev);
+        if (isCancelled) return;
+
+        if (data && data.sessions && data.sessions.length > 0) {
+          const mappedSessions: ActiveSessionItem[] = data.sessions.map((s: any) => {
+            const isCurr = Boolean(s.is_current || s.device_id === currentDev);
+            const isMobile = Boolean(
+              s.device_name?.includes('Samsung') ||
+              s.device_name?.includes('iPhone') ||
+              s.device_name?.includes('Mobile') ||
+              s.device_name?.includes('Pixel') ||
+              s.device_name?.includes('Android')
+            );
+            return {
+              id: s.id,
+              name: s.device_name,
+              isCurrent: isCurr,
+              deviceId: s.device_id,
+              details: `${s.browser_os} • ${s.location || 'Verified TLS Encrypted'}`,
+              badge: isCurr ? 'Active Now' : 'Authorized Remote',
+              icon: isMobile ? 'smartphone' : 'desktop_windows',
+              createdAt: s.created_at
+            };
+          });
+          setSessions(mappedSessions);
+          saveActiveSessions(mappedSessions, profile.email);
+        }
+
+        if (data && data.history && data.history.length > 0) {
+          const mappedHistory: LoginHistoryItem[] = data.history.map((h: any) => ({
+            id: h.id,
+            timestamp: h.created_at ? `Today at ${new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}` : 'Recent',
+            device: h.device_name,
+            browserOs: h.browser_os,
+            ip: h.ip_address || '10.240.42.18',
+            location: h.location || 'Cloudflare Edge • Verified TLS',
+            status: h.status,
+            details: h.details,
+            deviceId: h.device_id,
+            isCurrent: Boolean(h.is_current || h.device_id === currentDev)
+          }));
+          setLoginHistory(mappedHistory);
+        }
+      } catch {
+        // Fallback to local cache if offline
+      }
+    };
+
+    fetchRemoteSessions();
+  }, [profile.email]);
 
   // Detect whether current session is authenticated via Google OAuth
   const isGoogleUser = useMemo(() => {
@@ -444,32 +503,67 @@ export default function Settings() {
   };
 
   // --- Session Termination & Revocation ---
-  const handleConfirmTerminateAllRemote = () => {
-    const remaining = sessions.filter((s) => s.isCurrent);
+  const handleConfirmTerminateAllRemote = async () => {
+    const currentDev = getDeviceId();
+    const remoteSessions = sessions.filter((s) => !s.isCurrent && s.deviceId !== currentDev);
+    for (const rem of remoteSessions) {
+      try {
+        await authApi.revokeSession(profile.email, rem.deviceId, rem.id);
+      } catch {}
+    }
+
+    const remaining = sessions.filter((s) => s.isCurrent || s.deviceId === currentDev);
     setSessions(remaining);
     saveActiveSessions(remaining, profile.email);
     setShowTerminateAllModal(false);
+
+    setLoginHistory((prev) =>
+      prev.map((item) =>
+        !item.isCurrent && item.deviceId !== currentDev
+          ? { ...item, status: 'Revoked' as const }
+          : item
+      )
+    );
+
     const revokedRecord = recordLoginEvent(
       'Revoked',
       'All remote clinical terminals terminated via governance console',
       profile.email
     );
-    setLoginHistory((prev) => [revokedRecord, ...prev]);
+    setLoginHistory((prev) => [revokedRecord, ...prev.filter((p) => p.id !== revokedRecord.id)]);
     showToast('All remote active sessions terminated immediately.');
   };
 
-  const handleConfirmRevokeSingle = () => {
+  const handleConfirmRevokeSingle = async () => {
     if (!sessionToRevoke) return;
-    const remaining = sessions.filter((s) => s.id !== sessionToRevoke.id);
+    const targetId = sessionToRevoke.id;
+    const targetDeviceId = sessionToRevoke.deviceId;
+    const targetName = sessionToRevoke.name;
+
+    try {
+      await authApi.revokeSession(profile.email, targetDeviceId, targetId);
+    } catch {}
+
+    const remaining = sessions.filter((s) => s.id !== targetId);
     setSessions(remaining);
     saveActiveSessions(remaining, profile.email);
+
+    setLoginHistory((prev) =>
+      prev.map((item) =>
+        item.id === targetId || (targetDeviceId && item.deviceId === targetDeviceId)
+          ? { ...item, status: 'Revoked' as const }
+          : item
+      )
+    );
+
     const revokedRecord = recordLoginEvent(
       'Revoked',
-      `Remote terminal #${sessionToRevoke.id} revoked (${sessionToRevoke.name})`,
-      profile.email
+      `Remote terminal #${targetId} revoked (${targetName})`,
+      profile.email,
+      targetName
     );
-    setLoginHistory((prev) => [revokedRecord, ...prev]);
-    showToast(`Session #${sessionToRevoke.id} (${sessionToRevoke.name}) has been revoked.`);
+    setLoginHistory((prev) => [revokedRecord, ...prev.filter((p) => p.id !== revokedRecord.id)]);
+    showToast(`Workstation session #${targetId} (${targetName}) has been revoked.`);
     setSessionToRevoke(null);
   };
 
@@ -1322,7 +1416,8 @@ export default function Settings() {
                     <th className="py-3 px-4">Authorized Node / Device</th>
                     <th className="py-3 px-4">Client &amp; OS</th>
                     <th className="py-3 px-4">IP Address &amp; Location</th>
-                    <th className="py-3 px-6 text-right">Status</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-6 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container text-on-surface">
@@ -1334,7 +1429,9 @@ export default function Settings() {
                       </td>
                       <td className="py-3.5 px-4 font-bold text-on-surface">
                         <div className="flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-[16px] text-outline">terminal</span>
+                          <span className="material-symbols-outlined text-[16px] text-outline">
+                            {row.device.includes('Samsung') || row.device.includes('Mobile') || row.device.includes('iPhone') || row.device.includes('Pixel') ? 'smartphone' : 'terminal'}
+                          </span>
                           <span>{row.device}</span>
                         </div>
                         {row.details && (
@@ -1348,7 +1445,7 @@ export default function Settings() {
                         <div className="font-mono text-[11px] text-primary">{row.ip}</div>
                         <div className="text-[11px] text-outline">{row.location}</div>
                       </td>
-                      <td className="py-3.5 px-6 text-right">
+                      <td className="py-3.5 px-4 text-center">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                             row.status === '2FA Verified'
@@ -1372,11 +1469,46 @@ export default function Settings() {
                           <span>{row.status}</span>
                         </span>
                       </td>
+                      <td className="py-3.5 px-6 text-right">
+                        {row.status === 'Revoked' ? (
+                          <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[12px]">block</span>
+                            <span>Revoked</span>
+                          </span>
+                        ) : row.isCurrent ? (
+                          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span>This Device</span>
+                          </span>
+                        ) : (
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              setSessionToRevoke({
+                                id: row.id,
+                                name: row.device,
+                                isCurrent: false,
+                                deviceId: row.deviceId,
+                                details: `${row.browserOs} • ${row.location}`,
+                                badge: 'Authorized Remote',
+                                icon: row.device.includes('Samsung') || row.device.includes('Mobile') || row.device.includes('iPhone') ? 'smartphone' : 'desktop_windows'
+                              });
+                            }}
+                            className="px-2.5 py-1 rounded-xl border border-rose-200 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                            title="Log out and revoke this remote workstation session"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">logout</span>
+                            <span>Log Out Device</span>
+                          </motion.button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {paginatedHistory.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-outline">
+                      <td colSpan={6} className="py-8 text-center text-outline">
                         No login history found matching the selected search and filter criteria.
                       </td>
                     </tr>

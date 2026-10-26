@@ -35,7 +35,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
   const [authorizedConfirmation, setAuthorizedConfirmation] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
+    const revoked = sessionStorage.getItem('smileclinic_session_revoked_flash');
+    if (revoked) {
+      sessionStorage.removeItem('smileclinic_session_revoked_flash');
+      return revoked;
+    }
+    return null;
+  });
   const [successFlash, setSuccessFlash] = useState<string | null>(() => {
     const flash = sessionStorage.getItem('smileclinic_prescriber_registered_flash');
     if (flash) {
