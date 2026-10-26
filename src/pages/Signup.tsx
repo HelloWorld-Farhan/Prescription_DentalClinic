@@ -205,12 +205,22 @@ export default function Signup() {
         <div className="w-full max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
 
-            {/* LEFT: Registration Form */}
+            {/* LEFT: Info Panel */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="lg:col-span-7 flex flex-col justify-between"
+              className="lg:col-span-5 flex flex-col h-full order-2 lg:order-1"
+            >
+              <AuthInfoPanel variant="signup" />
+            </motion.div>
+
+            {/* RIGHT: Registration Form */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+              className="lg:col-span-7 flex flex-col justify-between order-1 lg:order-2"
             >
               <div className="bg-surface-container-lowest rounded-3xl shadow-xl shadow-primary/5 border border-surface-container-high p-6 sm:p-9 flex flex-col gap-6">
                 {/* Header */}
@@ -471,15 +481,7 @@ export default function Signup() {
               </div>
             </motion.div>
 
-            {/* RIGHT: Info Panel */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-              className="lg:col-span-5 flex flex-col h-full"
-            >
-              <AuthInfoPanel variant="signup" />
-            </motion.div>
+
           </div>
         </div>
       </main>
