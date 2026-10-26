@@ -267,7 +267,7 @@ export default function AlertDetailDrawer({
                   </div>
                   <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
                     <span className="material-symbols-outlined text-[13px]">auto_awesome</span>
-                    Constrained CDS Engine
+                    Prescription AI v1.0
                   </div>
                 </div>
                 <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container text-xs text-on-surface leading-relaxed">

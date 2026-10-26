@@ -89,7 +89,7 @@ export default function ExportAuditModal({
     } else if (selectedFormat === 'json') {
       const exportPayload = {
         exportMetadata: {
-          system: 'Smile Clinic Clinical CDS Engine',
+          system: 'Smile Clinic Prescription AI v1.0',
           protocol: 'FHIR R4 AuditEvent / HIPAA Safe Harbor §164.514',
           exportTimestamp: new Date().toISOString(),
           recordCount: exportableLogs.length,

@@ -795,36 +795,42 @@ export default function NewCheck() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  {prescriptions.map((rx) => (
-                    <div
-                      key={rx.id}
-                      className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-[18px]">pill</span>
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-on-surface">
-                            {rx.drugName} <span className="text-outline font-normal">({rx.genericName})</span>
-                          </div>
-                          <div className="text-[11px] text-outline">
-                            {rx.dosage} • {rx.route} • {rx.frequency} • {rx.duration}
-                          </div>
-                        </div>
-                      </div>
-
-                      {prescriptions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePrescription(rx.id)}
-                          className="p-1 rounded text-outline hover:text-rose-600"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">delete</span>
-                        </button>
-                      )}
+                  {prescriptions.length === 0 ? (
+                    <div className="p-4 rounded-xl border border-dashed border-surface-container-high text-center text-xs text-outline bg-surface-container-lowest/50">
+                      No medications in queue. Upload a prescription, scan a photo, or enter medicine details above.
                     </div>
-                  ))}
+                  ) : (
+                    prescriptions.map((rx) => (
+                      <div
+                        key={rx.id}
+                        className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-[18px]">pill</span>
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-on-surface">
+                              {rx.drugName} <span className="text-outline font-normal">({rx.genericName})</span>
+                            </div>
+                            <div className="text-[11px] text-outline">
+                              {rx.dosage} • {rx.route} • {rx.frequency} • {rx.duration}
+                            </div>
+                          </div>
+                        </div>
+
+                        {prescriptions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePrescription(rx.id)}
+                            className="p-1 rounded text-outline hover:text-rose-600"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 

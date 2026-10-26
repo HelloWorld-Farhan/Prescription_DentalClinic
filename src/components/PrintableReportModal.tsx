@@ -174,7 +174,7 @@ export default function PrintableReportModal({ check, isOpen, onClose }: Printab
                       </div>
                       <div>
                         <div className="text-xl font-bold tracking-tight text-primary leading-tight">
-                          Smile Clinic — Clinical CDS Engine
+                          Smile Clinic — Prescription AI v1.0
                         </div>
                         <div className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
                           Clinical Decision Support & Verification Protocol

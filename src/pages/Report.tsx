@@ -284,7 +284,7 @@ export default function Report() {
                   </div>
                   <div>
                     <div className="text-xl font-bold tracking-tight text-[#005c65] leading-tight">
-                      Smile Clinic CDS Engine
+                      Smile Clinic Prescription AI v1.0
                     </div>
                     <div className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
                       Clinical Decision Support &amp; Verification Protocol
@@ -732,8 +732,8 @@ export default function Report() {
             <footer className="pt-4 flex flex-col gap-2 text-[10px] text-slate-400 border-t border-slate-200">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pb-2">
                 <div>
-                  <span className="block text-slate-700 font-semibold">Rules Engine</span>
-                  <span>Smile Clinic CDS v4.2.1-prod</span>
+                  <span className="block text-slate-700 font-semibold">Safety AI Engine</span>
+                  <span>Prescription AI v1.0</span>
                 </div>
                 <div>
                   <span className="block text-slate-700 font-semibold">Knowledge Base</span>

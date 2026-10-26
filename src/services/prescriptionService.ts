@@ -7,11 +7,12 @@ const STORAGE_KEYS = {
   RULES: 'smileclinic_rules_v5'
 };
 
-// Purge legacy mock rules and audits if present
+// Purge legacy mock rules, audits, and mock patient seeds if present
 try {
   localStorage.removeItem('smileclinic_rules');
   localStorage.removeItem('smileclinic_rules_v5');
   localStorage.removeItem('smileclinic_audit');
+  localStorage.removeItem('smileclinic_patients');
   localStorage.removeItem('smileclinic_custom_prescriber_password');
   localStorage.removeItem('smileclinic_registered_doctors');
 } catch {
@@ -30,53 +31,7 @@ const getActiveClinicianName = () => {
   }
 };
 
-export const INITIAL_PATIENTS: Patient[] = [
-  {
-    id: 'pt-00821',
-    name: 'Eleanor Vance',
-    mrn: 'PT-00821',
-    age: 68,
-    gender: 'Female',
-    height: '5\'4"',
-    weightKg: 62,
-    egfr: 45,
-    pregnancyStatus: 'No',
-    allergies: ['Penicillin', 'Sulfa Drugs'],
-    activeMedications: ['Warfarin 5mg daily', 'Lisinopril 10mg'],
-    conditions: ['Chronic Kidney Disease (Stage 3)', 'Atrial Fibrillation'],
-    roomOrUnit: 'Operatory 2'
-  },
-  {
-    id: 'pt-00942',
-    name: 'Marcus Brody',
-    mrn: 'PT-00942',
-    age: 52,
-    gender: 'Male',
-    height: '5\'11"',
-    weightKg: 85,
-    egfr: 88,
-    pregnancyStatus: 'No',
-    allergies: ['NSAIDs / Aspirin'],
-    activeMedications: ['Metoprolol 50mg', 'Aspirin 81mg'],
-    conditions: ['Hypertension', 'Dental Abscess'],
-    roomOrUnit: 'Operatory 1'
-  },
-  {
-    id: 'pt-00615',
-    name: 'Sarah Jenkins',
-    mrn: 'PT-00615',
-    age: 29,
-    gender: 'Female',
-    height: '5\'6"',
-    weightKg: 58,
-    egfr: 98,
-    pregnancyStatus: 'No',
-    allergies: ['Latex', 'Codeine'],
-    activeMedications: ['Oral Contraceptive'],
-    conditions: ['Impacted Third Molar (Wisdom Tooth)'],
-    roomOrUnit: 'Surgical Suite'
-  }
-];
+export const INITIAL_PATIENTS: Patient[] = [];
 export const INITIAL_CHECKS: SafetyCheckRecord[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
 export const INITIAL_RULES: InteractionRule[] = [];

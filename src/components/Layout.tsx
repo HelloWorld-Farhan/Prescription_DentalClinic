@@ -1,9 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ErrorBoundary from './ErrorBoundary';
 import FirstTimeOnboardingModal from './FirstTimeOnboardingModal';
 import { UserProfile } from '../services/authApi';
+import { PrescriptionStorage } from '../services/prescriptionService';
+import { SafetyCheckRecord } from '../types';
 
 interface NotificationItem {
   id: string;
@@ -17,34 +19,24 @@ interface NotificationItem {
   textClass: string;
 }
 
-interface SearchableClinicalItem {
+interface SearchResultItem {
   id: string;
   name: string;
   category: string;
   icon: string;
   path: string;
-  type: 'drug' | 'action';
+  type: 'record' | 'action';
   badge?: string;
+  badgeStyle?: string;
   subtitle?: string;
 }
 
-const SEARCHABLE_CLINICAL_ITEMS: SearchableClinicalItem[] = [
-  // Dental Rx Drugs & Contraindications
-  { id: 'd1', name: 'Amoxicillin 500mg', category: 'Antibiotic (Dental Prophylaxis)', icon: 'medication', path: '/check', type: 'drug', badge: 'Standard Rx', subtitle: 'First-line odontogenic antibiotic' },
-  { id: 'd2', name: 'Clindamycin 300mg', category: 'Antibiotic (Penicillin Alternative)', icon: 'medication', path: '/check', type: 'drug', badge: 'Penicillin-Allergic', subtitle: 'Cross-checks pseudomembranous colitis risk' },
-  { id: 'd3', name: 'Ibuprofen 600mg', category: 'NSAID (Post-op Analgesic)', icon: 'medication', path: '/check', type: 'drug', badge: 'NSAID', subtitle: 'Renal & GI contraindication safety guard' },
-  { id: 'd4', name: 'Lidocaine 2% + 1:100k Epi', category: 'Local Dental Anesthetic', icon: 'vaccines', path: '/check', type: 'drug', badge: 'Local Block', subtitle: 'Epinephrine cardiovascular cross-check' },
-  { id: 'd5', name: 'Metronidazole 400mg', category: 'Nitroimidazole Antibiotic', icon: 'medication', path: '/check', type: 'drug', badge: 'Periodontal', subtitle: 'Severe disulfiram-like alcohol warning' },
-  { id: 'd6', name: 'Codeine / Acetaminophen', category: 'Opioid Combination Analgesic', icon: 'pill', path: '/check', type: 'drug', badge: 'Controlled', subtitle: 'Respiratory depression & dependency monitoring' },
-  { id: 'd7', name: 'Azithromycin 250mg', category: 'Macrolide Antibiotic', icon: 'medication', path: '/check', type: 'drug', badge: 'Macrolide', subtitle: 'QTc prolongation contraindication alert' },
-  { id: 'd8', name: 'Warfarin / Coumadin', category: 'Anticoagulant Risk Check', icon: 'warning', path: '/check', type: 'drug', badge: 'High Risk', subtitle: 'Major hemorrhage contraindication with NSAIDs' },
-
-  // Clinical Actions & Direct Navigation
-  { id: 'a1', name: 'Start New Safety Check', category: 'Prescription Screening', icon: 'add_circle', path: '/check', type: 'action', badge: 'Action', subtitle: 'Analyze patient vitals & multi-drug regimen' },
-  { id: 'a2', name: 'View Active Contraindication Alerts', category: 'Safety Alerts Queue', icon: 'warning', path: '/alerts', type: 'action', badge: 'Alerts', subtitle: 'Review active red-flag overrides & reviews' },
-  { id: 'a3', name: 'Inspect HIPAA Audit Trail', category: 'Notarized Ledger', icon: 'verified', path: '/audit-log', type: 'action', badge: 'Compliance', subtitle: 'Immutable cryptographically signed audit logs' },
-  { id: 'a4', name: 'Search Dental Rules & Knowledgebase', category: 'Rule Calibrations', icon: 'database', path: '/rules', type: 'action', badge: 'Database', subtitle: '24 clinical decision interaction rules' },
-  { id: 'a5', name: 'Clinician Profile & Session Security', category: 'Account Settings', icon: 'settings', path: '/settings', type: 'action', badge: 'Settings', subtitle: 'Manage sessions, audit history, and credentials' },
+const SYSTEM_ACTIONS: SearchResultItem[] = [
+  { id: 'act-check', name: 'Start New Safety Check', category: 'Prescription Screening', icon: 'add_circle', path: '/check', type: 'action', badge: 'Action', subtitle: 'Launch multi-modal patient safety check' },
+  { id: 'act-alerts', name: 'View Active Contraindication Alerts', category: 'Safety Alerts Queue', icon: 'warning', path: '/alerts', type: 'action', badge: 'Alerts', subtitle: 'Review active red-flag overrides & reviews' },
+  { id: 'act-audit', name: 'Inspect HIPAA Audit Trail', category: 'Compliance Ledger', icon: 'verified', path: '/audit-log', type: 'action', badge: 'Compliance', subtitle: 'Cryptographically signed audit logs' },
+  { id: 'act-rules', name: 'Search Dental Rules & Interactions', category: 'Knowledgebase', icon: 'database', path: '/rules', type: 'action', badge: 'Database', subtitle: 'Deterministic interaction decision matrix' },
+  { id: 'act-settings', name: 'Clinician Settings & Security', category: 'Account Settings', icon: 'settings', path: '/settings', type: 'action', badge: 'Settings', subtitle: 'Credentials, sessions & access controls' },
 ];
 
 const initialNotifications: NotificationItem[] = [];
@@ -246,13 +238,68 @@ export default function Layout() {
 
   const pageInfo = getPageInfo(location.pathname);
 
-  const filteredSearchItems = searchQuery.trim()
-    ? SEARCHABLE_CLINICAL_ITEMS.filter((item) =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.subtitle && item.subtitle.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Real clinical records from storage
+  const [realChecks, setRealChecks] = useState<SafetyCheckRecord[]>(() => {
+    try {
+      return PrescriptionStorage.getChecks();
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      setRealChecks(PrescriptionStorage.getChecks());
+    }
+  }, [isSearchOpen]);
+
+  const filteredSearchItems: SearchResultItem[] = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      // Clean real recent checks: strictly NO mock data!
+      return realChecks.slice(0, 5).map(check => ({
+        id: check.id,
+        name: `${check.patientName} (${check.mrn})`,
+        category: `Safety Check #${check.id}`,
+        icon: 'assignment',
+        path: `/report/${check.id}`,
+        type: 'record' as const,
+        badge: check.overallStatus || (check.alerts.length > 0 ? 'Flagged' : 'Cleared'),
+        badgeStyle: check.alerts.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800',
+        subtitle: check.prescriptions.map(p => p.drugName).join(', ') || 'No medications listed'
+      }));
+    }
+
+    const matchingChecks: SearchResultItem[] = realChecks
+      .filter(check =>
+        check.patientName.toLowerCase().includes(q) ||
+        check.mrn.toLowerCase().includes(q) ||
+        check.id.toLowerCase().includes(q) ||
+        check.prescriptions.some(p =>
+          p.drugName.toLowerCase().includes(q) ||
+          (p.genericName && p.genericName.toLowerCase().includes(q))
+        )
       )
-    : SEARCHABLE_CLINICAL_ITEMS.slice(0, 6);
+      .map(check => ({
+        id: check.id,
+        name: `${check.patientName} (${check.mrn})`,
+        category: `Safety Check #${check.id}`,
+        icon: 'assignment',
+        path: `/report/${check.id}`,
+        type: 'record' as const,
+        badge: check.overallStatus || (check.alerts.length > 0 ? 'Flagged' : 'Cleared'),
+        badgeStyle: check.alerts.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800',
+        subtitle: check.prescriptions.map(p => p.drugName).join(', ') || 'No medications listed'
+      }));
+
+    const matchingActions: SearchResultItem[] = SYSTEM_ACTIONS.filter(act =>
+      act.name.toLowerCase().includes(q) ||
+      act.category.toLowerCase().includes(q) ||
+      (act.subtitle && act.subtitle.toLowerCase().includes(q))
+    );
+
+    return [...matchingChecks, ...matchingActions];
+  }, [searchQuery, realChecks]);
 
   const handleLogout = () => {
     sessionStorage.removeItem('rxguard_authenticated');
@@ -374,9 +421,9 @@ export default function Layout() {
                 <span className="text-xs sm:text-sm font-bold text-on-surface block leading-tight truncate">
                   {pageInfo.title}
                 </span>
-                <span className="text-[10px] text-outline flex items-center gap-1 font-medium leading-none mt-0.5">
+                <span className="text-[10px] text-outline flex items-center gap-1.5 font-medium leading-none mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Smile Clinic CDS
+                  Prescription AI v1.0 • Active
                 </span>
               </div>
             </div>
@@ -418,15 +465,28 @@ export default function Layout() {
                   className="absolute top-11 left-0 right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-50 divide-y divide-surface-container-low"
                 >
                   <div className="p-2.5 px-3 bg-surface-container-low flex items-center justify-between text-[11px] font-bold text-outline">
-                    <span>{searchQuery.trim() ? `Search Results (${filteredSearchItems.length})` : 'Quick Clinical Actions & Medications'}</span>
+                    <span>
+                      {searchQuery.trim()
+                        ? `Search Results (${filteredSearchItems.length})`
+                        : filteredSearchItems.length > 0
+                        ? `Recent Clinical Checks (${filteredSearchItems.length})`
+                        : 'Clinical Records Search'}
+                    </span>
                     <span className="text-[10px] font-normal">Press Esc to exit</span>
                   </div>
 
                   <div className="max-h-72 overflow-y-auto divide-y divide-surface-container-low/60">
                     {filteredSearchItems.length === 0 ? (
-                      <div className="p-6 text-center text-xs text-outline flex flex-col items-center gap-1.5">
-                        <span className="material-symbols-outlined text-2xl text-outline/60">search_off</span>
-                        <span>No medications or clinical records matching "{searchQuery}"</span>
+                      <div className="p-8 text-center text-xs text-outline flex flex-col items-center justify-center gap-2">
+                        <span className="material-symbols-outlined text-3xl text-outline/40">
+                          {searchQuery.trim() ? 'search_off' : 'inbox'}
+                        </span>
+                        <span className="font-bold text-on-surface text-xs">No data</span>
+                        <span className="text-[11px] text-outline max-w-xs">
+                          {searchQuery.trim()
+                            ? `No clinical records or actions matching "${searchQuery}"`
+                            : 'No clinical safety checks on record yet. Start a new check to populate records.'}
+                        </span>
                       </div>
                     ) : (
                       filteredSearchItems.map((item) => (
@@ -444,9 +504,9 @@ export default function Layout() {
                             <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                               item.type === 'action'
                                 ? 'bg-primary/10 text-primary'
-                                : item.badge === 'High Risk'
+                                : item.badge === 'Flagged' || item.badge === 'High Risk'
                                 ? 'bg-rose-50 text-rose-600'
-                                : 'bg-surface-container text-on-surface'
+                                : 'bg-emerald-50 text-emerald-700'
                             }`}>
                               <span className="material-symbols-outlined text-[16px]">{item.icon}</span>
                             </div>
@@ -462,11 +522,12 @@ export default function Layout() {
 
                           {item.badge && (
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                              item.badge === 'High Risk'
+                              item.badgeStyle ||
+                              (item.badge === 'Flagged' || item.badge === 'High Risk'
                                 ? 'bg-rose-100 text-rose-800'
                                 : item.badge === 'Action'
                                 ? 'bg-primary/10 text-primary'
-                                : 'bg-surface-container-high text-on-surface-variant'
+                                : 'bg-emerald-100 text-emerald-800')
                             }`}>
                               {item.badge}
                             </span>
@@ -476,17 +537,21 @@ export default function Layout() {
                     )}
                   </div>
 
-                  <div className="p-2 px-3 bg-surface-container-low text-[10px] text-outline flex items-center justify-between">
-                    <span>Clinical Decision Support Engine • Dental Formulary</span>
+                  <div className="p-2.5 px-3.5 bg-surface-container-low text-[10px] text-outline flex items-center justify-between border-t border-surface-container-high/60">
+                    <span className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[14px] text-primary">psychology</span>
+                      <span>Prescription AI v1.0 • Clinical Safety Guard</span>
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
                         navigate('/check');
                         setIsSearchOpen(false);
                       }}
-                      className="font-bold text-primary hover:underline"
+                      className="font-bold text-primary hover:underline flex items-center gap-1"
                     >
-                      Open New Safety Check →
+                      <span>New Safety Check</span>
+                      <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                     </button>
                   </div>
                 </motion.div>
@@ -496,11 +561,12 @@ export default function Layout() {
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* CDS Engine Status Badge (Desktop only) */}
-            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-[11px] font-semibold text-on-surface-variant">
-              <span className="material-symbols-outlined text-[16px] text-emerald-600">verified_user</span>
-              <span>CDS Engine v2.4</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            {/* Prescription AI Status Badge (Desktop only) */}
+            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-[11px] font-semibold text-on-surface-variant shadow-2xs">
+              <span className="material-symbols-outlined text-[16px] text-primary">psychology</span>
+              <span className="font-bold text-on-surface">Prescription AI</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[10px] font-bold">v1.0</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" title="Prescription AI Online"></span>
             </div>
 
             {/* Quick Action Button: New Check */}
