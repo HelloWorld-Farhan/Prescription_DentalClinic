@@ -770,8 +770,8 @@ export default function Login() {
                     <span className="material-symbols-outlined text-[26px]">security</span>
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-on-surface">Two-Factor Authentication</h3>
-                    <p className="text-[11px] text-on-surface-variant mt-0.5">6-digit verification code required to authorize clinical sign-in</p>
+                    <h3 className="text-base font-bold text-on-surface">Workstation Sign-In Verification</h3>
+                    <p className="text-[11px] text-on-surface-variant mt-0.5">6-digit passcode required to authorize this workstation session</p>
                   </div>
                 </div>
                 <button
