@@ -9,14 +9,14 @@ export default function AuthInfoPanel({ variant }: { variant: 'login' | 'signup'
 
   const features = isLogin
     ? [
-        { icon: 'medication',      label: 'Drug Interaction Screener', sub: 'Deterministic cross-match engine',  color: 'rose',    badge: 'Live Screening' },
-        { icon: 'science',         label: 'Renal Clearance Guard',     sub: 'eGFR auto-dose adjustment',         color: 'amber',   badge: 'Auto-Adjust'    },
-        { icon: 'verified_user',   label: 'Allergy Cross-Class Check', sub: 'Penicillin / cephalosporin safe',   color: 'teal',    badge: 'Cross-Safe'     },
+        { icon: 'medication',        label: 'Drug Interaction Screener', sub: 'Instant drug-to-drug safety screening',      color: 'teal',    badge: 'Active'    },
+        { icon: 'verified_user',     label: 'Patient Allergy Alerts',   sub: 'Penicillin & cross-class allergy protection', color: 'emerald', badge: 'Protected' },
+        { icon: 'health_and_safety', label: 'Safe Dosage Guidance',     sub: 'Clinical guidance for dental prescriptions',  color: 'cyan',    badge: 'Verified'  },
       ]
     : [
-        { icon: 'badge',           label: 'HHS NPI National Registry', sub: 'Live prescriber credential sync',   color: 'emerald', badge: 'Verified Live'  },
-        { icon: 'fingerprint',     label: 'DEA Schedule II-IV EPCS',   sub: 'Dual-factor biometric identity',    color: 'cyan',    badge: '2FA Ready'      },
-        { icon: 'local_hospital',  label: 'Inpatient Dental Privileges',sub: 'Institutional clinical tier access',color: 'teal',    badge: 'Tier I Active'  },
+        { icon: 'dentistry',         label: 'Dental Clinic Care Team',  sub: 'For verified dentists, doctors & staff',       color: 'teal',    badge: 'Authorized'},
+        { icon: 'lock',              label: 'Secure Account Access',    sub: 'Fast sign-in & private credential protection',color: 'emerald', badge: 'Encrypted' },
+        { icon: 'clinical_notes',    label: 'Safety Screening Tools',   sub: 'Automatic safety checks during patient visits',color: 'cyan',    badge: 'Ready'     },
       ];
 
   type ColorKey = 'rose' | 'amber' | 'teal' | 'emerald' | 'cyan';
@@ -29,15 +29,17 @@ export default function AuthInfoPanel({ variant }: { variant: 'login' | 'signup'
   };
 
   const accent     = isLogin ? 'teal'  : 'cyan';
-  const mainIcon   = isLogin ? 'medication' : 'badge';
-  const titleText  = isLogin ? 'Clinical Interaction Screener' : 'Prescriber Privileges Gateway';
-  const subText    = isLogin ? 'Deterministic Cross-Match Engine' : 'Dual-Factor Notarized Identity';
-  const streamLabel= isLogin ? 'Prescription Safety Stream' : 'Prescriber Credential Stream';
-  const versionTag = isLogin ? 'FHIR R4 v4.0.1' : 'NPI Registry v4.1';
+  const mainIcon   = isLogin ? 'health_and_safety' : 'dentistry';
+  const titleText  = isLogin ? 'Smile Clinic Prescription Portal' : 'Clinician Account Portal';
+  const subText    = isLogin ? 'Smart Clinical Safety & Care System' : 'Prescriber & Team Registration';
+  const streamLabel= isLogin ? 'Clinical Safety Active' : 'Clinician Registration';
+  const versionTag = 'Smile Clinic';
   const bottomLeft = isLogin
-    ? { label: 'Engine Verification',   value: 'Real-Time Interlock · Zero Fault' }
-    : { label: 'Security Architecture', value: '256-Bit TLS AES · Zero-Knowledge' };
-  const bottomRight = { label: 'Compliance Matrix', value: '21 CFR §1311 EPCS' };
+    ? { label: 'System Status', value: 'Smile Clinic Verified' }
+    : { label: 'Portal Access', value: 'Smile Clinic Team' };
+  const bottomRight = isLogin
+    ? { label: 'Data Security', value: 'Encrypted & Protected' }
+    : { label: 'Patient Privacy', value: 'Protected Records' };
 
   // Deterministic floating particles (no Math.random)
   const particles = [
@@ -159,7 +161,7 @@ export default function AuthInfoPanel({ variant }: { variant: 'login' | 'signup'
               </div>
             </div>
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${tierBadgeClass}`}>
-              {isLogin ? 'Live Screening' : 'Tier II Ready'}
+              {isLogin ? 'Active System' : 'Verified Team'}
             </span>
           </div>
 
@@ -203,7 +205,7 @@ export default function AuthInfoPanel({ variant }: { variant: 'login' | 'signup'
       >
         <div>
           <span className="text-[10px] uppercase tracking-widest text-outline block font-semibold">{bottomLeft.label}</span>
-          <span className={`text-xs font-bold font-mono flex items-center gap-1.5 mt-0.5 ${accentTextClass}`}>
+          <span className={`text-xs font-bold flex items-center gap-1.5 mt-0.5 ${accentTextClass}`}>
             <span className="material-symbols-outlined text-[13px]">{isLogin ? 'verified' : 'lock'}</span>
             <span>{bottomLeft.value}</span>
           </span>

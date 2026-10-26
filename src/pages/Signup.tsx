@@ -171,7 +171,7 @@ export default function Signup() {
             </motion.div>
             <div className="flex flex-col">
               <span className="font-bold text-lg text-primary tracking-tight leading-none">Smile Clinic</span>
-              <span className="text-[10px] text-outline font-medium tracking-wider uppercase">RxGuard Safety Engine</span>
+              <span className="text-[10px] text-outline font-medium tracking-wider uppercase">Smile Clinic Portal</span>
             </div>
           </Link>
 
@@ -482,7 +482,7 @@ export default function Signup() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-on-surface-variant text-xs text-center sm:text-left">
           <div className="flex items-center justify-center sm:justify-start gap-1.5">
             <span className="material-symbols-outlined text-[16px] text-tertiary">shield_with_heart</span>
-            <span>© 2026 Smile Clinic Healthcare Technologies. RxGuard CDS Regulatory System.</span>
+            <span>© 2026 Smile Clinic Healthcare Technologies. All rights reserved.</span>
           </div>
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6 text-[11px] font-medium">
             <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>

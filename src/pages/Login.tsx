@@ -23,9 +23,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
-  const [attest1, setAttest1] = useState(true);
-  const [attest2, setAttest2] = useState(true);
-  const [attest3, setAttest3] = useState(true);
+  const [authorizedConfirmation, setAuthorizedConfirmation] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successFlash, setSuccessFlash] = useState<string | null>(() => {
     const flash = sessionStorage.getItem('smileclinic_prescriber_registered_flash');
@@ -41,14 +39,10 @@ export default function Login() {
   // Dynamic clinic logo
   const savedLogo = localStorage.getItem('dental_clinic_logo');
 
-  // Count confirmed attestations
-  const confirmedCount = (attest1 ? 1 : 0) + (attest2 ? 1 : 0) + (attest3 ? 1 : 0);
-  const isAllAttested = confirmedCount === 3;
-
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAllAttested) {
-      setErrorMessage('You must confirm all 3 mandatory clinical attestations before proceeding.');
+    if (!authorizedConfirmation) {
+      setErrorMessage('Please confirm authorization before signing in.');
       return;
     }
 
@@ -143,7 +137,7 @@ export default function Login() {
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg text-primary leading-none">Smile Clinic</span>
               <span className="px-1.5 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold uppercase tracking-wider">
-                RxGuard CDS
+                Prescription Portal
               </span>
             </div>
             <span className="text-[11px] text-on-surface-variant font-medium">Prescription Safety &amp; Decision Support</span>
@@ -302,7 +296,7 @@ export default function Login() {
                       </div>
                     </div>
 
-                    {/* Remember Device & EPCS Flag */}
+                    {/* Remember Device */}
                     <div className="flex items-center justify-between pt-0.5">
                       <label className="flex items-center gap-2 cursor-pointer select-none">
                         <input
@@ -311,95 +305,45 @@ export default function Login() {
                           onChange={(e) => setRememberDevice(e.target.checked)}
                           className="w-4 h-4 rounded text-primary focus:ring-0 accent-primary cursor-pointer"
                         />
-                        <span className="text-xs text-on-surface-variant font-medium">Remember verified workstation (8 hrs)</span>
+                        <span className="text-xs text-on-surface-variant font-medium">Remember me on this workstation</span>
                       </label>
-                      <span className="text-[11px] text-outline font-semibold">21 CFR EPCS Ready</span>
                     </div>
 
-                    {/* Mandatory Regulatory Attestations */}
-                    <div className="bg-surface-container-low rounded-2xl p-4 flex flex-col gap-2.5 border border-surface-container-high/60">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="material-symbols-outlined text-primary text-base">
-                            gavel
-                          </span>
-                          <span className="text-xs font-bold text-on-surface">Mandatory Regulatory Attestations</span>
-                        </div>
-                        <span
-                          className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold transition-colors ${
-                            isAllAttested
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                              : 'bg-error-container text-on-error-container'
-                          }`}
-                        >
-                          {confirmedCount} of 3 Confirmed
+                    {/* Clinician Authorization Confirmation */}
+                    <div className="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container-high/60">
+                      <label className="flex items-start gap-2.5 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={authorizedConfirmation}
+                          onChange={(e) => setAuthorizedConfirmation(e.target.checked)}
+                          className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
+                        />
+                        <span className="text-xs text-on-surface-variant group-hover:text-on-surface transition-colors leading-relaxed">
+                          I confirm that I am an authorized clinician accessing Smile Clinic patient records.
                         </span>
-                      </div>
-                      <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                        Per 45 CFR §164.530 &amp; Joint Commission standard IM.02.02.01, clinician attestation is legally required prior to viewing active prescription regimens.
-                      </p>
-
-                      <div className="flex flex-col gap-2 pt-1">
-                        <label className="flex items-start gap-2.5 cursor-pointer group p-1.5 rounded-lg hover:bg-surface-container-lowest transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={attest1}
-                            onChange={(e) => setAttest1(e.target.checked)}
-                            className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
-                          />
-                          <span className="text-xs text-on-surface group-hover:text-primary transition-colors leading-snug">
-                            I am authorized under institutional clinical privileges.
-                          </span>
-                        </label>
-
-                        <label className="flex items-start gap-2.5 cursor-pointer group p-1.5 rounded-lg hover:bg-surface-container-lowest transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={attest2}
-                            onChange={(e) => setAttest2(e.target.checked)}
-                            className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
-                          />
-                          <span className="text-xs text-on-surface group-hover:text-primary transition-colors leading-snug">
-                            I will enter only minimum necessary patient identifiable information (PHI).
-                          </span>
-                        </label>
-
-                        <label className="flex items-start gap-2.5 cursor-pointer group p-1.5 rounded-lg hover:bg-surface-container-lowest transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={attest3}
-                            onChange={(e) => setAttest3(e.target.checked)}
-                            className="w-4 h-4 mt-0.5 rounded text-primary focus:ring-0 accent-primary cursor-pointer shrink-0"
-                          />
-                          <span className="text-xs text-on-surface group-hover:text-primary transition-colors leading-snug">
-                            I understand this tool provides CDS and does not replace statutory pharmacist review.
-                          </span>
-                        </label>
-                      </div>
+                      </label>
                     </div>
 
                     {/* Submit Button */}
                     <div className="flex flex-col gap-2 pt-1">
                       <motion.button
                         type="submit"
-                        whileHover={isAllAttested && !isLoading ? { scale: 1.015, y: -1 } : {}}
-                        whileTap={isAllAttested && !isLoading ? { scale: 0.985 } : {}}
-                        disabled={!isAllAttested || isLoading}
+                        whileHover={authorizedConfirmation && !isLoading ? { scale: 1.015, y: -1 } : {}}
+                        whileTap={authorizedConfirmation && !isLoading ? { scale: 0.985 } : {}}
+                        disabled={!authorizedConfirmation || isLoading}
                         className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 select-none ${
-                          isAllAttested && !isLoading
+                          authorizedConfirmation && !isLoading
                             ? 'bg-primary hover:bg-primary-hover text-white shadow-md hover:shadow-lg cursor-pointer'
                             : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
                         }`}
                       >
                         <span className={`material-symbols-outlined text-lg ${isLoading ? 'animate-spin' : ''}`}>
-                          {isLoading ? 'sync' : isAllAttested ? 'login' : 'lock'}
+                          {isLoading ? 'sync' : 'login'}
                         </span>
                         <span>
                           {isLoading
-                            ? 'Authenticating Clinical Session...'
-                            : isAllAttested
-                            ? 'Sign In to RxGuard Portal'
-                            : 'Requires 3/3 Attestations Above'}
+                            ? 'Authenticating...'
+                            : 'Sign In to Smile Clinic Portal'}
                         </span>
                       </motion.button>
 
@@ -414,15 +358,15 @@ export default function Login() {
                   </form>
                 </div>
 
-                {/* Clean Bottom Security Strip (No demo buttons) */}
+                {/* Clean Bottom Security Strip */}
                 <div className="mt-4 p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/60 flex items-center justify-between text-xs text-on-surface-variant">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-base text-primary">shield</span>
-                    <span className="text-[11px] font-medium">Data encrypted in transit &amp; rest (AES-256 / TLS 1.3)</span>
+                    <span className="material-symbols-outlined text-base text-primary">verified_user</span>
+                    <span className="text-[11px] font-medium">Smile Clinic Verified &amp; Encrypted</span>
                   </div>
                   <div className="flex items-center gap-1 text-[11px] text-outline font-medium">
-                    <span className="material-symbols-outlined text-sm">schedule</span>
-                    <span>15m Inactivity Lock</span>
+                    <span className="material-symbols-outlined text-sm text-primary">lock</span>
+                    <span>Protected Patient Privacy</span>
                   </div>
                 </div>
               </motion.div>
