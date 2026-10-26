@@ -267,9 +267,15 @@ export const authApi = {
           device_id: deviceId || ''
         })
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text().catch(() => '');
+        data = { message: text || `Authentication server responded with status ${res.status}` };
+      }
       if (!res.ok) {
-        throw new Error(data.detail || data.message || 'Google authentication failed.');
+        throw new Error(data.detail || data.message || `Google authentication failed (${res.status}).`);
       }
       return data;
     } catch (err: any) {
