@@ -14,7 +14,7 @@ export default function Support() {
 
   const [formData, setFormData] = useState({
     name: 'Dr. Sarah Lin, PharmD',
-    email: 'rxguard@smileclinic.com',
+    email: 'support.smileclinic@gmail.com',
     category: 'Drug Interaction & Safety Rules Engine',
     priority: 'Normal',
     subject: '',
@@ -32,7 +32,7 @@ export default function Support() {
 
   const faqs = [
     {
-      q: 'How does the RxGuard drug-drug and allergy interaction engine validate orders?',
+      q: 'How does the Smile Clinic drug-drug and allergy interaction engine validate orders?',
       a: 'The engine cross-checks the proposed medication against the patient active medication list, known drug classes (e.g. Beta-lactam / Penicillin anaphylaxis), and liver/kidney biomarkers (eGFR and AST/ALT) via SMART on FHIR v4.'
     },
     {
@@ -267,7 +267,7 @@ export default function Support() {
             )}
           </div>
 
-          {/* RxGuard FAQs */}
+          {/* Prescription Safety FAQs */}
           <div className="lg:col-span-5 space-y-4">
             <div className="bg-white p-6 rounded-2xl border border-surface-container-high shadow-xs">
               <div className="flex items-center gap-2 mb-4 pb-3 border-b border-surface-container-high">

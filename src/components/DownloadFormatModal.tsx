@@ -87,7 +87,7 @@ export default function DownloadFormatModal({
 
     if (format === 'json') {
       const payload = {
-        reportSchema: 'SmileClinic-RxGuard-CDS-Verification-v4.12',
+        reportSchema: 'SmileClinic-CDS-Verification-v4.12',
         checkNumber,
         timestamp: check.timestamp || new Date().toISOString(),
         patient: {

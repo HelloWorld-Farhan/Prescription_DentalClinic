@@ -82,14 +82,14 @@ export default function ExportAuditModal({
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
       link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `RxGuard_HIPAA_Audit_${timestamp}.csv`);
+      link.setAttribute('download', `SmileClinic_HIPAA_Audit_${timestamp}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } else if (selectedFormat === 'json') {
       const exportPayload = {
         exportMetadata: {
-          system: 'Smile Clinic RxGuard CDS Engine',
+          system: 'Smile Clinic Clinical CDS Engine',
           protocol: 'FHIR R4 AuditEvent / HIPAA Safe Harbor §164.514',
           exportTimestamp: new Date().toISOString(),
           recordCount: exportableLogs.length,
@@ -103,7 +103,7 @@ export default function ExportAuditModal({
         encodeURIComponent(JSON.stringify(exportPayload, null, 2));
       const link = document.createElement('a');
       link.setAttribute('href', dataStr);
-      link.setAttribute('download', `RxGuard_AuditPayload_${timestamp}.json`);
+      link.setAttribute('download', `SmileClinic_AuditPayload_${timestamp}.json`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

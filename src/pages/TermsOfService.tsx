@@ -27,8 +27,8 @@ export default function TermsOfService() {
               <span className="px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed font-bold text-xs uppercase tracking-wider">
                 Clinical Agreement
               </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-xs font-semibold">
-                RxGuard Clinical Decision Terms
+              <span className="px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+                Smile Clinic Clinical Decision Terms
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface">Prescription Safety Checker Terms of Service</h1>
@@ -44,7 +44,7 @@ export default function TermsOfService() {
               <span>Clinical Decision Support System (CDSS) Scope</span>
             </h2>
             <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-              RxGuard is an intelligent clinical decision support system designed to assist licensed prescribers in evaluating drug-drug interactions, contraindications, and organ clearance warnings. RxGuard alerts do not replace the independent medical judgment of the attending dentist or clinical pharmacist.
+              Smile Clinic is an intelligent clinical decision support system designed to assist licensed prescribers in evaluating drug-drug interactions, contraindications, and organ clearance warnings. Safety alerts do not replace the independent medical judgment of the attending dentist or clinical pharmacist.
             </p>
           </section>
 

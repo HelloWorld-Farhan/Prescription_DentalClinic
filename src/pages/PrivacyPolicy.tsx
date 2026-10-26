@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface">Prescription Privacy Policy & Medication Data Safeguards</h1>
             <p className="text-xs sm:text-sm text-on-surface-variant mt-2">
-              Effective Date: January 1, 2026 • Governing Practice: Smile Clinic RxGuard Clinical Decision System
+              Effective Date: January 1, 2026 • Governing Practice: Smile Clinic Clinical Decision System
             </p>
           </div>
 
@@ -45,7 +45,7 @@ export default function PrivacyPolicy() {
               <span>Medication Data Privacy Commitment</span>
             </h2>
             <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-              Smile Clinic and the RxGuard decision support platform protect sensitive prescription records, allergy history, and patient pharmacogenomic markers under the HIPAA Privacy and Security Rules (45 CFR §164.312).
+              Smile Clinic and the clinical decision support platform protect sensitive prescription records, allergy history, and patient pharmacogenomic markers under the HIPAA Privacy and Security Rules (45 CFR §164.312).
             </p>
           </section>
 

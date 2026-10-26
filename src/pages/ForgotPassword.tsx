@@ -30,7 +30,7 @@ export default function ForgotPassword() {
           <div>
             <span className="font-bold text-lg text-primary block leading-none">Smile Clinic</span>
             <span className="text-[10px] text-outline font-medium uppercase tracking-wider">
-              RxGuard Decision Support
+              Clinical Decision Support
             </span>
           </div>
         </Link>

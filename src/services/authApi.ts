@@ -1,5 +1,5 @@
 /**
- * Smile Clinic RxGuard — Authentication API Service
+ * Smile Clinic — Authentication API Service
  * Connects frontend Signup, OTP Verification, and Login to the FastAPI Backend
  */
 

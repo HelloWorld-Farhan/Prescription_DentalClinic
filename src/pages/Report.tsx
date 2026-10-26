@@ -277,7 +277,7 @@ export default function Report() {
                   </div>
                   <div>
                     <div className="text-xl font-bold tracking-tight text-[#005c65] leading-tight">
-                      Smile Clinic RxGuard CDS Engine
+                      Smile Clinic CDS Engine
                     </div>
                     <div className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
                       Clinical Decision Support &amp; Verification Protocol
@@ -758,7 +758,7 @@ export default function Report() {
       {/* Global Clinical Footer */}
       <footer className="w-full bg-surface-container-lowest border-t border-surface-container-high py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-outline text-xs gap-2">
-          <div>© 2026 Smile Clinic Healthcare Technologies. RxGuard CDS Decision Support Engine.</div>
+          <div>© 2026 Smile Clinic Healthcare Technologies. Clinical CDS Decision Support Engine.</div>
           <div className="flex items-center gap-4">
             <span className="text-emerald-700 font-medium">HIPAA / HITECH Compliant</span>
             <span>CDS Authority Level 3</span>

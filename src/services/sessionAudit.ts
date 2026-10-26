@@ -1,5 +1,5 @@
 /**
- * Smile Clinic RxGuard — Session & Security Audit Service
+ * Smile Clinic — Session & Security Audit Service
  * Detects client environment, tracks active sessions, and maintains persistent login audit history.
  */
 

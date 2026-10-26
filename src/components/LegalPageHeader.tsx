@@ -54,7 +54,7 @@ export default function LegalPageHeader({
 
           {/* Context Breadcrumb */}
           <div className="hidden lg:flex items-center gap-2 text-xs text-on-surface-variant font-medium pl-3 border-l border-surface-container-high">
-            <span className="text-outline">{isLoggedIn ? 'RxGuard Dashboard' : 'Prescription Access'}</span>
+            <span className="text-outline">{isLoggedIn ? 'Prescription Dashboard' : 'Prescription Access'}</span>
             <span className="text-outline">/</span>
             <span className="text-primary font-semibold">{title}</span>
           </div>
