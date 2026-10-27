@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, AlertSeverity } from '../types';
@@ -43,6 +43,26 @@ export default function RulesAdmin() {
   const [draftRules, setDraftRules] = useState<DraftRuleItem[]>([emptyDraftRule()]);
   const [manualFormError, setManualFormError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Lock body scroll and handle Escape key for active modals
+  useEffect(() => {
+    if (!isAddModalOpen && !inspectRule) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (inspectRule) setInspectRule(null);
+        else if (isAddModalOpen) setIsAddModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAddModalOpen, inspectRule]);
 
 
   const handleOpenAddModal = () => {
@@ -592,33 +612,40 @@ export default function RulesAdmin() {
       {/* Inspect Rule AST Modal */}
       <AnimatePresence>
         {inspectRule && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              className="bg-surface-container-lowest rounded-2xl p-6 max-w-xl w-full border border-surface-container-high shadow-2xl space-y-4"
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="flex items-start justify-between border-b border-surface-container pb-3">
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[20px]">account_tree</span>
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">account_tree</span>
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-on-surface">Compiled Rule AST Inspector</h3>
-                    <span className="font-mono text-xs text-primary font-bold">{inspectRule.id}</span>
+                    <h3 className="text-sm sm:text-base font-bold text-on-surface">Compiled Rule AST Inspector</h3>
+                    <p className="text-[11px] text-on-surface-variant font-mono font-bold text-primary">
+                      {inspectRule.id}
+                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setInspectRule(null)}
-                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer"
+                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                  title="Close"
+                  aria-label="Close"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
               </div>
 
-              <div className="space-y-3 text-xs">
+              {/* Modal Body */}
+              <div className="py-4 overflow-y-auto flex-1 space-y-3.5 text-xs pr-1">
                 <div>
                   <span className="text-outline font-semibold block mb-1">Target Interactions:</span>
                   <div className="flex items-center gap-2">
@@ -653,33 +680,34 @@ export default function RulesAdmin() {
                     {inspectRule.description}
                   </p>
                 </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-surface-container">
-                  <span className="text-on-surface font-semibold">Active Engine Execution State:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleToggle(inspectRule.id);
-                      setInspectRule({ ...inspectRule, active: !inspectRule.active });
-                    }}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      inspectRule.active
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-surface-container text-on-surface-variant'
-                    }`}
-                  >
-                    {inspectRule.active ? 'ACTIVE & ENFORCED' : 'DISABLED / STAGED'}
-                  </button>
-                </div>
               </div>
 
-              <div className="pt-2 border-t border-surface-container flex justify-end">
+              {/* Modal Bottom Actions */}
+              <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setInspectRule(null)}
-                  className="px-4 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs hover:bg-surface-container-high transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
                 >
                   Close Inspector
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleToggle(inspectRule.id);
+                    setInspectRule({ ...inspectRule, active: !inspectRule.active });
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    inspectRule.active
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
+                      : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {inspectRule.active ? 'check_circle' : 'pause_circle'}
+                  </span>
+                  <span>{inspectRule.active ? 'Active & Enforced' : 'Disabled / Staged'}</span>
                 </button>
               </div>
             </motion.div>
@@ -1059,6 +1087,12 @@ export default function RulesAdmin() {
                 >
                   Cancel
                 </button>
+
+                {addModalMode === 'select' && (
+                  <span className="text-[11px] text-on-surface-variant font-medium">
+                    Choose an ingestion method above to proceed
+                  </span>
+                )}
 
                 {addModalMode === 'upload' && (
                   <button

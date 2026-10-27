@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export interface AuditLogItem {
@@ -119,56 +120,67 @@ export default function ExportAuditModal({
     onClose();
   };
 
-  return (
+  // Lock body scroll on open & handle Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isExporting) handleModalClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, isExporting]);
+
+  if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={handleModalClose}
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm cursor-pointer"
-          />
-
-          {/* Dialog Container */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 12 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className="relative w-full max-w-lg bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col"
-          >
-            {/* Header */}
-            <div className="p-5 sm:p-6 pb-4 border-b border-surface-container flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
-                  <span className="material-symbols-outlined text-[24px]">download_for_offline</span>
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-on-surface">
-                    Export HIPAA Audit Trail
-                  </h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    Notarized extraction of clinical screening queries & overrides
-                  </p>
-                </div>
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 print:hidden">
+        {/* Modal Window Container matching Sync Knowledge Base Popup */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 16 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+        >
+          {/* Top Modal Header */}
+          <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <span className="material-symbols-outlined text-[18px]">download_for_offline</span>
               </div>
-
-              <button
-                type="button"
-                onClick={handleModalClose}
-                disabled={isExporting}
-                className="p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                title="Close"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-on-surface">
+                  Export HIPAA Audit Trail
+                </h3>
+                <p className="text-[11px] text-on-surface-variant">
+                  Notarized extraction of clinical screening queries &amp; overrides
+                </p>
+              </div>
             </div>
 
-            {/* Content Body */}
-            <div className="p-5 sm:p-6 space-y-5">
+            <button
+              type="button"
+              onClick={handleModalClose}
+              disabled={isExporting}
+              className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+              title="Close"
+              aria-label="Close"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="py-4 overflow-y-auto flex-1 pr-1 space-y-4">
               {/* Format Chooser */}
               <div>
                 <label className="text-[11px] font-bold text-outline uppercase tracking-wider block mb-2">
@@ -301,34 +313,34 @@ export default function ExportAuditModal({
               </AnimatePresence>
             </div>
 
-            {/* Footer Buttons */}
-            <div className="p-4 sm:p-5 pt-3 bg-surface-container-low/60 border-t border-surface-container flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={handleModalClose}
-                disabled={isExporting}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
+            {/* Modal Bottom Actions */}
+          <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleModalClose}
+              disabled={isExporting}
+              className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+            >
+              Cancel
+            </button>
 
-              <motion.button
-                type="button"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleStartExport}
-                disabled={isExporting || exportSuccess}
-                className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[17px]">
-                  {isExporting ? 'hourglass_top' : 'download'}
-                </span>
-                <span>{isExporting ? 'Exporting...' : 'Download Export'}</span>
-              </motion.button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleStartExport}
+              disabled={isExporting || exportSuccess}
+              className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {isExporting ? 'sync' : 'download'}
+              </span>
+              <span>{isExporting ? 'Exporting...' : 'Download Export'}</span>
+            </motion.button>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>,
+    document.body
   );
 }

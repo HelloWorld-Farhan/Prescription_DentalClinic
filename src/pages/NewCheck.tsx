@@ -235,6 +235,21 @@ export default function NewCheck() {
   // Modal State for inspecting individual allergy safety details
   const [inspectingAllergy, setInspectingAllergy] = useState<string | null>(null);
 
+  // Lock body scroll and handle Escape key for inspectingAllergy modal
+  useEffect(() => {
+    if (!inspectingAllergy) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setInspectingAllergy(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [inspectingAllergy]);
+
   // Prescriptions List (Clean empty initial phase)
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([]);
 
@@ -1606,100 +1621,105 @@ export default function NewCheck() {
       {/* Allergy Safety Inspection Dialog */}
       <AnimatePresence>
         {inspectingAllergy && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setInspectingAllergy(null)}
-              className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-            />
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 26 }}
-              className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-5 sm:p-6 z-10 space-y-5"
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-lg w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
               {(() => {
                 const details = getAllergyDetails(inspectingAllergy);
                 return (
                   <>
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3 pb-3 border-b border-surface-container">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
-                          <span className="material-symbols-outlined text-[24px]">emergency</span>
+                    {/* Top Modal Header */}
+                    <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                          <span className="material-symbols-outlined text-[18px]">emergency</span>
                         </div>
                         <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-base text-on-surface">{details.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm sm:text-base font-bold text-on-surface">{details.name}</h3>
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 uppercase tracking-wider">
                               {details.severity}
                             </span>
                           </div>
-                          <p className="text-xs text-outline mt-0.5">{details.category}</p>
+                          <p className="text-[11px] text-on-surface-variant">{details.category}</p>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => setInspectingAllergy(null)}
-                        className="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container transition-colors cursor-pointer"
+                        className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
                         title="Close"
+                        aria-label="Close"
                       >
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                        <span className="material-symbols-outlined text-[18px]">close</span>
                       </button>
                     </div>
 
-                    {/* CDS Rule Status */}
-                    <div className="p-3 bg-surface-container-low rounded-xl border border-surface-container flex items-center justify-between text-xs gap-2">
-                      <div className="flex items-center gap-2 text-on-surface min-w-0">
-                        <span className="material-symbols-outlined text-primary text-[18px] shrink-0">verified</span>
-                        <span className="font-semibold truncate">{details.screeningRule}</span>
+                    {/* Modal Body */}
+                    <div className="py-4 overflow-y-auto flex-1 space-y-4 pr-1">
+                      {/* CDS Rule Status */}
+                      <div className="p-3 bg-surface-container-low rounded-xl border border-surface-container flex items-center justify-between text-xs gap-2">
+                        <div className="flex items-center gap-2 text-on-surface min-w-0">
+                          <span className="material-symbols-outlined text-primary text-[18px] shrink-0">verified</span>
+                          <span className="font-semibold truncate">{details.screeningRule}</span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          Active in Engine
+                        </span>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        Active in Engine
-                      </span>
+
+                      {/* Cross-Reactivity Drug Classes */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
+                          Known Cross-Reactive Dental Drugs &amp; Classes
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {details.crossReactivities.map((drug) => (
+                            <span
+                              key={drug}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200"
+                            >
+                              <span className="material-symbols-outlined text-[14px] text-rose-600">block</span>
+                              <span>{drug}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Clinical Note */}
+                      <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1">
+                        <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-amber-700">clinical_notes</span>
+                          <span>Clinical Safety Guidance</span>
+                        </div>
+                        <p className="text-xs text-amber-900/90 leading-relaxed">
+                          {details.clinicalNote}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Cross-Reactivity Drug Classes */}
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
-                        Known Cross-Reactive Dental Drugs &amp; Classes
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {details.crossReactivities.map((drug) => (
-                          <span
-                            key={drug}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200"
-                          >
-                            <span className="material-symbols-outlined text-[14px] text-rose-600">block</span>
-                            <span>{drug}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Clinical Note */}
-                    <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1">
-                      <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[16px] text-amber-700">clinical_notes</span>
-                        <span>Clinical Safety Guidance</span>
-                      </div>
-                      <p className="text-xs text-amber-900/90 leading-relaxed">
-                        {details.clinicalNote}
-                      </p>
-                    </div>
-
-                    {/* Action */}
-                    <div className="pt-2 flex justify-end">
+                    {/* Modal Bottom Actions */}
+                    <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => setInspectingAllergy(null)}
-                        className="py-2.5 px-5 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold text-xs transition-colors cursor-pointer"
+                        className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
                       >
-                        Acknowledge &amp; Dismiss
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInspectingAllergy(null)}
+                        className="px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">check</span>
+                        <span>Acknowledge &amp; Dismiss</span>
                       </button>
                     </div>
                   </>

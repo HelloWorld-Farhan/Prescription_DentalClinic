@@ -164,6 +164,31 @@ export default function Settings() {
   const [historyPage, setHistoryPage] = useState(1);
   const pageSize = 4;
 
+  // Lock body scroll and handle Escape key for any active modal in Settings
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(
+      showEditProfileModal || showOtpModal || showTerminateAllModal || sessionToRevoke
+    );
+    if (!isAnyModalOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showEditProfileModal) setShowEditProfileModal(false);
+        else if (showOtpModal) setShowOtpModal(false);
+        else if (showTerminateAllModal) setShowTerminateAllModal(false);
+        else if (sessionToRevoke) setSessionToRevoke(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showEditProfileModal, showOtpModal, showTerminateAllModal, sessionToRevoke]);
+
   // Sync real-time sessions and login history from backend PostgreSQL
   useEffect(() => {
     let isCancelled = false;
@@ -1568,222 +1593,225 @@ export default function Settings() {
       {/* ========================================================================= */}
       <AnimatePresence>
         {showEditProfileModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.94, y: 16 }}
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full max-w-xl bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden"
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-xl bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
             >
               {/* Modal Header */}
-              <div className="p-6 bg-surface-container-low border-b border-surface-container-high flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shadow-xs">
-                    <span className="material-symbols-outlined text-[22px]">badge</span>
+              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">badge</span>
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-on-surface">Edit Clinical Profile</h3>
-                    <p className="text-xs text-outline">Update personal credentials, licensing, and facility station</p>
+                    <h3 className="text-sm sm:text-base font-bold text-on-surface">Edit Clinical Profile</h3>
+                    <p className="text-[11px] text-on-surface-variant">Update personal credentials, licensing, and facility station</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowEditProfileModal(false)}
-                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
+                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                  title="Close"
+                  aria-label="Close"
                 >
-                  <span className="material-symbols-outlined">close</span>
+                  <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
               </div>
 
               {/* Modal Form */}
-              <form onSubmit={handleSaveProfile} className="p-6 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Full Name */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Full Name &amp; Academic Degree *</label>
-                    <input
-                      type="text"
-                      required
-                      value={editForm.fullName}
-                      onChange={(e) => {
-                        const name = e.target.value;
-                        const initials = name
-                          .split(' ')
-                          .filter(Boolean)
-                          .map((n) => n[0])
-                          .join('')
-                          .slice(0, 2)
-                          .toUpperCase();
-                        setEditForm({ ...editForm, fullName: name, avatarInitials: initials || 'CL' });
-                      }}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
-                    />
-                  </div>
-
-                  {/* Clinical Role */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Clinical Designation / Role *</label>
-                    <input
-                      type="text"
-                      required
-                      value={editForm.role}
-                      onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                      placeholder="e.g. Lead Clinician / USER"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Read-Only Email */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-on-surface">Registered Account Email</label>
-                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">Read-Only</span>
-                    </div>
-                    <div className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-mono flex items-center justify-between">
-                      <span className="truncate">{editForm.email}</span>
-                      <span className="material-symbols-outlined text-slate-400 text-[16px]">lock</span>
-                    </div>
-                  </div>
-
-                  {/* Phone */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Direct Mobile Phone (for 2FA &amp; Alerts) *</label>
-                    <input
-                      type="text"
-                      required
-                      value={editForm.phone}
-                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                      placeholder="+91 9876543210"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Age */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Age (Years) *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="125"
-                      value={editForm.age || ''}
-                      onChange={(e) => setEditForm({ ...editForm, age: e.target.value ? parseInt(e.target.value, 10) : undefined })}
-                      placeholder="e.g. 32"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
-                    />
-                  </div>
-
-                  {/* Gender */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Gender *</label>
-                    <select
-                      value={editForm.gender || 'Prefer not to say'}
-                      onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium cursor-pointer"
-                    >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Non-Binary">Non-Binary</option>
-                      <option value="Prefer not to say">Prefer not to say</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Height */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Height</label>
-                    <input
-                      type="text"
-                      value={editForm.height || ''}
-                      onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
-                      placeholder="e.g. 175 cm or 5'9''"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
-                    />
-                  </div>
-
-                  {/* Weight */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Weight</label>
-                    <input
-                      type="text"
-                      value={editForm.weight || ''}
-                      onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
-                      placeholder="e.g. 70 kg or 154 lbs"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
-                    />
-                  </div>
-                </div>
-
-                {/* Allergies */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[18px] text-amber-600">warning</span>
-                      <span>Known Drug / Medical Allergies?</span>
-                    </span>
-                    <div className="flex items-center rounded-lg bg-slate-200 p-0.5 text-xs font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setEditForm({ ...editForm, hasAllergies: false, allergiesDescription: '' })}
-                        className={`px-2.5 py-1 rounded-md transition-all ${
-                          !editForm.hasAllergies ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
-                        }`}
-                      >
-                        No (NKDA)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditForm({ ...editForm, hasAllergies: true })}
-                        className={`px-2.5 py-1 rounded-md transition-all ${
-                          editForm.hasAllergies ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600'
-                        }`}
-                      >
-                        Yes
-                      </button>
-                    </div>
-                  </div>
-
-                  {editForm.hasAllergies ? (
+              <form onSubmit={handleSaveProfile} className="flex flex-col flex-1 min-h-0">
+                <div className="py-4 overflow-y-auto flex-1 space-y-4 pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Full Name */}
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-amber-900">Specify Allergies *</label>
+                      <label className="text-xs font-bold text-on-surface">Full Name &amp; Academic Degree *</label>
                       <input
                         type="text"
-                        value={editForm.allergiesDescription || ''}
-                        onChange={(e) => setEditForm({ ...editForm, allergiesDescription: e.target.value })}
-                        placeholder="e.g. Penicillin, Amoxicillin, Latex, NSAIDs"
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-amber-300 bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                        required
+                        value={editForm.fullName}
+                        onChange={(e) => {
+                          const name = e.target.value;
+                          const initials = name
+                            .split(' ')
+                            .filter(Boolean)
+                            .map((n) => n[0])
+                            .join('')
+                            .slice(0, 2)
+                            .toUpperCase();
+                          setEditForm({ ...editForm, fullName: name, avatarInitials: initials || 'CL' });
+                        }}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
                       />
                     </div>
-                  ) : (
-                    <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[15px] text-emerald-600">check_circle</span>
-                      <span>No Known Drug Allergies (NKDA) recorded</span>
-                    </p>
-                  )}
+
+                    {/* Clinical Role */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Clinical Designation / Role *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editForm.role}
+                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                        placeholder="e.g. Lead Clinician / USER"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Read-Only Email */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-on-surface">Registered Account Email</label>
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">Read-Only</span>
+                      </div>
+                      <div className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-mono flex items-center justify-between">
+                        <span className="truncate">{editForm.email}</span>
+                        <span className="material-symbols-outlined text-slate-400 text-[16px]">lock</span>
+                      </div>
+                    </div>
+
+                    {/* Phone */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Direct Mobile Phone (for 2FA &amp; Alerts) *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        placeholder="+91 9876543210"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Age */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Age (Years) *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="125"
+                        value={editForm.age || ''}
+                        onChange={(e) => setEditForm({ ...editForm, age: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                        placeholder="e.g. 32"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
+                      />
+                    </div>
+
+                    {/* Gender */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Gender *</label>
+                      <select
+                        value={editForm.gender || 'Prefer not to say'}
+                        onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium cursor-pointer"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Non-Binary">Non-Binary</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Height */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Height</label>
+                      <input
+                        type="text"
+                        value={editForm.height || ''}
+                        onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
+                        placeholder="e.g. 175 cm or 5'9''"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
+                      />
+                    </div>
+
+                    {/* Weight */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-on-surface">Weight</label>
+                      <input
+                        type="text"
+                        value={editForm.weight || ''}
+                        onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
+                        placeholder="e.g. 70 kg or 154 lbs"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-surface-container-high bg-white focus:outline-none focus:border-primary font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Allergies */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[18px] text-amber-600">warning</span>
+                        <span>Known Drug / Medical Allergies?</span>
+                      </span>
+                      <div className="flex items-center rounded-lg bg-slate-200 p-0.5 text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setEditForm({ ...editForm, hasAllergies: false, allergiesDescription: '' })}
+                          className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                            !editForm.hasAllergies ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
+                          }`}
+                        >
+                          No (NKDA)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditForm({ ...editForm, hasAllergies: true })}
+                          className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                            editForm.hasAllergies ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600'
+                          }`}
+                        >
+                          Yes
+                        </button>
+                      </div>
+                    </div>
+
+                    {editForm.hasAllergies ? (
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-amber-900">Specify Allergies *</label>
+                        <input
+                          type="text"
+                          value={editForm.allergiesDescription || ''}
+                          onChange={(e) => setEditForm({ ...editForm, allergiesDescription: e.target.value })}
+                          placeholder="e.g. Penicillin, Amoxicillin, Latex, NSAIDs"
+                          className="w-full px-3 py-1.5 text-xs rounded-lg border border-amber-300 bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[15px] text-emerald-600">check_circle</span>
+                        <span>No Known Drug Allergies (NKDA) recorded</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                {/* Actions */}
-                <div className="pt-3 flex gap-3">
+                {/* Modal Bottom Actions */}
+                <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowEditProfileModal(false)}
-                    className="w-1/2 py-2.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container"
+                    className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
                   >
                     Cancel
                   </button>
-                  <motion.button
+                  <button
                     type="submit"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-1/2 py-2.5 rounded-xl bg-primary-container text-on-primary text-xs font-bold hover:bg-primary shadow-xs transition-colors cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    Save Changes
-                  </motion.button>
+                    <span className="material-symbols-outlined text-[16px]">save</span>
+                    <span>Save Changes</span>
+                  </button>
                 </div>
               </form>
             </motion.div>
@@ -1796,17 +1824,17 @@ export default function Settings() {
       {/* ========================================================================= */}
       <AnimatePresence>
         {showOtpModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={
                 isOtpError
                   ? { x: [-12, 12, -8, 8, -4, 4, 0], scale: 1, opacity: 1, y: 0 }
                   : { opacity: 1, scale: 1, y: 0 }
               }
-              exit={{ opacity: 0, scale: 0.92, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className={`w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border overflow-hidden transition-colors ${
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className={`w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border flex flex-col max-h-[90vh] overflow-hidden transition-colors ${
                 isOtpSuccess
                   ? 'border-emerald-500 shadow-emerald-500/10'
                   : isOtpError
@@ -1815,22 +1843,22 @@ export default function Settings() {
               }`}
             >
               {/* Modal Header */}
-              <div className="p-6 bg-surface-container-low border-b border-surface-container-high flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs transition-colors ${
+              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                     isOtpSuccess
                       ? 'bg-emerald-600 text-white'
-                      : 'bg-primary-container text-on-primary'
+                      : 'bg-primary/10 text-primary'
                   }`}>
-                    <span className="material-symbols-outlined text-[22px]">
+                    <span className="material-symbols-outlined text-[18px]">
                       {isOtpSuccess ? 'check' : 'lock_clock'}
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-on-surface">
+                    <h3 className="text-sm sm:text-base font-bold text-on-surface">
                       {otpPurpose === 'password_change' ? 'Authorize Password Reset' : 'Reconfigure 2FA Token'}
                     </h3>
-                    <p className="text-xs text-outline">
+                    <p className="text-[11px] text-on-surface-variant">
                       {otpPurpose === 'password_change'
                         ? verificationMethod === 'email'
                           ? `Code sent to ${profile.email}`
@@ -1845,15 +1873,17 @@ export default function Settings() {
                   <button
                     type="button"
                     onClick={() => setShowOtpModal(false)}
-                    className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container"
+                    className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                    title="Close"
+                    aria-label="Close"
                   >
-                    <span className="material-symbols-outlined">close</span>
+                    <span className="material-symbols-outlined text-[18px]">close</span>
                   </button>
                 )}
               </div>
 
               {/* Modal Content */}
-              <div className="p-6 space-y-5">
+              <div className="py-4 overflow-y-auto flex-1 space-y-4">
                 {/* QR Code display if 2FA reconfiguration */}
                 {otpPurpose === 'two_factor_reconfig' && (
                   <div className="p-4 bg-surface-container-low rounded-xl border border-surface-container-high flex flex-col items-center gap-2 text-center">
@@ -1968,41 +1998,40 @@ export default function Settings() {
                         ))}
                       </div>
                     </div>
-
-
-                    {/* Modal Buttons */}
-                    <div className="pt-2 flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowOtpModal(false)}
-                        className="w-1/3 py-2.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container"
-                      >
-                        Cancel
-                      </button>
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        disabled={isOtpVerifying}
-                        onClick={() => handleVerifyOtp()}
-                        className="w-2/3 py-2.5 rounded-xl bg-primary-container text-on-primary text-xs font-bold hover:bg-primary shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                      >
-                        {isOtpVerifying ? (
-                          <>
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                            <span>Validating Token...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-[18px]">verified</span>
-                            <span>Verify Code</span>
-                          </>
-                        )}
-                      </motion.button>
-                    </div>
                   </>
                 )}
               </div>
+
+              {/* Modal Bottom Actions */}
+              {!isOtpSuccess && (
+                <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowOtpModal(false)}
+                    className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isOtpVerifying}
+                    onClick={() => handleVerifyOtp()}
+                    className="px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isOtpVerifying ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span>Validating Token...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[16px]">verified</span>
+                        <span>Verify Code</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
@@ -2013,42 +2042,58 @@ export default function Settings() {
       {/* ========================================================================= */}
       <AnimatePresence>
         {showTerminateAllModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.94 }}
-              className="w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-6 space-y-4"
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-2xl">logout</span>
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-on-surface">Terminate All Remote Sessions?</h3>
+                    <p className="text-[11px] text-on-surface-variant">Immediate global credential invalidation</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-on-surface">Terminate All Remote Sessions?</h3>
-                  <p className="text-xs text-outline">Immediate global credential invalidation</p>
-                </div>
-              </div>
-              <p className="text-xs text-on-surface-variant leading-relaxed">
-                This will immediately revoke active JWT bearer authorization for all other connected nodes (including Ward Tablet Cart #12 and Consultation Room 2). Only your current workstation will remain authenticated.
-              </p>
-              <div className="pt-2 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowTerminateAllModal(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container"
+                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                  title="Close"
+                  aria-label="Close"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="py-4 overflow-y-auto flex-1 text-xs text-on-surface-variant leading-relaxed">
+                This will immediately revoke active JWT bearer authorization for all other connected nodes (including Ward Tablet Cart #12 and Consultation Room 2). Only your current workstation will remain authenticated.
+              </div>
+
+              {/* Modal Bottom Actions */}
+              <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowTerminateAllModal(false)}
+                  className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
-                <motion.button
+                <button
                   type="button"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={handleConfirmTerminateAllRemote}
-                  className="w-1/2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  Terminate All Remote
-                </motion.button>
+                  <span className="material-symbols-outlined text-[16px]">logout</span>
+                  <span>Terminate All Remote</span>
+                </button>
               </div>
             </motion.div>
           </div>
@@ -2060,42 +2105,58 @@ export default function Settings() {
       {/* ========================================================================= */}
       <AnimatePresence>
         {sessionToRevoke && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.94 }}
-              className="w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-6 space-y-4"
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-2xl">phonelink_erase</span>
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">phonelink_erase</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-on-surface">Revoke Session {sessionToRevoke.id}?</h3>
+                    <p className="text-[11px] text-on-surface-variant">{sessionToRevoke.name}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-on-surface">Revoke Session {sessionToRevoke.id}?</h3>
-                  <p className="text-xs text-outline">{sessionToRevoke.name}</p>
-                </div>
-              </div>
-              <p className="text-xs text-on-surface-variant leading-relaxed">
-                Are you sure you want to revoke authorized access for <strong>{sessionToRevoke.name}</strong> ({sessionToRevoke.details})? The remote terminal will be forced to log out immediately.
-              </p>
-              <div className="pt-2 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setSessionToRevoke(null)}
-                  className="w-1/2 py-2.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container"
+                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                  title="Close"
+                  aria-label="Close"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="py-4 overflow-y-auto flex-1 text-xs text-on-surface-variant leading-relaxed">
+                Are you sure you want to revoke authorized access for <strong>{sessionToRevoke.name}</strong> ({sessionToRevoke.details})? The remote terminal will be forced to log out immediately.
+              </div>
+
+              {/* Modal Bottom Actions */}
+              <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSessionToRevoke(null)}
+                  className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
-                <motion.button
+                <button
                   type="button"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={handleConfirmRevokeSingle}
-                  className="w-1/2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  Confirm Revoke
-                </motion.button>
+                  <span className="material-symbols-outlined text-[16px]">phonelink_erase</span>
+                  <span>Confirm Revoke</span>
+                </button>
               </div>
             </motion.div>
           </div>

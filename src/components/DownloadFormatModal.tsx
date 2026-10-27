@@ -25,11 +25,15 @@ export default function DownloadFormatModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    document.body.style.overflow = 'hidden';
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   if (!check) return null;
@@ -236,23 +240,23 @@ export default function DownloadFormatModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm print:hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 print:hidden">
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+            initial={{ opacity: 0, scale: 0.95, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 16 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 320 }}
-            className="w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden"
+            exit={{ opacity: 0, scale: 0.95, y: 16 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="w-full max-w-lg bg-surface-container-lowest rounded-2xl p-5 sm:p-6 border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
           >
             {/* Modal Header */}
-            <div className="p-6 bg-surface-container-low border-b border-surface-container-high flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shadow-xs">
-                  <span className="material-symbols-outlined text-[22px]">download</span>
+            <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[18px]">download</span>
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-on-surface">Download Clinical Report</h3>
-                  <p className="text-xs text-outline">
+                  <h3 className="text-sm sm:text-base font-bold text-on-surface">Download Clinical Report</h3>
+                  <p className="text-[11px] text-on-surface-variant">
                     Record #{check.checkNumber} • {check.patientName}
                   </p>
                 </div>
@@ -260,14 +264,14 @@ export default function DownloadFormatModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 space-y-4">
+            <div className="py-4 overflow-y-auto flex-1 space-y-4">
               <label className="text-xs font-bold text-on-surface block">
                 Select Export Document Format:
               </label>
@@ -279,8 +283,8 @@ export default function DownloadFormatModal({
                   return (
                     <motion.div
                       key={fmt.id}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
                       onClick={() => setSelectedFormat(fmt.id)}
                       className={`p-3.5 rounded-xl border flex flex-col justify-between gap-2 cursor-pointer transition-all ${
                         isSelected
@@ -290,7 +294,7 @@ export default function DownloadFormatModal({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className={`material-symbols-outlined text-[22px] ${fmt.iconColor}`}>
+                          <span className={`material-symbols-outlined text-[20px] ${fmt.iconColor}`}>
                             {fmt.icon}
                           </span>
                           <span className="text-xs font-bold text-on-surface">{fmt.name}</span>
@@ -307,7 +311,7 @@ export default function DownloadFormatModal({
                       <div className="pt-1 flex items-center justify-between text-[10px]">
                         <span className="font-mono font-bold text-primary">{fmt.ext}</span>
                         {fmt.isDefault && (
-                          <span className="px-2 py-0.5 rounded-full font-bold bg-primary-container text-on-primary">
+                          <span className="px-2 py-0.5 rounded-full font-bold bg-primary/10 text-primary">
                             Default
                           </span>
                         )}
@@ -336,30 +340,28 @@ export default function DownloadFormatModal({
                   </div>
                 </div>
               )}
+            </div>
 
-              {/* Actions */}
-              <div className="pt-3 flex gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-1/3 py-2.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={isDownloading}
-                  onClick={handleDownload}
-                  className="w-2/3 py-2.5 rounded-xl bg-primary-container hover:bg-primary text-on-primary text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-[18px]">download</span>
-                  <span>
-                    Download {selectedFormat.toUpperCase()} {selectedFormat === 'pdf' ? '(A4 Print)' : 'File'}
-                  </span>
-                </motion.button>
-              </div>
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDownloading}
+                onClick={handleDownload}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[16px]">download</span>
+                <span>
+                  Download {selectedFormat.toUpperCase()} {selectedFormat === 'pdf' ? '(A4 Print)' : 'File'}
+                </span>
+              </button>
             </div>
           </motion.div>
         </div>
