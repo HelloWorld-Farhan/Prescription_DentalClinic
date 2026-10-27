@@ -7,6 +7,7 @@ import { authApi, UserProfile } from '../services/authApi';
 import { getDeviceId } from '../services/sessionAudit';
 import { PrescriptionStorage } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
+import { ConfirmationEventDetail, showConfirmation } from '../services/confirmation';
 
 interface NotificationItem {
   id: string;
@@ -53,6 +54,29 @@ export default function Layout() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Animated Top Bar Action Confirmation State
+  const [topConfirmation, setTopConfirmation] = useState<ConfirmationEventDetail | null>(null);
+
+  useEffect(() => {
+    let timer: any = null;
+    const handleConfirmation = (e: Event) => {
+      const customEvent = e as CustomEvent<ConfirmationEventDetail>;
+      if (customEvent.detail) {
+        setTopConfirmation(customEvent.detail);
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          setTopConfirmation(null);
+        }, customEvent.detail.duration || 3500);
+      }
+    };
+
+    window.addEventListener('clinical-confirmation', handleConfirmation);
+    return () => {
+      window.removeEventListener('clinical-confirmation', handleConfirmation);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -321,6 +345,7 @@ export default function Layout() {
 
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+    showConfirmation('All clinical notifications marked as read.', 'success');
   };
 
   const navItems = [
@@ -633,39 +658,125 @@ export default function Layout() {
             </div>
           </div>
 
-          {/* Prominent Clinical Search Bar on Medium & Large Screens */}
-          <div className="hidden md:flex flex-1 max-w-sm lg:max-w-md xl:max-w-xl mx-2 lg:mx-6 items-center min-w-0">
-            <button
-              type="button"
-              onClick={() => setIsSearchOpen(true)}
-              className="w-full h-10 px-3.5 rounded-xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high hover:border-primary/40 text-xs text-outline flex items-center justify-between transition-all duration-150 cursor-pointer group shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              title="Search clinical records, patients, drugs, or actions (⌘K)"
-              aria-label="Search clinical records"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="material-symbols-outlined text-[19px] text-outline group-hover:text-primary transition-colors duration-150 shrink-0">
-                  search
-                </span>
-                <span className="truncate font-medium text-outline group-hover:text-on-surface">
-                  {searchQuery.trim() ? searchQuery : 'Search patients, medications, MRN, or safety checks...'}
-                </span>
-              </div>
-              <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-bold text-outline bg-surface-container-high rounded border border-surface-container-highest shrink-0 group-hover:text-on-surface">
-                ⌘K
-              </kbd>
-            </button>
+          {/* Prominent Clinical Search Bar on Medium & Large Screens / Animated Top Confirmation */}
+          <div className="hidden md:flex flex-1 max-w-sm lg:max-w-md xl:max-w-xl mx-2 lg:mx-6 items-center min-w-0 relative h-10">
+            <AnimatePresence mode="wait">
+              {topConfirmation ? (
+                <motion.div
+                  key={`desktop-confirm-${topConfirmation.id}`}
+                  initial={{ opacity: 0, y: -26, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.96 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full h-10 px-3.5 rounded-xl bg-gradient-to-r from-teal-800 via-teal-700 to-emerald-700 text-white flex items-center justify-between shadow-md border border-emerald-400/40 z-30 select-none overflow-hidden"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="material-symbols-outlined text-[19px] text-emerald-300 shrink-0">
+                      {topConfirmation.type === 'error'
+                        ? 'error'
+                        : topConfirmation.type === 'warning'
+                        ? 'warning'
+                        : 'check_circle'}
+                    </span>
+                    <span className="text-xs font-semibold text-white truncate leading-tight">
+                      {topConfirmation.message}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTopConfirmation(null)}
+                    className="ml-2 w-6 h-6 rounded-lg hover:bg-white/10 text-white/80 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                    title="Dismiss confirmation"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="desktop-search-bar"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="w-full"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsSearchOpen(true)}
+                    className="w-full h-10 px-3.5 rounded-xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high hover:border-primary/40 text-xs text-outline flex items-center justify-between transition-all duration-150 cursor-pointer group shadow-2xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    title="Search clinical records, patients, drugs, or actions (⌘K)"
+                    aria-label="Search clinical records"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="material-symbols-outlined text-[19px] text-outline group-hover:text-primary transition-colors duration-150 shrink-0">
+                        search
+                      </span>
+                      <span className="truncate font-medium text-outline group-hover:text-on-surface">
+                        {searchQuery.trim() ? searchQuery : 'Search patients, medications, MRN, or safety checks...'}
+                      </span>
+                    </div>
+                    <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-bold text-outline bg-surface-container-high rounded border border-surface-container-highest shrink-0 group-hover:text-on-surface">
+                      ⌘K
+                    </kbd>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* Center: Mobile Prescription AI Status Badge (< md screens) */}
-          <div className="flex md:hidden items-center justify-center min-w-0">
-            <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
-              <span className="material-symbols-outlined text-[16px] text-primary">psychology</span>
-              <span className="font-bold text-on-surface text-[11px]">AI</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] font-bold">
-                v1.0
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
-            </div>
+          {/* Center: Mobile Prescription AI Status / Animated Top Bar Confirmation (< md screens) */}
+          <div className="flex md:hidden items-center justify-center min-w-0 flex-1 mx-2 relative h-10">
+            <AnimatePresence mode="wait">
+              {topConfirmation ? (
+                <motion.div
+                  key={`mobile-confirm-${topConfirmation.id}`}
+                  initial={{ opacity: 0, y: -26, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full max-w-xs h-9 px-3 rounded-xl bg-gradient-to-r from-teal-800 via-teal-700 to-emerald-700 text-white flex items-center justify-between shadow-md border border-emerald-400/40 z-30 select-none overflow-hidden"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="material-symbols-outlined text-[17px] text-emerald-300 shrink-0">
+                      {topConfirmation.type === 'error'
+                        ? 'error'
+                        : topConfirmation.type === 'warning'
+                        ? 'warning'
+                        : 'check_circle'}
+                    </span>
+                    <span className="text-[11px] font-semibold text-white truncate leading-tight">
+                      {topConfirmation.message}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTopConfirmation(null)}
+                    className="ml-1.5 w-5 h-5 rounded-md hover:bg-white/10 text-white/80 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                    title="Dismiss confirmation"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">close</span>
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="mobile-ai-badge"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center justify-center"
+                >
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
+                    <span className="material-symbols-outlined text-[16px] text-primary">psychology</span>
+                    <span className="font-bold text-on-surface text-[11px]">AI</span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] font-bold">
+                      v1.0
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Right Header Actions */}
@@ -684,7 +795,10 @@ export default function Layout() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/check')}
+              onClick={() => {
+                showConfirmation('Opening Prescription Safety Screening...', 'info', 2200);
+                navigate('/check');
+              }}
               className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-hover transition-colors duration-150 flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
               title="Start New Prescription Safety Check"
             >

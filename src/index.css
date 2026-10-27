@@ -88,13 +88,23 @@ textarea,
   animation: modernFadeIn 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Reduced Motion Clinical Accessibility Rule */
+/* Reduced Motion Clinical Accessibility Rule (exempting critical loaders) */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *:not(.saving-spinner):not(.saving-spinner *) {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Force 60fps Spinner for Cloudflare R2 and Async Operations */
+.saving-spinner {
+  animation: forceSpinAlways 0.75s linear infinite !important;
+  transform-origin: center center;
+}
+@keyframes forceSpinAlways {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Accessible Interactive Keyboard Focus Ring */

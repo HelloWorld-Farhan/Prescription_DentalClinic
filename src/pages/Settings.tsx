@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { authApi } from '../services/authApi';
 import { signInWithGooglePopup } from '../services/firebase';
 import AvatarCropModal from '../components/AvatarCropModal';
+import { showConfirmation } from '../services/confirmation';
 import {
   ActiveSessionItem,
   LoginHistoryItem,
@@ -411,12 +412,9 @@ export default function Settings() {
     }
   }, [profile.email, profile.fullName]);
 
-  // General Toast Notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  // Top Bar Action Confirmation Notification
+  const showToast = (msg: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
+    showConfirmation(msg, type);
   };
 
   // Keep editForm synced when modal opens
@@ -766,20 +764,6 @@ export default function Settings() {
 
   return (
     <div className="flex flex-col w-full gap-6 max-w-7xl mx-auto py-2">
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2.5 border border-slate-700"
-          >
-            <span className="material-symbols-outlined text-emerald-400 text-lg">check_circle</span>
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Top Header Card */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 bg-surface-container-lowest p-6 rounded-2xl shadow-xs border border-surface-container-high/60">

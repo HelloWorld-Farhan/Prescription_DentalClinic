@@ -9,6 +9,7 @@ import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import { uploadToR2, updateDocumentExtractedCount, deleteDocumentRecord } from '../services/storageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
+import { showConfirmation } from '../services/confirmation';
 
 interface AllergyDetailInfo {
   name: string;
@@ -165,7 +166,6 @@ export default function NewCheck() {
     extractedPatient?: ExtractedPatientMetadata;
   } | null>(null);
   const [extractedMedicines, setExtractedMedicines] = useState<PrescriptionItem[]>([]);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [emptyQueueAlertOpen, setEmptyQueueAlertOpen] = useState(false);
 
   // Read active logged-in user profile
@@ -438,14 +438,13 @@ export default function NewCheck() {
         return Array.from(map.values());
       });
 
-      setToastMessage(
-        `Extracted ${extracted.length} medications from ${r2Result.filename} and saved to Cloudflare R2.`
+      showConfirmation(
+        `Extracted ${extracted.length} medications from ${r2Result.filename} and saved to Cloudflare R2.`,
+        'success'
       );
-      setTimeout(() => setToastMessage(null), 3500);
     } catch (err: any) {
       console.error('File processing error:', err);
-      setToastMessage('Document parsed locally; please verify extracted items.');
-      setTimeout(() => setToastMessage(null), 3500);
+      showConfirmation('Document parsed locally; please verify extracted items.', 'info');
     } finally {
       setIsProcessingDocument(false);
     }
@@ -480,6 +479,7 @@ export default function NewCheck() {
       return;
     }
 
+    showConfirmation('Running Automated Safety Screening & Extraction...', 'info', 2000);
     setFlowPhase('analyzing');
     setAnalysisProgress(5);
     setCurrentAnalysisStage(1);
@@ -550,6 +550,7 @@ export default function NewCheck() {
 
       VirtualDb.addCheck(newRecord);
       setSavedCheckRecord(newRecord);
+      showConfirmation(`Prescription safety check ${newRecord.checkNumber} completed & logged`, 'success');
 
       // Automatically transition directly into the complete Clinical Safety Report & Record screen
       setTimeout(() => {
@@ -569,6 +570,7 @@ export default function NewCheck() {
             : a
         )
       );
+      showConfirmation('Clinical decision override signed & recorded into HIPAA audit trail', 'success');
     }
   };
 
@@ -1152,8 +1154,7 @@ export default function NewCheck() {
                           setExtractedMeta(null);
                           setExtractedMedicines([]);
                           setCapturedPhoto(null);
-                          setToastMessage('Document deleted from Cloudflare R2 and unsaved medications removed.');
-                          setTimeout(() => setToastMessage(null), 3500);
+                          showConfirmation('Document deleted from Cloudflare R2 and unsaved medications removed.', 'info');
                         }}
                         className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title="Remove uploaded file and delete from Cloudflare R2"
@@ -1247,8 +1248,7 @@ export default function NewCheck() {
                             setCapturedPhoto(null);
                             setExtractedMeta(null);
                             setExtractedMedicines([]);
-                            setToastMessage('Captured prescription deleted from Cloudflare R2.');
-                            setTimeout(() => setToastMessage(null), 3500);
+                            showConfirmation('Captured prescription deleted from Cloudflare R2.', 'info');
                           }}
                           className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
                           title="Delete photo and purge from Cloudflare R2"
@@ -1428,8 +1428,7 @@ export default function NewCheck() {
                         setUploadedFileName('');
                         setUploadedFileSize('');
                         setCapturedPhoto(null);
-                        setToastMessage('Document purged from Cloudflare R2 and unsaved items cleared.');
-                        setTimeout(() => setToastMessage(null), 3500);
+                        showConfirmation('Document purged from Cloudflare R2 and unsaved items cleared.', 'info');
                       }}
                       className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50/60 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors flex items-center gap-1 cursor-pointer"
                       title="Clear extracted items and purge document from Cloudflare R2"
@@ -2208,23 +2207,6 @@ export default function NewCheck() {
         onCapture={handleCameraCapture}
       />
 
-      {/* Floating Toast Notification - Positioned cleanly in bottom-right corner */}
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 left-5 sm:left-auto max-w-sm sm:max-w-md z-50 bg-emerald-800 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold border border-emerald-600/60 backdrop-blur-md pointer-events-auto"
-          >
-            <span className="material-symbols-outlined text-[20px] text-emerald-300 shrink-0">
-              check_circle
-            </span>
-            <span className="leading-snug">{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {/* UI Matching Clinical Alert Modal (Replaces browser alert) */}
       {createPortal(
         <AnimatePresence>

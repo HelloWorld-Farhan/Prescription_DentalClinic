@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, AlertSeverity } from '../types';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
+import { showConfirmation } from '../services/confirmation';
 import CustomDropdown from '../components/CustomDropdown';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
@@ -49,7 +50,7 @@ export default function RulesAdmin() {
   const currentUserId = storedUser?.id || storedUser?.email || 'user-current';
   const currentClinicianName = storedUser?.fullName || 'Authorized Clinician';
 
-  const [activeTab, setActiveTab] = useState<'rules' | 'history' | 'knowledge' | 'regression'>('rules');
+  const [activeTab, setActiveTab] = useState<'rules' | 'history' | 'knowledge'>('rules');
   const [rules, setRules] = useState<InteractionRule[]>(() => VirtualDb.getRules(currentUserId));
   const [documentHistory, setDocumentHistory] = useState<UploadedDocumentRecord[]>(() =>
     getDocumentHistory(currentUserId)
@@ -60,7 +61,6 @@ export default function RulesAdmin() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [syncStatusText, setSyncStatusText] = useState('');
   const [inspectRule, setInspectRule] = useState<InteractionRule | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Deletion Modal States
   const [docToDelete, setDocToDelete] = useState<UploadedDocumentRecord | null>(null);
@@ -94,8 +94,7 @@ export default function RulesAdmin() {
     if (extractedFileMeta?.storageUrl) {
       await deleteDocumentRecord('', extractedFileMeta.storageUrl);
       setDocumentHistory(getDocumentHistory(currentUserId));
-      setToastMessage(`Cancelled: Staged document "${extractedFileMeta.filename}" purged from Cloudflare R2.`);
-      setTimeout(() => setToastMessage(null), 3500);
+      showConfirmation(`Cancelled: Staged document "${extractedFileMeta.filename}" purged from Cloudflare R2.`, 'info');
     }
     setIsAddModalOpen(false);
     setUploadedFile(null);
@@ -221,8 +220,7 @@ export default function RulesAdmin() {
     setDocumentHistory(getDocumentHistory(currentUserId));
 
     setIsAddModalOpen(false);
-    setToastMessage(`Successfully saved ${newRules.length} clinical rule${newRules.length > 1 ? 's' : ''} to History & Data.`);
-    setTimeout(() => setToastMessage(null), 3500);
+    showConfirmation(`Successfully saved ${newRules.length} clinical rule${newRules.length > 1 ? 's' : ''} to History & Data.`, 'success');
   };
 
   const handleExtractFromDocument = async () => {
@@ -276,7 +274,7 @@ export default function RulesAdmin() {
       setAddModalMode('preview');
     } catch (err: any) {
       console.error('Extraction error:', err);
-      setToastMessage('Failed to extract document. Please check file format.');
+      showConfirmation('Failed to extract document. Please check file format.', 'error');
     } finally {
       setIsExtracting(false);
     }
@@ -294,16 +292,14 @@ export default function RulesAdmin() {
     }
 
     setIsAddModalOpen(false);
-    setToastMessage(`Saved ${extractedPreviewRules.length} extracted rules to History & Data.`);
-    setTimeout(() => setToastMessage(null), 3500);
+    showConfirmation(`Saved ${extractedPreviewRules.length} extracted rules to History & Data.`, 'success');
   };
 
   const handleToggle = (id: string) => {
     const updated = VirtualDb.toggleRule(id);
     setRules([...updated]);
     const target = updated.find(r => r.id === id);
-    setToastMessage(`Rule ${id} is now ${target?.active ? 'ACTIVE' : 'DISABLED'}`);
-    setTimeout(() => setToastMessage(null), 3000);
+    showConfirmation(`Rule ${id} is now ${target?.active ? 'ACTIVE' : 'DISABLED'}`, 'success');
   };
 
   const handleDelete = (id: string) => {
@@ -324,12 +320,10 @@ export default function RulesAdmin() {
       VirtualDb.deleteRulesBySource(docToDelete.filename);
       setRules(VirtualDb.getRules(currentUserId));
       setDocumentHistory(getDocumentHistory(currentUserId));
-      setToastMessage(`Document "${docToDelete.filename}" and extracted rules vanished from database & R2.`);
-      setTimeout(() => setToastMessage(null), 3500);
+      showConfirmation(`Document "${docToDelete.filename}" and extracted rules vanished from database & R2.`, 'success');
       setDocToDelete(null);
     } catch {
-      setToastMessage('Failed to delete document from storage.');
-      setTimeout(() => setToastMessage(null), 3500);
+      showConfirmation('Failed to delete document from storage.', 'error');
     } finally {
       setIsDeletingDoc(false);
     }
@@ -339,14 +333,8 @@ export default function RulesAdmin() {
     if (!ruleToDelete) return;
     const updated = VirtualDb.deleteRule(ruleToDelete.id);
     setRules([...updated]);
-    setToastMessage(`Rule "${ruleToDelete.drugA} + ${ruleToDelete.drugB}" permanently removed.`);
-    setTimeout(() => setToastMessage(null), 3000);
+    showConfirmation(`Rule "${ruleToDelete.drugA} + ${ruleToDelete.drugB}" permanently removed.`, 'success');
     setRuleToDelete(null);
-  };
-
-  const handleRunRegression = () => {
-    setToastMessage('No test assertion data available. Please author or import clinical decision rules first.');
-    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const filteredRules = rules.filter((r) => {
@@ -537,23 +525,6 @@ export default function RulesAdmin() {
               <span>engines</span>
             </span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('regression')}
-            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-              activeTab === 'regression'
-                ? 'border-primary-container text-primary font-bold'
-                : 'border-transparent text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">checklist_rtl</span>
-            <span>Test Suite &amp; Regression</span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px] font-bold whitespace-nowrap">
-              <span className="font-mono">0</span>
-              <span>assertions</span>
-            </span>
-          </button>
         </div>
       </div>
 
@@ -621,8 +592,7 @@ export default function RulesAdmin() {
                   setSearchQuery('');
                   setCategoryFilter('ALL');
                   setStatusFilter('ALL');
-                  setToastMessage('Filters cleared: Showing all rules');
-                  setTimeout(() => setToastMessage(null), 2500);
+                  showConfirmation('Filters cleared: Showing all rules', 'info');
                 }}
                 className={`p-2.5 h-10 rounded-xl transition-all flex items-center justify-center cursor-pointer border ${
                   searchQuery !== '' || categoryFilter !== 'ALL' || statusFilter !== 'ALL'
@@ -1099,37 +1069,7 @@ export default function RulesAdmin() {
         </div>
       )}
 
-      {/* TAB 3: REGRESSION & TEST SUITE */}
-      {activeTab === 'regression' && (
-        <div className="flex flex-col w-full gap-4">
-          <div className="p-5 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-bold text-on-surface">Deterministic Test Suite Battery</h3>
-              <p className="text-xs text-on-surface-variant mt-0.5">
-                Evaluates critical golden test cases across renal clearance, drug-drug contraindications, and allergy cross-reactivity.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleRunRegression}
-              className="px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">play_arrow</span>
-              <span>Run All Test Assertions</span>
-            </button>
-          </div>
 
-          <div className="p-12 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex flex-col items-center justify-center text-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-surface-container text-outline flex items-center justify-center shadow-xs">
-              <span className="material-symbols-outlined text-3xl">science</span>
-            </div>
-            <h4 className="text-sm font-bold text-on-surface">No Test Assertions Configured</h4>
-            <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
-              There are currently no deterministic test assertions configured or registered for this environment. Author or import clinical decision rules to establish assertion batteries.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Inspect Rule AST Modal */}
       {typeof document !== 'undefined' && createPortal(
@@ -1916,8 +1856,7 @@ export default function RulesAdmin() {
         onClose={() => setIsSyncModalOpen(false)}
         onSyncComplete={() => {
           setSyncStatusText('Knowledge feeds synchronized just now');
-          setToastMessage('Knowledge Base Feeds Synchronized & Verified');
-          setTimeout(() => setToastMessage(null), 3000);
+          showConfirmation('Knowledge Base Feeds Synchronized & Verified', 'success');
         }}
       />
 
@@ -2287,22 +2226,6 @@ export default function RulesAdmin() {
         </AnimatePresence>,
         document.body
       )}
-
-      {/* Floating Toast Notification - Positioned cleanly in bottom-right corner */}
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 left-5 sm:left-auto max-w-sm sm:max-w-md z-50 bg-emerald-800 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold border border-emerald-600/60 backdrop-blur-md pointer-events-auto"
-          >
-            <span className="material-symbols-outlined text-[20px] text-emerald-300 shrink-0">check_circle</span>
-            <span className="leading-snug">{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

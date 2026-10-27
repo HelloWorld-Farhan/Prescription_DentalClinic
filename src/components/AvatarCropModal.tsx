@@ -32,6 +32,7 @@ export default function AvatarCropModal({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isSaving, setIsSaving] = useState(false);
+  const [savingStage, setSavingStage] = useState('Saving to Cloudflare R2...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
@@ -46,6 +47,23 @@ export default function AvatarCropModal({
   useEffect(() => {
     setCurrentImageSrc(initialImageSrc);
   }, [initialImageSrc]);
+
+  // Fit presets: Fill all 4 corners (Cover) or Fit whole picture (Contain)
+  const handleFitCover = useCallback(() => {
+    if (!naturalSize.width || !naturalSize.height) return;
+    const { width: w, height: h } = naturalSize;
+    // Scale needed so that both dimensions reach or exceed the square frame
+    const coverScale = Math.max(w, h) / Math.min(w, h);
+    setScale(parseFloat(Math.max(1.0, coverScale).toFixed(2)));
+    setPosition({ x: 0, y: 0 });
+    setRotation(0);
+  }, [naturalSize]);
+
+  const handleFitContain = useCallback(() => {
+    setScale(1.0);
+    setPosition({ x: 0, y: 0 });
+    setRotation(0);
+  }, []);
 
   // Automatically calculate ideal framing for the person when image loads
   const handleImageLoad = useCallback(() => {
@@ -148,6 +166,7 @@ export default function AvatarCropModal({
   const handleConfirmCrop = async () => {
     if (!currentImageSrc || !imgRef.current) return;
     setIsSaving(true);
+    setSavingStage('Cropping & optimizing photo...');
 
     try {
       const outputSize = 640; // High-resolution crystal clear avatar
@@ -169,20 +188,32 @@ export default function AvatarCropModal({
       const natH = naturalSize.height || img.naturalHeight || 512;
       const maxDim = Math.max(natW, natH);
 
-      // Exact pixel scaling factor from preview frame to canvas
-      const factor = outputSize / displayCropSize;
+      // Measure exact rendered dimension of containerRef in DOM to guarantee 1:1 match
+      const containerBox = containerRef.current?.getBoundingClientRect();
+      const currentBoxSize = (containerBox && containerBox.width > 0) ? containerBox.width : displayCropSize;
+      const factor = outputSize / currentBoxSize;
+
+      // Base dimensions rendered on screen before scaling
+      const renderedW = (natW / maxDim) * currentBoxSize;
+      const renderedH = (natH / maxDim) * currentBoxSize;
 
       ctx.save();
+      // 1. Move to canvas center
       ctx.translate(outputSize / 2, outputSize / 2);
-      ctx.rotate((rotation * Math.PI) / 180);
+      // 2. Apply drag translation (scaled to canvas coordinates)
       ctx.translate(position.x * factor, position.y * factor);
+      // 3. Apply user zoom scale
       ctx.scale(scale, scale);
+      // 4. Apply rotation around center
+      ctx.rotate((rotation * Math.PI) / 180);
 
-      // Draw image normalized to fit whole picture inside output size
-      const drawW = (natW / maxDim) * outputSize;
-      const drawH = (natH / maxDim) * outputSize;
+      // 5. Draw image centered
+      const drawW = renderedW * factor;
+      const drawH = renderedH * factor;
       ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.restore();
+
+      setSavingStage('Uploading to Cloudflare R2...');
 
       // Convert canvas to JPEG Blob with high quality
       const blob = await new Promise<Blob | null>((resolve) =>
@@ -241,6 +272,7 @@ export default function AvatarCropModal({
       localStorage.setItem(`smileclinic_avatar_${emailKey}`, savedUrl);
 
       // Persist to backend database so other devices (e.g. mobile phones) get the avatar
+      setSavingStage('Syncing clinical profile...');
       try {
         await authApi.updateProfile({
           email: userEmail,
@@ -355,8 +387,14 @@ export default function AvatarCropModal({
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
-              style={{ width: `${displayCropSize}px`, height: `${displayCropSize}px` }}
-              className="relative rounded-2xl overflow-hidden border-2 border-primary/50 cursor-grab active:cursor-grabbing shadow-lg flex items-center justify-center touch-none bg-white max-w-full"
+              style={{
+                width: `${displayCropSize}px`,
+                height: `${displayCropSize}px`,
+                maxWidth: '100%',
+                maxHeight: '100%',
+                aspectRatio: '1 / 1',
+              }}
+              className="relative rounded-2xl overflow-hidden border-2 border-primary/60 cursor-grab active:cursor-grabbing shadow-lg flex items-center justify-center touch-none bg-white shrink-0 select-none"
             >
               {/* Profile Avatar Squircle Frame Matching User Profile Badge */}
               <div
@@ -448,11 +486,31 @@ export default function AvatarCropModal({
 
             {/* Quick Action Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleFitCover}
+                  className="px-3 py-1.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  title="Fill all 4 corners without white borders"
+                >
+                  <span className="material-symbols-outlined text-[16px]">aspect_ratio</span>
+                  <span>Fill Frame</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleFitContain}
+                  className="px-3 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  title="Fit 100% of whole photo"
+                >
+                  <span className="material-symbols-outlined text-[16px]">fit_screen</span>
+                  <span>Fit Photo</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleRotate}
-                  className="px-3.5 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
                   <span className="material-symbols-outlined text-[16px] text-primary">rotate_right</span>
                   <span>Rotate 90°</span>
@@ -461,16 +519,16 @@ export default function AvatarCropModal({
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="px-3.5 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
                   <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                  <span>Auto-Center</span>
+                  <span>Reset</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => replaceFileInputRef.current?.click()}
-                  className="px-3.5 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-xs font-semibold text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
                   <span className="material-symbols-outlined text-[16px] text-secondary">image</span>
                   <span>Replace Photo</span>
@@ -510,7 +568,7 @@ export default function AvatarCropModal({
               whileTap={{ scale: isSaving ? 1 : 0.98 }}
               disabled={isSaving}
               onClick={handleConfirmCrop}
-              className="min-w-[200px] h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75 relative overflow-hidden"
+              className="min-w-[210px] h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-85 relative overflow-hidden"
             >
               <AnimatePresence mode="wait">
                 {isSaving ? (
@@ -522,12 +580,11 @@ export default function AvatarCropModal({
                     transition={{ duration: 0.2 }}
                     className="flex items-center gap-2.5"
                   >
-                    <motion.span
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block shrink-0"
-                    />
-                    <span>Saving to Cloudflare R2...</span>
+                    <svg className="saving-spinner w-4 h-4 text-white shrink-0" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-95" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span className="truncate">{savingStage}</span>
                   </motion.div>
                 ) : (
                   <motion.div
