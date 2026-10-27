@@ -26,7 +26,7 @@ export default function AvatarCropModal({
   onReplaceImage,
 }: AvatarCropModalProps) {
   const [currentImageSrc, setCurrentImageSrc] = useState<string | null>(initialImageSrc);
-  const [scale, setScale] = useState(1.15);
+  const [scale, setScale] = useState(1.0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -54,25 +54,17 @@ export default function AvatarCropModal({
     const natH = imgRef.current.naturalHeight || 512;
     setNaturalSize({ width: natW, height: natH });
 
-    // Auto-frame person:
-    // In portraits (height > width), faces typically sit in the upper 35-45% of the frame.
-    // We start at a comfortable 1.15x zoom and bias the vertical position slightly upwards
-    // so the face falls naturally inside the circular crosshair.
-    const minDim = Math.min(natW, natH);
-    const initialY = natH > natW
-      ? Math.round((natW - natH) * (displayCropSize / minDim) * 0.12)
-      : 0;
-
-    setScale(1.15);
-    setPosition({ x: 0, y: initialY });
+    // Fit the 100% whole picture by default with zero upper-area cutoff
+    setScale(1.0);
+    setPosition({ x: 0, y: 0 });
     setRotation(0);
     setErrorMessage(null);
-  }, [displayCropSize]);
+  }, []);
 
   // Reset transforms whenever modal opens
   useEffect(() => {
     if (isOpen && currentImageSrc) {
-      setScale(1.15);
+      setScale(1.0);
       setPosition({ x: 0, y: 0 });
       setRotation(0);
       setErrorMessage(null);
@@ -125,17 +117,8 @@ export default function AvatarCropModal({
   };
 
   const handleReset = () => {
-    if (naturalSize.width && naturalSize.height) {
-      const minDim = Math.min(naturalSize.width, naturalSize.height);
-      const initialY = naturalSize.height > naturalSize.width
-        ? Math.round((naturalSize.width - naturalSize.height) * (displayCropSize / minDim) * 0.12)
-        : 0;
-      setScale(1.15);
-      setPosition({ x: 0, y: initialY });
-    } else {
-      setScale(1.15);
-      setPosition({ x: 0, y: 0 });
-    }
+    setScale(1.0);
+    setPosition({ x: 0, y: 0 });
     setRotation(0);
   };
 
@@ -184,7 +167,7 @@ export default function AvatarCropModal({
       const img = imgRef.current;
       const natW = naturalSize.width || img.naturalWidth || 512;
       const natH = naturalSize.height || img.naturalHeight || 512;
-      const minDim = Math.min(natW, natH);
+      const maxDim = Math.max(natW, natH);
 
       // Exact pixel scaling factor from preview frame to canvas
       const factor = outputSize / displayCropSize;
@@ -195,9 +178,9 @@ export default function AvatarCropModal({
       ctx.translate(position.x * factor, position.y * factor);
       ctx.scale(scale, scale);
 
-      // Draw image normalized to output size
-      const drawW = (natW / minDim) * outputSize;
-      const drawH = (natH / minDim) * outputSize;
+      // Draw image normalized to fit whole picture inside output size
+      const drawW = (natW / maxDim) * outputSize;
+      const drawH = (natH / maxDim) * outputSize;
       ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.restore();
 
@@ -292,12 +275,12 @@ export default function AvatarCropModal({
 
   if (!isOpen || !currentImageSrc) return null;
 
-  // Calculate rendered image dimensions in viewport to ensure object-fit: cover baseline
-  const minDim = naturalSize.width && naturalSize.height
-    ? Math.min(naturalSize.width, naturalSize.height)
+  // Calculate rendered image dimensions in viewport to ensure 100% whole picture fits by default
+  const maxDim = naturalSize.width && naturalSize.height
+    ? Math.max(naturalSize.width, naturalSize.height)
     : 512;
-  const renderedWidth = naturalSize.width ? (naturalSize.width / minDim) * displayCropSize : displayCropSize;
-  const renderedHeight = naturalSize.height ? (naturalSize.height / minDim) * displayCropSize : displayCropSize;
+  const renderedWidth = naturalSize.width ? (naturalSize.width / maxDim) * displayCropSize : displayCropSize;
+  const renderedHeight = naturalSize.height ? (naturalSize.height / maxDim) * displayCropSize : displayCropSize;
 
   return createPortal(
     <AnimatePresence>
@@ -373,22 +356,20 @@ export default function AvatarCropModal({
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               style={{ width: `${displayCropSize}px`, height: `${displayCropSize}px` }}
-              className="relative rounded-3xl overflow-hidden border-2 border-primary/40 cursor-grab active:cursor-grabbing shadow-lg flex items-center justify-center touch-none bg-slate-50 max-w-full"
+              className="relative rounded-2xl overflow-hidden border-2 border-primary/50 cursor-grab active:cursor-grabbing shadow-lg flex items-center justify-center touch-none bg-white max-w-full"
             >
               {/* Profile Avatar Squircle Frame Matching User Profile Badge */}
               <div
                 className="absolute inset-0 rounded-2xl border-2 border-primary/60 pointer-events-none z-20 shadow-[0_0_0_9999px_rgba(255,255,255,0.78)]"
-                style={{ margin: '12px' }}
               />
 
               {/* Dashed Inner Trim Guide */}
               <div
-                className="absolute inset-0 rounded-2xl border border-dashed border-primary/40 pointer-events-none z-20"
-                style={{ margin: '12px' }}
+                className="absolute inset-0 rounded-2xl border border-dashed border-primary/30 pointer-events-none z-20"
               />
 
               {/* Center Guidance Crosshair Marker */}
-              <div className="absolute w-5 h-5 pointer-events-none z-20 flex items-center justify-center text-primary/50">
+              <div className="absolute w-5 h-5 pointer-events-none z-20 flex items-center justify-center text-primary/40">
                 <span className="material-symbols-outlined text-[20px]">add</span>
               </div>
 
@@ -427,12 +408,12 @@ export default function AvatarCropModal({
 
           {/* Interactive Controls Bar */}
           <div className="p-4 sm:p-5 border-t border-surface-container flex flex-col gap-3.5 bg-surface-container-low/40 shrink-0">
-            {/* Zoom Slider */}
+            {/* Zoom Slider (0.5x to 3.5x for full zoom in and zoom out) */}
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-outline text-[18px] shrink-0">zoom_out</span>
               <button
                 type="button"
-                onClick={() => setScale((s) => Math.max(1.0, parseFloat((s - 0.15).toFixed(2))))}
+                onClick={() => setScale((s) => Math.max(0.5, parseFloat((s - 0.15).toFixed(2))))}
                 className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-bold text-on-surface flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
                 title="Zoom Out"
                 aria-label="Zoom Out"
@@ -442,7 +423,7 @@ export default function AvatarCropModal({
 
               <input
                 type="range"
-                min="1.0"
+                min="0.5"
                 max="3.5"
                 step="0.05"
                 value={scale}
