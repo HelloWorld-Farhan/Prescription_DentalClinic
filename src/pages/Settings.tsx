@@ -146,8 +146,9 @@ export default function Settings() {
   const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      showToast('Please select a valid image file (JPEG, PNG, WebP).');
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|avif|tiff|svg)$/i.test(file.name);
+    if (!isImage) {
+      showToast('Please select a valid image file (PNG, JPG, WebP, GIF, BMP, AVIF).');
       return;
     }
     const reader = new FileReader();
@@ -888,7 +889,7 @@ export default function Settings() {
                 <input
                   ref={avatarFileInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,image/jpg"
+                  accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif,.tiff,.svg"
                   className="hidden"
                   onChange={handleAvatarFileSelect}
                 />
