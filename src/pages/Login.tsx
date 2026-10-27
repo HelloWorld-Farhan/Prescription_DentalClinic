@@ -265,7 +265,11 @@ export default function Login() {
 
       if (res.token && res.user) {
         if (!res.user.authProvider) res.user.authProvider = 'google';
+        res.user.isGoogleLinked = true;
         authApi.saveSession(res.token, res.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`google_linked_${googleUser.email.toLowerCase()}`, 'true');
+        }
         recordLoginEvent('Success', `Authenticated via 1-Click Google OAuth (${googleUser.email})`, googleUser.email);
         navigate('/dashboard');
       }

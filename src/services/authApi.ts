@@ -32,6 +32,8 @@ export interface UserProfile {
   profileCompleted?: boolean;
   authProvider?: string;
   twoFactorEnabled?: boolean;
+  isGoogleLinked?: boolean;
+  hasPassword?: boolean;
 }
 
 export interface AuthApiResponse {
@@ -290,6 +292,39 @@ export const authApi = {
   },
 
   /**
+   * Link Google account to an existing clinician account
+   */
+  async linkGoogle(email: string, idToken?: string, photoUrl?: string): Promise<AuthApiResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/link-google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          id_token: idToken || '',
+          photo_url: photoUrl || ''
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || 'Failed to link Google account.');
+      }
+      if (data.user) {
+        this.saveSession(data.token || localStorage.getItem('smileclinic_jwt_token') || '', data.user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`google_linked_${data.user.email.toLowerCase()}`, 'true');
+        }
+      }
+      return data;
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Unable to reach clinical authentication server.');
+      }
+      throw err;
+    }
+  },
+
+  /**
    * Validate password reset 6-digit OTP code against backend
    */
   async verifyResetOtp(email: string, otp_code: string): Promise<AuthApiResponse> {
@@ -458,6 +493,15 @@ export const authApi = {
     if (user.twoFactorEnabled !== undefined) {
       sessionStorage.setItem('rxguard_two_factor_enabled', String(user.twoFactorEnabled));
     }
+    if (user.isGoogleLinked !== undefined) {
+      sessionStorage.setItem('rxguard_google_linked', String(user.isGoogleLinked));
+      if (user.isGoogleLinked) {
+        localStorage.setItem(`google_linked_${user.email.toLowerCase()}`, 'true');
+      }
+    }
+    if (user.hasPassword !== undefined) {
+      sessionStorage.setItem('rxguard_has_password', String(user.hasPassword));
+    }
     if (token) localStorage.setItem('smileclinic_jwt_token', token);
     localStorage.setItem('smileclinic_auth_user', JSON.stringify(user));
     if (user.profileCompleted) {
@@ -563,13 +607,17 @@ export const authApi = {
     } catch {}
     const email = sessionStorage.getItem('rxguard_prescriber_email') || localStorage.getItem('rxguard_prescriber_email');
     if (email) {
+      const isGoogleLinked = localStorage.getItem(`google_linked_${email.toLowerCase()}`) === 'true' ||
+        sessionStorage.getItem('rxguard_google_linked') === 'true' ||
+        sessionStorage.getItem('rxguard_auth_provider') === 'google';
       return {
         id: sessionStorage.getItem('rxguard_prescriber_id') || '',
         fullName: sessionStorage.getItem('rxguard_prescriber_name') || 'Clinician',
         email,
         phone: '',
         role: 'USER',
-        profileCompleted: true
+        profileCompleted: true,
+        isGoogleLinked
       };
     }
     return null;

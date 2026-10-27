@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authApi } from '../services/authApi';
+import { signInWithGooglePopup } from '../services/firebase';
 import {
   ActiveSessionItem,
   LoginHistoryItem,
@@ -25,6 +26,8 @@ export interface ClinicalProfile {
   allergiesDescription?: string;
   avatarInitials: string;
   avatarColor: string;
+  isGoogleLinked?: boolean;
+  hasPassword?: boolean;
 }
 
 function loadRealUserProfile(): ClinicalProfile {
@@ -70,6 +73,17 @@ function loadRealUserProfile(): ClinicalProfile {
     .slice(0, 2)
     .join('') || 'RX';
 
+  const isGoogleLinked =
+    Boolean(storedUser.isGoogleLinked) ||
+    (typeof window !== 'undefined' && email ? localStorage.getItem(`google_linked_${email.toLowerCase()}`) === 'true' : false) ||
+    sessionStorage.getItem('rxguard_google_linked') === 'true' ||
+    sessionStorage.getItem('rxguard_auth_provider') === 'google';
+
+  const hasPassword =
+    storedUser.hasPassword !== undefined
+      ? Boolean(storedUser.hasPassword)
+      : sessionStorage.getItem('rxguard_has_password') !== 'false';
+
   return {
     fullName: name,
     role: role,
@@ -82,7 +96,9 @@ function loadRealUserProfile(): ClinicalProfile {
     hasAllergies: Boolean(storedUser.hasAllergies),
     allergiesDescription: storedUser.allergiesDescription || '',
     avatarInitials: initials,
-    avatarColor: 'bg-primary-container text-on-primary'
+    avatarColor: 'bg-primary-container text-on-primary',
+    isGoogleLinked,
+    hasPassword
   };
 }
 
@@ -276,6 +292,39 @@ export default function Settings() {
       return false;
     }
   }, [profile.email, loginHistory]);
+
+  // Check whether account is linked with Google email
+  const isGoogleLinked = useMemo(() => {
+    if (profile.isGoogleLinked) return true;
+    try {
+      const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+      if (u.isGoogleLinked) return true;
+      if (localStorage.getItem(`google_linked_${profile.email.toLowerCase()}`) === 'true') return true;
+      if (sessionStorage.getItem('rxguard_google_linked') === 'true') return true;
+      if (sessionStorage.getItem('rxguard_auth_provider') === 'google') return true;
+      return false;
+    } catch {
+      return false;
+    }
+  }, [profile.email, profile.isGoogleLinked]);
+
+  // Link Google Account to the clinician profile
+  const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
+  const handleLinkGoogle = async () => {
+    setIsLinkingGoogle(true);
+    try {
+      const gUser = await signInWithGooglePopup();
+      if (!gUser) return;
+      await authApi.linkGoogle(gUser.email, gUser.idToken, gUser.photoUrl);
+      setProfile((prev) => ({ ...prev, isGoogleLinked: true }));
+      localStorage.setItem(`google_linked_${profile.email.toLowerCase()}`, 'true');
+      showToast(`Account successfully linked with your Google email (${gUser.email}).`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to link Google account.');
+    } finally {
+      setIsLinkingGoogle(false);
+    }
+  };
 
   // Keep sessions and audit history synced whenever clinician email changes
   useEffect(() => {
@@ -766,6 +815,17 @@ export default function Settings() {
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     Verified User
                   </span>
+                  {isGoogleLinked && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                      Linked with Google
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs sm:text-sm text-outline mt-0.5">
                   {profile.role} • Registered Prescriber Account
@@ -851,6 +911,78 @@ export default function Settings() {
               <div className="text-[11px] text-outline mt-1">Real-time database authorization active</div>
             </div>
           </div>
+
+          {/* Connected Accounts & OAuth Identity Card */}
+          <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[22px]">link</span>
+                  <h3 className="text-base font-bold text-on-surface">Connected Accounts &amp; OAuth Single Sign-On</h3>
+                </div>
+                <p className="text-xs text-outline mt-0.5">
+                  Manage third-party authentication providers linked to your clinician profile.
+                </p>
+              </div>
+              {isGoogleLinked && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Linked &amp; Active
+                </span>
+              )}
+            </div>
+
+            <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-xl bg-surface-container-lowest border border-surface-container-high flex items-center justify-center shrink-0 shadow-xs">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-on-surface">Google Account</span>
+                    {isGoogleLinked ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                        Linked with your Google email
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container text-outline">
+                        Not Linked
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    {isGoogleLinked
+                      ? `Linked with your Google email: ${profile.email}`
+                      : 'Link your Google account to enable instantaneous 1-click single sign-on.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isGoogleLinked ? (
+                  <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                    <span className="material-symbols-outlined text-[16px]">verified</span>
+                    <span>1-Click SSO Active</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleLinkGoogle}
+                    disabled={isLinkingGoogle}
+                    className="px-4 py-2 rounded-xl bg-primary-container text-on-primary text-xs font-bold shadow-xs hover:bg-primary transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add_link</span>
+                    <span>{isLinkingGoogle ? 'Connecting Google...' : 'Link Google Account'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </motion.div>
       )}
 
@@ -915,15 +1047,15 @@ export default function Settings() {
                     <h3 className="text-base font-bold text-on-surface">Clinician Account Password</h3>
                   </div>
                   <p className="text-xs text-outline mt-0.5">
-                    {isGoogleUser
+                    {isGoogleUser && profile.hasPassword === false
                       ? 'Single Sign-On (OAuth 2.0) credential status & identity security'
                       : 'Authorized security protocol: verify identity via OTP or existing credentials prior to updating password.'}
                   </p>
                 </div>
-                {isGoogleUser ? (
+                {isGoogleLinked ? (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                    Google SSO
+                    Google Linked
                   </span>
                 ) : isVerificationUnlocked ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
@@ -933,8 +1065,28 @@ export default function Settings() {
                 ) : null}
               </div>
 
-              {isGoogleUser ? (
-                /* Google Authenticated Account: Password Change is completely Blocked */
+              {/* Linked with Google banner in Security tab */}
+              {isGoogleLinked && (
+                <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
+                    <span>
+                      Linked with your Google email: <strong>{profile.email}</strong>. 1-Click Google Sign-In is active for this account.
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full shrink-0">
+                    Linked
+                  </span>
+                </div>
+              )}
+
+              {isGoogleUser && profile.hasPassword === false ? (
+                /* Google Authenticated Account with NO Password set */
                 <div className="p-5 rounded-2xl bg-surface-container-low border border-surface-container-high flex flex-col gap-4">
                   <div className="flex items-start gap-3.5">
                     <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
