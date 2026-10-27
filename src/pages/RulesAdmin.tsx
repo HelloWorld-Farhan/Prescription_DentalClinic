@@ -14,6 +14,7 @@ import {
   deleteDocumentRecord,
   UploadedDocumentRecord,
 } from '../services/storageService';
+import { extractPrescriptionData } from '../services/prescriptionExtractor';
 
 interface DraftRuleItem {
   id: string;
@@ -193,81 +194,28 @@ export default function RulesAdmin() {
     setIsExtracting(true);
 
     try {
-      // 1. Upload to Cloudflare R2
+      // 1. Upload to Cloudflare R2 (handles duplicate names automatically)
       const r2Result = await uploadToR2(uploadedFile, currentUserId, currentClinicianName);
 
-      // 2. Extract rules from content or format
-      let extracted: InteractionRule[] = [];
+      // 2. Extract rules from content or format using universal prescription extractor
+      const extractionResult = await extractPrescriptionData(
+        uploadedFile,
+        uploadSource === 'camera' ? 'camera' : 'upload'
+      );
 
-      if (uploadFormat === 'csv') {
-        try {
-          const text = await uploadedFile.text();
-          const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-          if (lines.length > 1) {
-            for (let i = 1; i < lines.length; i++) {
-              const cols = lines[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
-              if (cols.length >= 2 && cols[0] && cols[1]) {
-                extracted.push({
-                  id: `rule-csv-${Date.now()}-${i}`,
-                  drugA: cols[0],
-                  drugB: cols[1],
-                  category: (cols[2] as any) || 'Drug-Drug',
-                  severity: (cols[3]?.toLowerCase() as AlertSeverity) || 'major',
-                  description: cols[4] || `Extracted from ${uploadedFile.name}: Documented clinical interaction between ${cols[0]} and ${cols[1]}.`,
-                  active: true,
-                  userId: currentUserId,
-                  authorName: currentClinicianName,
-                  createdAt: new Date().toLocaleString(),
-                  sourceFile: uploadedFile.name,
-                  storageUrl: r2Result.url,
-                });
-              }
-            }
-          }
-        } catch {
-          // fallback
-        }
-      }
-
-      // If no CSV rows parsed or other formats (PDF, Word, Image, Camera):
-      if (extracted.length === 0) {
-        const baseName = uploadedFile.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-        const isCamera = uploadSource === 'camera' || uploadedFile.name.includes('camera');
-        extracted = [
-          {
-            id: 'rule-ext-' + Date.now() + '-1',
-            drugA: `${baseName.slice(0, 16)} (Primary Molecule)`,
-            drugB: 'Warfarin / Anticoagulant',
-            category: 'Drug-Drug',
-            severity: 'contraindicated',
-            description: `Extracted from ${isCamera ? 'Live Camera Scan' : uploadedFile.name}: Elevated INR and severe GI hemorrhage risk detected in clinical monograph.`,
-            active: true,
-            userId: currentUserId,
-            authorName: currentClinicianName,
-            createdAt: new Date().toLocaleString(),
-            sourceFile: uploadedFile.name,
-            storageUrl: r2Result.url,
-          },
-          {
-            id: 'rule-ext-' + Date.now() + '-2',
-            drugA: `${baseName.slice(0, 16)} (Secondary Agent)`,
-            drugB: 'Renal Clearance Matrix (eGFR < 45)',
-            category: 'Renal Dose Adjustment',
-            severity: 'major',
-            description: `Extracted from ${isCamera ? 'Live Camera Scan' : uploadedFile.name}: Obligatory 50% dose titration required when renal clearance is impaired.`,
-            active: true,
-            userId: currentUserId,
-            authorName: currentClinicianName,
-            createdAt: new Date().toLocaleString(),
-            sourceFile: uploadedFile.name,
-            storageUrl: r2Result.url,
-          },
-        ];
-      }
+      const extracted: InteractionRule[] = extractionResult.rules.map((rule, idx) => ({
+        ...rule,
+        id: `rule-doc-${Date.now()}-${idx + 1}`,
+        userId: currentUserId,
+        authorName: currentClinicianName,
+        createdAt: new Date().toLocaleString(),
+        sourceFile: r2Result.filename,
+        storageUrl: r2Result.url,
+      }));
 
       setExtractedPreviewRules(extracted);
       setExtractedFileMeta({
-        filename: uploadedFile.name,
+        filename: r2Result.filename,
         filesize: (uploadedFile.size / 1024).toFixed(1) + ' KB',
         extractedAt: new Date().toLocaleString(),
         storageUrl: r2Result.url,

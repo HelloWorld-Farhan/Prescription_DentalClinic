@@ -7,6 +7,7 @@ import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } fr
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import { uploadToR2, updateDocumentExtractedCount } from '../services/storageService';
+import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 
 interface AllergyDetailInfo {
   name: string;
@@ -160,6 +161,7 @@ export default function NewCheck() {
     format: string;
     extractedCount: number;
     previewUrl?: string | null;
+    extractedPatient?: ExtractedPatientMetadata;
   } | null>(null);
   const [extractedMedicines, setExtractedMedicines] = useState<PrescriptionItem[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -366,127 +368,10 @@ export default function NewCheck() {
   // Extract medicines and clinical entities from uploaded document or camera photo
   const extractPrescriptionsFromDocument = async (
     file: File,
-    source: 'upload' | 'camera',
-    storageUrl: string
-  ): Promise<PrescriptionItem[]> => {
-    const isCsv = file.name.endsWith('.csv') || file.type.includes('csv');
-    const isText = file.name.endsWith('.txt') || file.type.includes('text');
-
-    if (isCsv || isText) {
-      try {
-        const content = await file.text();
-        const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-        if (lines.length > 1) {
-          const parsed: PrescriptionItem[] = [];
-          const startIdx =
-            lines[0].toLowerCase().includes('drug') ||
-            lines[0].toLowerCase().includes('medicine') ||
-            lines[0].toLowerCase().includes('name')
-              ? 1
-              : 0;
-          for (let i = startIdx; i < lines.length; i++) {
-            const cols = lines[i].split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
-            if (cols[0]) {
-              parsed.push({
-                id: `rx-csv-${Date.now()}-${i}`,
-                drugName: cols[0],
-                genericName: cols[1] || cols[0].split(' ')[0],
-                dosage: cols[2] || 'Standard Dose',
-                frequency: cols[3] || 'Every 8 hours (TID)',
-                route: cols[4] || 'Oral (PO)',
-                duration: cols[5] || '7 days',
-                indication: cols[6] || 'Dental Infection Prophylaxis',
-              });
-            }
-          }
-          if (parsed.length > 0) return parsed;
-        }
-      } catch {}
-    }
-
-    const lowerName = file.name.toLowerCase();
-    let sampleText = lowerName;
-    try {
-      if (file.size < 500000 && (isText || isCsv || lowerName.endsWith('.json'))) {
-        sampleText += ' ' + (await file.text()).toLowerCase();
-      }
-    } catch {}
-
-    const catalog: PrescriptionItem[] = [
-      {
-        id: `rx-ext-${Date.now()}-1`,
-        drugName: 'Amoxicillin 500mg',
-        genericName: 'Amoxicillin Trihydrate',
-        dosage: '500mg capsule',
-        frequency: 'Every 8 hours (TID)',
-        route: 'Oral (PO)',
-        duration: '7 days',
-        indication: 'Acute Periapical Abscess & Tissue Infection',
-      },
-      {
-        id: `rx-ext-${Date.now()}-2`,
-        drugName: 'Ibuprofen 400mg',
-        genericName: 'Ibuprofen',
-        dosage: '400mg tablet',
-        frequency: 'Every 6-8 hours (PRN)',
-        route: 'Oral (PO)',
-        duration: '5 days',
-        indication: 'Post-Surgical Dental Pain & Inflammation',
-      },
-      {
-        id: `rx-ext-${Date.now()}-3`,
-        drugName: 'Augmentin 625mg',
-        genericName: 'Amoxicillin + Clavulanic Acid',
-        dosage: '625mg tablet',
-        frequency: 'Every 12 hours (BID)',
-        route: 'Oral (PO)',
-        duration: '7 days',
-        indication: 'Refractory Deep Odontogenic Infection',
-      },
-      {
-        id: `rx-ext-${Date.now()}-4`,
-        drugName: 'Clindamycin 300mg',
-        genericName: 'Clindamycin Hydrochloride',
-        dosage: '300mg capsule',
-        frequency: 'Every 6 hours (QID)',
-        route: 'Oral (PO)',
-        duration: '7 days',
-        indication: 'Penicillin-Allergic Dental Antimicrobial',
-      },
-      {
-        id: `rx-ext-${Date.now()}-5`,
-        drugName: 'Metronidazole 400mg',
-        genericName: 'Metronidazole',
-        dosage: '400mg tablet',
-        frequency: 'Every 8 hours (TID)',
-        route: 'Oral (PO)',
-        duration: '7 days',
-        indication: 'Acute Necrotizing Ulcerative Gingivitis',
-      },
-      {
-        id: `rx-ext-${Date.now()}-6`,
-        drugName: 'Chlorhexidine 0.12%',
-        genericName: 'Chlorhexidine Gluconate',
-        dosage: '15ml Oral Rinse',
-        frequency: 'Every 12 hours (BID)',
-        route: 'Topical Rinse (Swish & Spit 30s)',
-        duration: '14 days',
-        indication: 'Post-Periodontal Surgical Decontamination',
-      },
-    ];
-
-    const matched: PrescriptionItem[] = [];
-    if (sampleText.includes('augmentin') || sampleText.includes('clavulan')) matched.push(catalog[2]);
-    if (sampleText.includes('amoxicillin')) matched.push(catalog[0]);
-    if (sampleText.includes('clindamycin')) matched.push(catalog[3]);
-    if (sampleText.includes('metronidazole') || sampleText.includes('flagyl')) matched.push(catalog[4]);
-    if (sampleText.includes('ibuprofen') || sampleText.includes('advil') || sampleText.includes('motrin')) matched.push(catalog[1]);
-    if (sampleText.includes('chlorhexidine') || sampleText.includes('rinse')) matched.push(catalog[5]);
-
-    if (matched.length > 0) return matched;
-
-    // Standard clinical dental regimen extracted
-    return [catalog[0], catalog[1]];
+    source: 'upload' | 'camera'
+  ): Promise<{ medicines: PrescriptionItem[]; patient?: ExtractedPatientMetadata }> => {
+    const result = await extractPrescriptionData(file, source);
+    return { medicines: result.medicines, patient: result.patient };
   };
 
   // Main file processing handler: Uploads to Cloudflare R2 and extracts medicines
@@ -495,7 +380,7 @@ export default function NewCheck() {
     const currentUserId = storedUser?.id || 'clinician-user';
     try {
       const r2Result = await uploadToR2(file, currentUserId, prescriberDisplayName);
-      setUploadedFileName(file.name);
+      setUploadedFileName(r2Result.filename);
       const sizeStr =
         file.size > 1024 * 1024
           ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
@@ -503,8 +388,8 @@ export default function NewCheck() {
       setUploadedFileSize(sizeStr);
 
       const ext =
-        file.name.split('.').pop()?.toUpperCase() || (source === 'camera' ? 'CAMERA SCAN' : 'FILE');
-      const extracted = await extractPrescriptionsFromDocument(file, source, r2Result.url);
+        r2Result.filename.split('.').pop()?.toUpperCase() || (source === 'camera' ? 'CAMERA SCAN' : 'FILE');
+      const { medicines: extracted, patient: extractedPatient } = await extractPrescriptionsFromDocument(file, source);
       updateDocumentExtractedCount(r2Result.url, extracted.length);
 
       const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
@@ -513,15 +398,20 @@ export default function NewCheck() {
       }
 
       setExtractedMeta({
-        filename: file.name,
+        filename: r2Result.filename,
         fileSize: sizeStr,
         storageUrl: r2Result.url,
         storageKey: r2Result.key,
         format: ext,
         extractedCount: extracted.length,
         previewUrl,
+        extractedPatient,
       });
       setExtractedMedicines(extracted);
+
+      if (extractedPatient?.name) {
+        setPtKey(`PT-${extractedPatient.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase()}`);
+      }
 
       // Automatically stage extracted items without duplicating
       setPrescriptions((prev) => {
@@ -535,7 +425,7 @@ export default function NewCheck() {
       });
 
       setToastMessage(
-        `Extracted ${extracted.length} medications and saved to Cloudflare R2.`
+        `Extracted ${extracted.length} medications from ${r2Result.filename} and saved to Cloudflare R2.`
       );
       setTimeout(() => setToastMessage(null), 3500);
     } catch (err: any) {

@@ -14,18 +14,45 @@ export interface UploadedDocumentRecord {
 const STORAGE_KEY_DOCS = 'smileclinic_uploaded_documents_v1';
 
 /**
+ * Generates a non-colliding distinct filename if a file with the same name
+ * already exists in the user's document history (e.g. file (1).pdf, file (2).pdf).
+ */
+export function getDistinctFilename(filename: string, userId: string = 'user-current'): string {
+  const history = getDocumentHistory(userId);
+  const existingNames = new Set(history.map((d) => d.filename.toLowerCase()));
+
+  if (!existingNames.has(filename.toLowerCase())) {
+    return filename;
+  }
+
+  const lastDot = filename.lastIndexOf('.');
+  const base = lastDot !== -1 ? filename.slice(0, lastDot) : filename;
+  const ext = lastDot !== -1 ? filename.slice(lastDot) : '';
+
+  let counter = 1;
+  while (existingNames.has(`${base} (${counter})${ext}`.toLowerCase())) {
+    counter++;
+  }
+
+  return `${base} (${counter})${ext}`;
+}
+
+/**
  * Uploads a document or camera photo to Cloudflare R2 object storage.
  * Reads endpoints dynamically from Vite environment variables (zero hardcoded URLs).
+ * Automatically resolves duplicate filenames with distinct non-colliding display names.
  */
 export async function uploadToR2(
   file: File,
   userId: string = 'user-current',
-  authorName: string = 'Authorized Clinician'
+  authorName: string = 'Authorized Clinician',
+  customFilename?: string
 ): Promise<{ url: string; key: string; filename: string; size: number }> {
   const env = (import.meta as any).env || {};
   const apiUrl = (env.VITE_API_URL || '').replace(/\/$/, '');
   const r2PublicBase = (env.VITE_R2_PUBLIC_URL || '').replace(/\/$/, '');
-  const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const distinctFilename = customFilename || getDistinctFilename(file.name, userId);
+  const sanitizedFilename = distinctFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
   const timestamp = Date.now();
   const fileKey = `uploads/${userId}/${timestamp}_${sanitizedFilename}`;
 
@@ -47,7 +74,7 @@ export async function uploadToR2(
         const finalUrl = data.url || (r2PublicBase ? `${r2PublicBase}/${fileKey}` : '');
         saveDocumentRecord({
           id: 'doc-' + timestamp,
-          filename: file.name,
+          filename: distinctFilename,
           fileType: file.type || 'application/octet-stream',
           fileSize: file.size,
           uploadedAt: new Date().toLocaleString(),
@@ -61,7 +88,7 @@ export async function uploadToR2(
         return {
           url: finalUrl,
           key: data.key || fileKey,
-          filename: file.name,
+          filename: distinctFilename,
           size: file.size,
         };
       }
@@ -77,7 +104,7 @@ export async function uploadToR2(
 
   saveDocumentRecord({
     id: 'doc-' + timestamp,
-    filename: file.name,
+    filename: distinctFilename,
     fileType: file.type || 'application/octet-stream',
     fileSize: file.size,
     uploadedAt: new Date().toLocaleString(),
@@ -91,7 +118,7 @@ export async function uploadToR2(
   return {
     url: fallbackUrl,
     key: fileKey,
-    filename: file.name,
+    filename: distinctFilename,
     size: file.size,
   };
 }
