@@ -204,3 +204,30 @@ export async function deleteDocumentRecord(
   return { success: true, deletedDoc };
 }
 
+/**
+ * Directly purges a file from Cloudflare R2 object storage by URL or key.
+ */
+export async function deleteFromR2(urlOrKey: string): Promise<boolean> {
+  if (!urlOrKey) return false;
+  const env = (import.meta as any).env || {};
+  const apiUrl = (env.VITE_API_URL || '').replace(/\/$/, '');
+  if (!apiUrl) return false;
+
+  try {
+    const formData = new FormData();
+    if (urlOrKey.startsWith('http://') || urlOrKey.startsWith('https://')) {
+      formData.append('url', urlOrKey);
+    } else {
+      formData.append('key', urlOrKey);
+    }
+
+    const res = await fetch(`${apiUrl}/api/storage/delete`, {
+      method: 'POST',
+      body: formData,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+

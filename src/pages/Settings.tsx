@@ -2487,6 +2487,7 @@ export default function Settings() {
       <AvatarCropModal
         isOpen={cropModalOpen}
         imageSrc={cropImageSrc}
+        currentAvatarUrl={profile.avatarUrl}
         userEmail={profile.email}
         userName={profile.fullName}
         onClose={() => setCropModalOpen(false)}

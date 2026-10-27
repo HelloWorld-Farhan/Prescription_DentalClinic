@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { uploadToR2 } from '../services/storageService';
+import { uploadToR2, deleteFromR2, deleteDocumentRecord } from '../services/storageService';
 
 interface AvatarCropModalProps {
   isOpen: boolean;
   imageSrc: string | null;
+  currentAvatarUrl?: string;
   userEmail: string;
   userName: string;
   onClose: () => void;
@@ -16,6 +17,7 @@ interface AvatarCropModalProps {
 export default function AvatarCropModal({
   isOpen,
   imageSrc: initialImageSrc,
+  currentAvatarUrl,
   userEmail,
   userName,
   onClose,
@@ -174,8 +176,8 @@ export default function AvatarCropModal({
         throw new Error('Canvas rendering context not available');
       }
 
-      // Fill with smooth background
-      ctx.fillStyle = '#0F172A';
+      // Fill with clean white background (no dark borders)
+      ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, outputSize, outputSize);
 
       const img = imgRef.current;
@@ -214,11 +216,44 @@ export default function AvatarCropModal({
       );
 
       // Upload directly to Cloudflare R2
-      const r2Result = await uploadToR2(file, userEmail, userName);
+      const r2Result = await uploadToR2(
+        file,
+        userEmail,
+        userName,
+        `avatar_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`
+      );
       const savedUrl = r2Result.url;
 
-      // Persist locally scoped to exact email
+      // Identify previous avatar URL to purge from Cloudflare R2
       const emailKey = userEmail.toLowerCase().trim();
+      let oldAvatarUrl = currentAvatarUrl;
+      if (!oldAvatarUrl && typeof window !== 'undefined') {
+        oldAvatarUrl = localStorage.getItem(`smileclinic_avatar_${emailKey}`) || '';
+        if (!oldAvatarUrl) {
+          try {
+            const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+            oldAvatarUrl = u.photoUrl || '';
+          } catch {}
+        }
+      }
+
+      // Purge previous avatar from Cloudflare R2 if it's an R2 URL and different
+      if (oldAvatarUrl && oldAvatarUrl !== savedUrl) {
+        const isR2 =
+          oldAvatarUrl.includes('r2.dev') ||
+          oldAvatarUrl.includes('cloudflarestorage.com') ||
+          oldAvatarUrl.includes('uploads/');
+        if (isR2) {
+          try {
+            await deleteFromR2(oldAvatarUrl);
+            await deleteDocumentRecord('', oldAvatarUrl);
+          } catch (delErr) {
+            console.warn('[AvatarCropModal] Failed to delete previous avatar from R2:', delErr);
+          }
+        }
+      }
+
+      // Persist locally scoped to exact email
       localStorage.setItem(`smileclinic_avatar_${emailKey}`, savedUrl);
 
       try {
@@ -318,8 +353,8 @@ export default function AvatarCropModal({
             </div>
           )}
 
-          {/* Interactive Crop Viewport Area */}
-          <div className="p-5 sm:p-6 flex flex-col items-center justify-center bg-slate-950/95 relative overflow-hidden">
+          {/* Interactive Crop Viewport Area (Clean White Light Theme) */}
+          <div className="p-5 sm:p-6 flex flex-col items-center justify-center bg-white relative overflow-hidden border-y border-surface-container">
             {/* Viewport Frame with generous size */}
             <div
               ref={containerRef}
@@ -327,16 +362,22 @@ export default function AvatarCropModal({
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               style={{ width: `${displayCropSize}px`, height: `${displayCropSize}px` }}
-              className="relative rounded-3xl overflow-hidden border-2 border-primary/40 cursor-grab active:cursor-grabbing shadow-2xl flex items-center justify-center touch-none bg-slate-900 max-w-full"
+              className="relative rounded-3xl overflow-hidden border-2 border-primary/40 cursor-grab active:cursor-grabbing shadow-lg flex items-center justify-center touch-none bg-slate-50 max-w-full"
             >
-              {/* Circular Aperture Cutout Guide with Dark Masking */}
+              {/* Profile Avatar Squircle Frame Matching User Profile Badge */}
               <div
-                className="absolute inset-0 rounded-full border-2 border-dashed border-white/70 pointer-events-none z-20 shadow-[0_0_0_9999px_rgba(15,23,42,0.65)]"
-                style={{ margin: '14px' }}
+                className="absolute inset-0 rounded-2xl border-2 border-primary/60 pointer-events-none z-20 shadow-[0_0_0_9999px_rgba(255,255,255,0.78)]"
+                style={{ margin: '12px' }}
+              />
+
+              {/* Dashed Inner Trim Guide */}
+              <div
+                className="absolute inset-0 rounded-2xl border border-dashed border-primary/40 pointer-events-none z-20"
+                style={{ margin: '12px' }}
               />
 
               {/* Center Guidance Crosshair Marker */}
-              <div className="absolute w-4 h-4 pointer-events-none z-20 flex items-center justify-center text-white/40">
+              <div className="absolute w-5 h-5 pointer-events-none z-20 flex items-center justify-center text-primary/50">
                 <span className="material-symbols-outlined text-[20px]">add</span>
               </div>
 
@@ -360,14 +401,14 @@ export default function AvatarCropModal({
             </div>
 
             {/* Hint & Gesture Indicators */}
-            <div className="mt-3.5 flex items-center gap-3 text-xs font-medium text-slate-300">
-              <span className="flex items-center gap-1">
+            <div className="mt-3.5 flex items-center gap-3 text-xs font-semibold text-on-surface-variant">
+              <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px] text-primary">pan_tool</span>
                 <span>Drag to shift</span>
               </span>
-              <span className="text-slate-600">•</span>
-              <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px] text-teal-400">mouse</span>
+              <span className="text-surface-container-high">•</span>
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-teal-600">mouse</span>
                 <span>Mouse wheel to zoom</span>
               </span>
             </div>
@@ -380,7 +421,7 @@ export default function AvatarCropModal({
               <span className="material-symbols-outlined text-outline text-[18px] shrink-0">zoom_out</span>
               <button
                 type="button"
-                onClick={() => setScale((s) => Math.max(0.5, parseFloat((s - 0.15).toFixed(2))))}
+                onClick={() => setScale((s) => Math.max(1.0, parseFloat((s - 0.15).toFixed(2))))}
                 className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-bold text-on-surface flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
                 title="Zoom Out"
                 aria-label="Zoom Out"
@@ -390,7 +431,7 @@ export default function AvatarCropModal({
 
               <input
                 type="range"
-                min="0.5"
+                min="1.0"
                 max="3.5"
                 step="0.05"
                 value={scale}
@@ -470,24 +511,47 @@ export default function AvatarCropModal({
               Cancel
             </button>
 
-            <button
+            <motion.button
               type="button"
+              layout
+              whileHover={{ scale: isSaving ? 1 : 1.02 }}
+              whileTap={{ scale: isSaving ? 1 : 0.98 }}
               disabled={isSaving}
               onClick={handleConfirmCrop}
-              className="px-6 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-60"
+              className="min-w-[200px] h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-75 relative overflow-hidden"
             >
-              {isSaving ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  <span>Saving to Cloudflare R2...</span>
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-[18px]">check</span>
-                  <span>Save &amp; Apply Avatar</span>
-                </>
-              )}
-            </button>
+              <AnimatePresence mode="wait">
+                {isSaving ? (
+                  <motion.div
+                    key="saving"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center gap-2.5"
+                  >
+                    <motion.span
+                      animate={{ rotate: 360 }}
+                      transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block shrink-0"
+                    />
+                    <span>Saving to Cloudflare R2...</span>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="idle"
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                    <span>Save &amp; Apply Avatar</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.button>
           </div>
         </motion.div>
       </div>
