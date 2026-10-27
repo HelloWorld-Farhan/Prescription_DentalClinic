@@ -722,84 +722,91 @@ export default function NewCheck() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.3 }}
-          className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
+          className="w-full flex flex-col gap-6"
         >
-          {/* LEFT COLUMN: Input Forms (8 cols) */}
-          <div className="lg:col-span-8 flex flex-col gap-6">
-            <section className="bg-surface-container-lowest rounded-2xl p-6 shadow-xs border border-surface-container-high/60 flex flex-col gap-5">
-              {/* Header with Quick Presets */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-surface-container gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-[24px]">medication</span>
-                    <h2 className="text-base sm:text-lg font-bold text-on-surface">Enter or Capture Prescription</h2>
+          {/* FULL-WIDTH WORKSPACE: Primary Clinical Decision Support Feature */}
+          <section className="relative bg-surface-container-lowest rounded-2xl p-6 sm:p-7 shadow-xs border border-surface-container-high ring-1 ring-primary/20 hover:ring-primary/30 transition-all flex flex-col gap-5 overflow-hidden">
+            {/* Subtle Top Accent Highlight Line */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/10 via-primary to-primary/10" />
+
+            {/* Header with Quick Presets & Primary CDS Feature Badge */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-surface-container gap-3">
+              <div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[20px]">medication</span>
                   </div>
-                  <p className="text-xs text-outline mt-0.5">
-                    Submit prescription slip via image upload, camera photo capture, or manual medication entry.
-                  </p>
+                  <h2 className="text-base sm:text-lg font-bold text-on-surface">Enter or Capture Prescription</h2>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    <span>Primary CDS Engine</span>
+                  </span>
                 </div>
-
+                <p className="text-xs text-outline mt-1">
+                  Submit prescription slip via image upload, camera photo capture, or manual medication entry.
+                </p>
               </div>
+            </div>
 
-              {/* 3 Input Mode Tabs */}
-              <div className="grid grid-cols-3 p-1.5 bg-surface-container-low rounded-xl gap-1">
-                <button
-                  type="button"
-                  onClick={() => setInputMethod('upload')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    inputMethod === 'upload'
-                      ? 'bg-primary-container text-on-primary shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            {/* 3 Input Mode Tabs */}
+            <div className="grid grid-cols-3 p-1.5 bg-surface-container-low rounded-xl gap-1">
+              <button
+                type="button"
+                onClick={() => setInputMethod('upload')}
+                className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  inputMethod === 'upload'
+                    ? 'bg-primary-container text-on-primary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
+                <span>Upload File / PDF</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setInputMethod('camera')}
+                className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  inputMethod === 'camera'
+                    ? 'bg-primary-container text-on-primary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+                <span>Click / Scan Photo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setInputMethod('manual')}
+                className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  inputMethod === 'manual'
+                    ? 'bg-primary-container text-on-primary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                <span>Write Medicine Names</span>
+              </button>
+            </div>
+
+            {/* TAB 1: UPLOAD FILE */}
+            {inputMethod === 'upload' && (
+              <div className="space-y-4">
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={handleFileDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`p-10 sm:p-12 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                    isDragOver
+                      ? 'border-primary bg-primary/10 shadow-inner'
+                      : 'border-primary/30 bg-gradient-to-b from-surface-container-lowest to-surface-container-low/40 hover:border-primary hover:bg-surface-container-low/60'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
-                  <span>Upload File / PDF</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInputMethod('camera')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    inputMethod === 'camera'
-                      ? 'bg-primary-container text-on-primary shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">photo_camera</span>
-                  <span>Click / Scan Photo</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInputMethod('manual')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    inputMethod === 'manual'
-                      ? 'bg-primary-container text-on-primary shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">edit_note</span>
-                  <span>Write Medicine Names</span>
-                </button>
-              </div>
-
-              {/* TAB 1: UPLOAD FILE */}
-              {inputMethod === 'upload' && (
-                <div className="space-y-4">
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsDragOver(true);
-                    }}
-                    onDragLeave={() => setIsDragOver(false)}
-                    onDrop={handleFileDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`p-8 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
-                      isDragOver
-                        ? 'border-primary bg-primary/10'
-                        : 'border-surface-container-high bg-surface-container-low/60 hover:bg-surface-container-low'
-                    }`}
-                  >
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -1089,104 +1096,6 @@ export default function NewCheck() {
                 </motion.button>
               </div>
             </section>
-          </div>
-
-          {/* RIGHT COLUMN: Pre-Screening Radar & Insights Preview (4 cols) */}
-          <aside className="lg:col-span-4 flex flex-col gap-6">
-            <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-xs border border-surface-container-high/60 flex flex-col gap-4">
-              <div className="flex items-center justify-between pb-2 border-b border-surface-container">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-[20px]">troubleshoot</span>
-                  <h3 className="text-sm font-bold text-on-surface">Screening Readiness</h3>
-                </div>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                  Engine Ready
-                </span>
-              </div>
-
-              <div className="space-y-2.5 text-xs">
-                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
-                  <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">medication</span>
-                  <div>
-                    <div className="font-bold text-on-surface">Current Medications</div>
-                    <div className="text-[11px] text-outline mt-0.5">
-                      Checking {activeMeds.length} active medications on file: <strong>{activeMeds.join(', ') || 'None documented'}</strong>.
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
-                  <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${hasDocumentedAllergies ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {hasDocumentedAllergies ? 'emergency' : 'verified'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-on-surface text-xs flex items-center justify-between">
-                      <span>Documented Allergies</span>
-                      {hasDocumentedAllergies && (
-                        <span className="px-1.5 py-0.2 rounded-md bg-rose-100 text-rose-800 text-[10px] font-bold">
-                          {parsedAllergies.length}
-                        </span>
-                      )}
-                    </div>
-                    {hasDocumentedAllergies ? (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {parsedAllergies.map((allergy) => (
-                          <button
-                            key={allergy}
-                            type="button"
-                            onClick={() => setInspectingAllergy(allergy)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
-                            title={`Click to check ${allergy}`}
-                          >
-                            <span className="w-1 h-1 rounded-full bg-rose-500"></span>
-                            <span>{allergy}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-[11px] font-semibold mt-0.5 text-emerald-700">
-                        None documented (NKDA)
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
-                  <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">badge</span>
-                  <div className="w-full">
-                    <div className="font-bold text-on-surface">Patient Profile Vitals</div>
-                    <div className="text-[11px] text-on-surface-variant mt-1 grid grid-cols-2 gap-y-1 gap-x-2">
-                      <div>Name: <strong className="text-on-surface font-semibold truncate block">{patientDisplayName}</strong></div>
-                      <div>Age / Gender: <strong className="text-on-surface font-semibold">{patientAge}y, {patientGender}</strong></div>
-                      <div>Height: <strong className="text-on-surface font-semibold">{patientHeight}</strong></div>
-                      <div>Weight: <strong className="text-on-surface font-semibold">{patientWeightFormatted}</strong></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
-                  <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${customEgfr >= 60 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    health_and_safety
-                  </span>
-                  <div>
-                    <div className="font-bold text-on-surface">Renal Function Indicator</div>
-                    <div className="text-[11px] text-outline mt-0.5">
-                      {customEgfr >= 90
-                        ? `eGFR ${customEgfr} mL/min (Optimal / Normal). Standard clinical dosing applies.`
-                        : customEgfr >= 60
-                        ? `eGFR ${customEgfr} mL/min (Stage 2 Mild Reduction). Adequate renal clearance.`
-                        : `eGFR ${customEgfr} mL/min (Renal Caution). Titrate dose for renally eliminated medications.`}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-emerald-50/80 text-emerald-900 text-[11px] font-medium flex items-center gap-2 border border-emerald-200 shadow-2xs">
-                <span className="material-symbols-outlined text-[16px] text-emerald-600 shrink-0">lock</span>
-                <span>Patient health data is securely encrypted &amp; confidential.</span>
-              </div>
-            </div>
-          </aside>
         </motion.div>
       )}
 
