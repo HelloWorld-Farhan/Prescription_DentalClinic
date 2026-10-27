@@ -40,8 +40,8 @@ export default function AvatarCropModal({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const replaceFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Display crop frame dimensions (270px fits all viewports with guaranteed 4-corner visibility)
-  const displayCropSize = 270;
+  // Display crop frame dimensions (250px fits mobile and desktop viewports with guaranteed 4-corner visibility)
+  const displayCropSize = 250;
 
   // Sync image source when prop updates
   useEffect(() => {
@@ -334,7 +334,7 @@ export default function AvatarCropModal({
           exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
           transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
           onClick={(e) => e.stopPropagation()}
-          className="relative z-10 w-full max-w-xl sm:max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+          className="relative z-10 w-full max-w-xl sm:max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[88vh] my-auto"
         >
           {/* Modal Header */}
           <div className="p-4 sm:p-5 border-b border-surface-container flex items-center justify-between shrink-0">
@@ -379,23 +379,25 @@ export default function AvatarCropModal({
             </div>
           )}
 
-          {/* Interactive Crop Viewport Area (Clean White Light Theme) */}
-          <div className="py-4 sm:py-5 px-4 sm:px-6 flex flex-col items-center justify-center bg-slate-50/70 relative overflow-hidden border-y border-surface-container shrink-0">
-            {/* Viewport Frame with guaranteed all 4 corners visible */}
-            <div
-              ref={containerRef}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              style={{
-                width: `${displayCropSize}px`,
-                height: `${displayCropSize}px`,
-                maxWidth: 'calc(100vw - 48px)',
-                maxHeight: '38vh',
-                aspectRatio: '1 / 1',
-              }}
-              className="relative rounded-2xl overflow-hidden border-2 border-primary cursor-grab active:cursor-grabbing shadow-xl flex items-center justify-center touch-none bg-white shrink-0 select-none my-1"
-            >
+          {/* Scrollable Middle Body: Viewport & Controls */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {/* Interactive Crop Viewport Area (Clean White Light Theme) */}
+            <div className="py-3 sm:py-4 px-4 sm:px-6 flex flex-col items-center justify-center bg-slate-50/70 relative overflow-hidden border-b border-surface-container shrink-0">
+              {/* Viewport Frame with guaranteed all 4 corners visible */}
+              <div
+                ref={containerRef}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                style={{
+                  width: `${displayCropSize}px`,
+                  height: `${displayCropSize}px`,
+                  maxWidth: 'min(250px, 68vw)',
+                  maxHeight: '30vh',
+                  aspectRatio: '1 / 1',
+                }}
+                className="relative rounded-2xl overflow-hidden border-2 border-primary cursor-grab active:cursor-grabbing shadow-xl flex items-center justify-center touch-none bg-white shrink-0 select-none my-1"
+              >
               {/* 4 Optical Corner Brackets (Guarantees All 4 Corners Are 100% Visible & Distinct) */}
               <div className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] border-primary rounded-tl-xl pointer-events-none z-30" />
               <div className="absolute top-0 right-0 w-6 h-6 border-t-[3px] border-r-[3px] border-primary rounded-tr-xl pointer-events-none z-30" />
@@ -450,8 +452,8 @@ export default function AvatarCropModal({
             </div>
           </div>
 
-          {/* Interactive Controls Bar */}
-          <div className="p-4 sm:p-5 border-t border-surface-container flex flex-col gap-3.5 bg-surface-container-low/40 shrink-0">
+            {/* Interactive Controls Bar */}
+            <div className="p-3.5 sm:p-5 flex flex-col gap-3.5 bg-surface-container-low/40 shrink-0">
             {/* Zoom Slider (0.5x to 3.5x for full zoom in and zoom out) */}
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-outline text-[18px] shrink-0">zoom_out</span>
@@ -555,9 +557,10 @@ export default function AvatarCropModal({
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Modal Footer Actions */}
-          <div className="p-4 sm:p-5 border-t border-surface-container flex items-center justify-between gap-3 bg-surface-container-lowest shrink-0">
+          {/* Modal Footer Actions - Guaranteed Never Cut Off */}
+          <div className="p-4 sm:p-5 pb-5 sm:pb-6 border-t border-surface-container flex items-center justify-between gap-3 bg-surface-container-lowest shrink-0 z-20">
             <button
               type="button"
               disabled={isSaving}
@@ -574,7 +577,7 @@ export default function AvatarCropModal({
               whileTap={{ scale: isSaving ? 1 : 0.98 }}
               disabled={isSaving}
               onClick={handleConfirmCrop}
-              className="min-w-[210px] h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-85 relative overflow-hidden"
+              className="min-w-[170px] sm:min-w-[210px] h-11 px-5 sm:px-6 rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-85 relative overflow-hidden"
             >
               <AnimatePresence mode="wait">
                 {isSaving ? (
