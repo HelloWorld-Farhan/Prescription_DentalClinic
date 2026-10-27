@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, drawerVariants, modalVariants, buttonTapTransition, EASE } from '../lib/motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { DrugInteractionAlert } from '../types';
 
 interface AlertDetailDrawerProps {
@@ -92,20 +92,19 @@ export default function AlertDetailDrawer({
         <div className="fixed inset-0 z-[100] overflow-hidden">
           {/* Backdrop */}
           <motion.div
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={modalVariants.backdrop}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs"
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
           />
 
           {/* Slide-Over Drawer Canvas */}
           <motion.aside
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={drawerVariants}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             className="fixed inset-y-0 right-0 max-w-3xl w-full bg-surface-container-lowest shadow-2xl z-50 flex flex-col border-l border-surface-container-high overflow-hidden"
           >
             {/* Top Fixed Drawer Header */}
@@ -406,15 +405,13 @@ export default function AlertDetailDrawer({
 
                   {/* Drawer Action Footer Buttons */}
                   <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
-                    <motion.button
-                      whileTap={{ scale: 0.98 }}
-                      transition={buttonTapTransition}
+                    <button
                       type="submit"
                       disabled={isSubmitting || isSuccess || overrideRationale.length < 10}
-                      className={`w-full sm:flex-1 h-10 px-4 rounded-xl text-xs font-bold shadow-md transition-colors duration-150 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
+                      className={`w-full sm:flex-1 h-10 px-4 rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
                         isSuccess
                           ? 'bg-emerald-600 text-white shadow-emerald-500/20'
-                          : 'bg-primary hover:bg-primary-hover text-white'
+                          : 'bg-primary hover:bg-primary-container text-on-primary'
                       }`}
                     >
                       {isSuccess ? (
@@ -433,16 +430,14 @@ export default function AlertDetailDrawer({
                           <span>Submit Review & Sign Protocol</span>
                         </>
                       )}
-                    </motion.button>
-                    <motion.button
-                      whileTap={{ scale: 0.98 }}
-                      transition={buttonTapTransition}
+                    </button>
+                    <button
                       type="button"
                       onClick={onClose}
-                      className="w-full sm:w-auto h-10 px-4 rounded-xl border border-primary text-primary hover:bg-primary/5 text-xs font-bold transition-colors duration-150 cursor-pointer"
+                      className="w-full sm:w-auto h-10 px-4 rounded-xl border border-primary text-primary hover:bg-primary/5 text-xs font-bold transition-all cursor-pointer"
                     >
                       Cancel / Close
-                    </motion.button>
+                    </button>
                   </div>
                 </form>
               </section>

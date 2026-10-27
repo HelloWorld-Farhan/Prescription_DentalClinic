@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence, modalVariants, buttonTapTransition, EASE } from '../lib/motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { authApi, UserProfile } from '../services/authApi';
 
 export const COUNTRIES = [
@@ -234,19 +234,19 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
         >
           {/* Subtle Backdrop - Closes off background interaction */}
           <motion.div
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={modalVariants.backdrop}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs"
           />
 
           {/* Unified Minimal Modal Container Matching App UI */}
           <motion.div
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={modalVariants.panel}
+            initial={{ opacity: 0, scale: 0.95, y: 14 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 14 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 340 }}
             className="relative w-full max-w-2xl bg-surface-container-lowest border-0 sm:border sm:border-surface-container-high rounded-none sm:rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col h-full sm:h-auto sm:max-h-[90vh] my-auto"
           >
             {/* Modal Header */}
@@ -595,13 +595,11 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
                 <span>Encrypted &amp; HIPAA Safe Harbor Protected</span>
               </span>
 
-              <motion.button
-                whileTap={!isSubmitting ? { scale: 0.98 } : undefined}
-                transition={buttonTapTransition}
+              <button
                 type="submit"
                 form="onboardingForm"
                 disabled={isSubmitting}
-                className="w-full sm:w-auto h-11 px-5 sm:px-6 rounded-xl bg-primary text-white font-bold text-xs sm:text-sm shadow-sm hover:bg-primary-hover transition-colors duration-150 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full sm:w-auto h-11 px-5 sm:px-6 rounded-xl bg-primary text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 {isSubmitting ? (
                   <>
@@ -614,7 +612,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
                     <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                   </>
                 )}
-              </motion.button>
+              </button>
             </div>
           </motion.div>
         </div>

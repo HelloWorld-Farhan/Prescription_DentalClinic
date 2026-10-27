@@ -1,14 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  motion,
-  AnimatePresence,
-  fadeUpVariants,
-  staggerVariants,
-  toastVariants,
-  buttonTapTransition,
-  EASE
-} from '../lib/motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
 import { SafetyCheckRecord, DrugInteractionAlert } from '../types';
 import PrintableReportModal from '../components/PrintableReportModal';
@@ -149,6 +141,23 @@ export default function Dashboard() {
     }, 600);
   }, []);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { type: 'spring' as const, stiffness: 350, damping: 26 }
+    }
+  };
+
   return (
     <div className="flex flex-col w-full gap-6">
       {/* 1. TOP CONTEXT & FILTER BAR */}
@@ -172,9 +181,10 @@ export default function Dashboard() {
               {units.map((unit) => {
                 const isSelected = selectedUnit === unit;
                 return (
-                  <button
+                  <motion.button
                     type="button"
                     key={unit}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setSelectedUnit(unit)}
                     className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors duration-150 ${
                       isSelected
@@ -186,11 +196,11 @@ export default function Dashboard() {
                       <motion.div
                         layoutId="activeUnitTab"
                         className="absolute inset-0 bg-surface-container-lowest rounded-lg shadow-2xs"
-                        transition={{ duration: 0.2, ease: EASE }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                       />
                     )}
                     <span className="relative z-10">{unit}</span>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -211,18 +221,18 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* 2. FOUR STAT CARDS */}
+      {/* 2. FOUR STAT CARDS (Cascading Staggered Spring Entrance) */}
       <motion.section
-        variants={staggerVariants}
-        initial="initial"
-        animate="animate"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
         className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-w-0 max-w-full"
       >
         {/* Card 1: Checks Today */}
         <motion.div
-          variants={fadeUpVariants}
-          whileHover={{ y: -3 }}
-          transition={{ duration: 0.3, ease: EASE }}
+          variants={cardVariants}
+          whileHover={{ y: -4, scale: 1.01 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-primary/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/check')}
         >
@@ -276,9 +286,9 @@ export default function Dashboard() {
 
         {/* Card 2: Alerts In Queue */}
         <motion.div
-          variants={fadeUpVariants}
-          whileHover={{ y: -3 }}
-          transition={{ duration: 0.3, ease: EASE }}
+          variants={cardVariants}
+          whileHover={{ y: -4, scale: 1.01 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#975A16]/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/alerts')}
         >
@@ -321,9 +331,9 @@ export default function Dashboard() {
 
         {/* Card 3: High-Severity Open */}
         <motion.div
-          variants={fadeUpVariants}
-          whileHover={{ y: -3 }}
-          transition={{ duration: 0.3, ease: EASE }}
+          variants={cardVariants}
+          whileHover={{ y: -4, scale: 1.01 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-error/50 relative overflow-hidden cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/alerts?q=contraindicated')}
         >
@@ -371,9 +381,9 @@ export default function Dashboard() {
 
         {/* Card 4: Rules & Clinical Data */}
         <motion.div
-          variants={fadeUpVariants}
-          whileHover={{ y: -3 }}
-          transition={{ duration: 0.3, ease: EASE }}
+          variants={cardVariants}
+          whileHover={{ y: -4, scale: 1.01 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#553C9A]/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/rules')}
         >
@@ -415,12 +425,7 @@ export default function Dashboard() {
       </motion.section>
 
       {/* 3. 2-COLUMN MAIN CONTENT (8 cols Left / 4 cols Right) */}
-      <motion.section 
-        variants={fadeUpVariants}
-        initial="initial"
-        animate="animate"
-        className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-w-0 max-w-full"
-      >
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-w-0 max-w-full">
         {/* LEFT COLUMN: Recent Checks Table */}
         <div className="lg:col-span-8 flex flex-col gap-4 bg-surface-container-lowest rounded-2xl p-4 sm:p-6 shadow-xs border border-surface-container-high/60 min-w-0 max-w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container">
@@ -447,7 +452,6 @@ export default function Dashboard() {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.95 }}
-                transition={buttonTapTransition}
                 onClick={handleBatchSync}
                 aria-label="Refresh check feed"
                 className="p-2 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-colors duration-150 cursor-pointer"
@@ -488,7 +492,6 @@ export default function Dashboard() {
                         <motion.button
                           type="button"
                           whileTap={{ scale: 0.98 }}
-                          transition={buttonTapTransition}
                           onClick={() => navigate('/check')}
                           className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover transition-colors duration-150"
                         >
@@ -580,7 +583,6 @@ export default function Dashboard() {
                             <motion.button
                               type="button"
                               whileTap={{ scale: 0.98 }}
-                              transition={buttonTapTransition}
                               onClick={() => setActiveReportCheck(check)}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors duration-150 text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
                               title="Open Clinical Decision Report"
@@ -591,7 +593,6 @@ export default function Dashboard() {
                             <motion.button
                               type="button"
                               whileTap={{ scale: 0.98 }}
-                              transition={buttonTapTransition}
                               onClick={() => handleInspect(check)}
                               className="px-3 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors duration-150 text-xs font-bold cursor-pointer"
                             >
@@ -632,7 +633,6 @@ export default function Dashboard() {
             <motion.button
               type="button"
               whileTap={{ scale: 0.98 }}
-              transition={buttonTapTransition}
               onClick={() => navigate('/check')}
               className="w-full flex items-center justify-center gap-2 bg-primary-container text-on-primary py-3 px-4 rounded-xl shadow-sm hover:bg-primary transition-colors duration-150 group text-sm font-bold cursor-pointer"
             >
@@ -645,7 +645,6 @@ export default function Dashboard() {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.98 }}
-                transition={buttonTapTransition}
                 onClick={handleBatchSync}
                 className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container shadow-xs text-xs font-semibold border border-surface-container-high transition-colors duration-150 cursor-pointer"
               >
@@ -655,7 +654,6 @@ export default function Dashboard() {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.98 }}
-                transition={buttonTapTransition}
                 onClick={() => navigate('/check')}
                 className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container shadow-xs text-xs font-semibold border border-surface-container-high transition-colors duration-150 cursor-pointer"
               >
@@ -666,7 +664,6 @@ export default function Dashboard() {
             <motion.button
               type="button"
               whileTap={{ scale: 0.98 }}
-              transition={buttonTapTransition}
               onClick={() => navigate('/report')}
               className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-surface-container-low text-secondary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors duration-150 cursor-pointer"
             >
@@ -742,7 +739,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-      </motion.section>
+      </section>
 
       {/* Modals & Drawers */}
       <AlertDetailDrawer
@@ -768,10 +765,10 @@ export default function Dashboard() {
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={toastVariants}
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="fixed top-20 right-6 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-emerald-500 backdrop-blur-md"
           >
             <span className="material-symbols-outlined text-[20px] text-emerald-200">verified</span>

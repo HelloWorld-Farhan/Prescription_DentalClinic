@@ -1,13 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
-import {
-  motion,
-  AnimatePresence,
-  pageTransitionVariants,
-  modalVariants,
-  buttonTapTransition,
-  EASE
-} from '../lib/motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import ErrorBoundary from './ErrorBoundary';
 import FirstTimeOnboardingModal from './FirstTimeOnboardingModal';
 import { authApi, UserProfile } from '../services/authApi';
@@ -413,7 +406,6 @@ export default function Layout() {
             <motion.button
               type="button"
               whileTap={{ scale: 0.92 }}
-              transition={buttonTapTransition}
               onClick={() => setSidebarOpen(false)}
               onPointerDown={(e) => {
                 e.stopPropagation();
@@ -474,7 +466,7 @@ export default function Layout() {
                   <motion.div
                     layoutId={isMobile ? "activeMobileSidebarItem" : "activeSidebarItem"}
                     className="absolute inset-0 bg-primary rounded-xl shadow-xs"
-                    transition={{ duration: 0.25, ease: EASE }}
+                    transition={{ type: 'spring', stiffness: 350, damping: 25 }}
                   />
                 )}
                 <span className={`material-symbols-outlined mr-3 text-[20px] relative z-10 ${isActive ? 'text-white' : 'text-on-surface-variant'}`}>
@@ -502,8 +494,8 @@ export default function Layout() {
         </div>
 
         <motion.button
+          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.95 }}
-          transition={buttonTapTransition}
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-error hover:bg-error-container/40 transition-colors duration-150 font-semibold text-xs cursor-pointer"
         >
@@ -525,7 +517,7 @@ export default function Layout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease: EASE }}
+              transition={{ duration: 0.2 }}
               className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 lg:hidden cursor-pointer touch-none"
               onClick={() => setSidebarOpen(false)}
               onPointerDown={() => setSidebarOpen(false)}
@@ -536,7 +528,7 @@ export default function Layout() {
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ duration: 0.25, ease: EASE }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               drag="x"
               dragDirectionLock
               dragConstraints={{ left: -320, right: 0 }}
@@ -567,7 +559,6 @@ export default function Layout() {
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
             <motion.button
               whileTap={{ scale: 0.95 }}
-              transition={buttonTapTransition}
               onClick={() => setSidebarOpen((prev) => !prev)}
               className="lg:hidden p-2 text-on-surface hover:bg-surface-container rounded-xl cursor-pointer shrink-0 transition-colors duration-150"
               aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
@@ -646,8 +637,8 @@ export default function Layout() {
             {/* Quick Search Button (Mobile Only, < md) */}
             <motion.button
               type="button"
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              transition={buttonTapTransition}
               onClick={() => setIsSearchOpen(true)}
               className="md:hidden p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors duration-150 cursor-pointer flex items-center justify-center shadow-2xs"
               title="Search clinical records or actions (⌘K)"
@@ -658,8 +649,8 @@ export default function Layout() {
 
             {/* Quick Action Button: New Check */}
             <motion.button
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              transition={buttonTapTransition}
               onClick={() => navigate('/check')}
               className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-hover transition-colors duration-150 flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
               title="Start New Prescription Safety Check"
@@ -671,8 +662,8 @@ export default function Layout() {
             {/* Notifications Dropdown */}
             <div className="relative" ref={notifDropdownRef}>
               <motion.button
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                transition={buttonTapTransition}
                 onClick={() => {
                   setNotificationsOpen(!notificationsOpen);
                   setProfileOpen(false);
@@ -697,10 +688,10 @@ export default function Layout() {
                       onClick={() => setNotificationsOpen(false)}
                     />
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.98 }}
-                      transition={{ duration: 0.15, ease: EASE }}
+                      initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                       className="fixed top-16 left-3 right-3 max-w-sm mx-auto sm:absolute sm:top-12 sm:left-auto sm:right-0 sm:w-96 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-50"
                     >
                       <div className="p-4 border-b border-surface-container-low flex items-center justify-between">
@@ -754,8 +745,8 @@ export default function Layout() {
             {/* Profile Dropdown */}
             <div className="relative" ref={profileDropdownRef}>
               <motion.button
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                transition={buttonTapTransition}
                 onClick={() => {
                   setProfileOpen(!profileOpen);
                   setNotificationsOpen(false);
@@ -777,10 +768,10 @@ export default function Layout() {
                       onClick={() => setProfileOpen(false)}
                     />
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.98 }}
-                      transition={{ duration: 0.15, ease: EASE }}
+                      initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                       className="fixed top-16 right-3 left-auto w-64 max-w-[calc(100vw-24px)] sm:absolute sm:top-12 sm:right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-2 z-50 space-y-1"
                     >
                       <div className="p-3 border-b border-surface-container-low bg-surface-container-low/30 rounded-t-xl space-y-1.5">
@@ -833,8 +824,8 @@ export default function Layout() {
 
                       <div className="border-t border-surface-container-low pt-1">
                         <motion.button
+                          whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
-                          transition={buttonTapTransition}
                           onClick={handleLogout}
                           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-error hover:bg-error-container/30 transition-colors duration-150 cursor-pointer"
                         >
@@ -853,18 +844,16 @@ export default function Layout() {
         {/* Content Route with Page Transition */}
         <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto min-h-[calc(100vh-140px)]">
           <ErrorBoundary fallbackTitle="Unable to load this clinical safety view">
-            <AnimatePresence initial={false}>
-              <motion.div
-                key={location.pathname}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                variants={pageTransitionVariants}
-                className="w-full transform-gpu will-change-transform"
-              >
-                <Outlet />
-              </motion.div>
-            </AnimatePresence>
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ type: 'spring', stiffness: 360, damping: 27 }}
+              className="w-full transform-gpu will-change-transform"
+            >
+              <Outlet />
+            </motion.div>
           </ErrorBoundary>
         </main>
 
@@ -899,10 +888,10 @@ export default function Layout() {
           <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 sm:pt-20 px-3 sm:px-4">
             {/* Backdrop */}
             <motion.div
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              variants={modalVariants.backdrop}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
               onClick={() => setIsSearchOpen(false)}
               className="fixed inset-0 bg-black/50 backdrop-blur-xs"
             />
@@ -910,10 +899,10 @@ export default function Layout() {
             {/* Modal Dialog Window */}
             <motion.div
               ref={searchContainerRef}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              variants={modalVariants.panel}
+              initial={{ opacity: 0, y: -16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -16, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 26 }}
               className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col max-h-[82vh] divide-y divide-surface-container-low"
             >
               {/* Search Bar Input */}
@@ -982,8 +971,8 @@ export default function Layout() {
                     <motion.button
                       key={item.id}
                       type="button"
+                      whileHover={{ scale: 1.005 }}
                       whileTap={{ scale: 0.99 }}
-                      transition={buttonTapTransition}
                       onClick={() => {
                         navigate(item.path);
                         setIsSearchOpen(false);

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, EASE } from '../lib/motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   password: string;
@@ -113,10 +113,10 @@ export default function PasswordStrengthMeter({ password, confirmPassword }: Pro
                   {met ? (
                     <motion.span
                       key="check"
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.8, opacity: 0 }}
-                      transition={{ duration: 0.15, ease: EASE }}
+                      initial={{ scale: 0, rotate: -45 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                       className="material-symbols-outlined text-[16px] text-emerald-600 absolute inset-0"
                     >
                       check_circle
@@ -124,10 +124,10 @@ export default function PasswordStrengthMeter({ password, confirmPassword }: Pro
                   ) : (
                     <motion.span
                       key="empty"
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.8, opacity: 0 }}
-                      transition={{ duration: 0.15, ease: EASE }}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ duration: 0.15 }}
                       className="material-symbols-outlined text-[16px] text-outline absolute inset-0"
                     >
                       radio_button_unchecked
@@ -165,10 +165,10 @@ export default function PasswordStrengthMeter({ password, confirmPassword }: Pro
               {passwordsMatch ? (
                 <motion.span
                   key="match"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  transition={{ duration: 0.15, ease: EASE }}
+                  initial={{ scale: 0, rotate: -90 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  exit={{ scale: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 22 }}
                   className="material-symbols-outlined text-[20px] text-emerald-600 absolute inset-0"
                 >
                   verified
@@ -176,10 +176,10 @@ export default function PasswordStrengthMeter({ password, confirmPassword }: Pro
               ) : (
                 <motion.span
                   key="mismatch"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  transition={{ duration: 0.15, ease: EASE }}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  transition={{ duration: 0.15 }}
                   className="material-symbols-outlined text-[20px] text-rose-500 absolute inset-0"
                 >
                   cancel
@@ -196,9 +196,13 @@ export default function PasswordStrengthMeter({ password, confirmPassword }: Pro
             {passwordsMatch ? 'Passwords match ✓' : 'Passwords do not match'}
           </span>
 
-          {/* Subtle status indicator dot on match */}
+          {/* Subtle animated ring on match */}
           {passwordsMatch && (
-            <span className="ml-auto w-2 h-2 rounded-full bg-emerald-500" />
+            <motion.span
+              animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+              className="ml-auto w-2 h-2 rounded-full bg-emerald-400"
+            />
           )}
         </motion.div>
       )}

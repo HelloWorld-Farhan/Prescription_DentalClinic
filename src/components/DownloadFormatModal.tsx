@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, modalVariants, buttonTapTransition, EASE } from '../lib/motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { SafetyCheckRecord } from '../types';
 
 interface DownloadFormatModalProps {
@@ -238,10 +238,10 @@ export default function DownloadFormatModal({
       {isOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm print:hidden">
           <motion.div
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={modalVariants.panel}
+            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 320 }}
             className="w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden"
           >
             {/* Modal Header */}

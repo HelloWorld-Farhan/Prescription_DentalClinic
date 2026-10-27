@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { MotionConfig, AnimatePresence, motion, EASE } from './lib/motion';
+import { MotionConfig, AnimatePresence, motion } from 'framer-motion';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from './components/Layout';
 
@@ -51,7 +51,7 @@ function TopLoadingBar() {
           initial={{ scaleX: 0, opacity: 1 }}
           animate={{ scaleX: 1, opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.25, ease: EASE }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           style={{ originX: 0 }}
           className="fixed top-0 left-0 right-0 h-[2px] bg-primary z-[9999] pointer-events-none"
         />
@@ -116,7 +116,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <MotionConfig reducedMotion="user" transition={{ duration: 0.38, ease: EASE }}>
+    <MotionConfig reducedMotion="user">
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>
