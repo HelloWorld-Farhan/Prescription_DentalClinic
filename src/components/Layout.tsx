@@ -198,6 +198,43 @@ export default function Layout() {
     .slice(0, 2)
     .join('') || 'RX';
 
+  const prescriberEmail = (
+    currentUser?.email ||
+    sessionStorage.getItem('rxguard_prescriber_email') ||
+    localStorage.getItem('rxguard_prescriber_email') ||
+    storedUser.email ||
+    ''
+  ).toLowerCase().trim();
+
+  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
+    if (prescriberEmail) {
+      const saved = localStorage.getItem(`smileclinic_avatar_${prescriberEmail}`);
+      if (saved) return saved;
+    }
+    return currentUser?.photoUrl || storedUser.photoUrl || '';
+  });
+
+  useEffect(() => {
+    if (prescriberEmail) {
+      const saved = localStorage.getItem(`smileclinic_avatar_${prescriberEmail}`);
+      if (saved) {
+        setAvatarUrl(saved);
+      }
+    }
+  }, [prescriberEmail]);
+
+  useEffect(() => {
+    const handleAvatarUpdate = (e: any) => {
+      const newUrl = e?.detail?.avatarUrl || e?.detail?.url;
+      const targetEmail = (e?.detail?.email || '').toLowerCase().trim();
+      if (newUrl && (!targetEmail || targetEmail === prescriberEmail)) {
+        setAvatarUrl(newUrl);
+      }
+    };
+    window.addEventListener('smileclinic_avatar_updated', handleAvatarUpdate);
+    return () => window.removeEventListener('smileclinic_avatar_updated', handleAvatarUpdate);
+  }, [prescriberEmail]);
+
   // Close drawers/menus and scroll to top on navigation
   useEffect(() => {
     setSidebarOpen(false);
@@ -483,7 +520,11 @@ export default function Layout() {
       <div className="p-4 space-y-3 border-t border-surface-container-high">
         <div className="p-2.5 bg-surface-container-lowest rounded-xl border border-surface-container-high flex items-center gap-2.5 shadow-2xs">
           <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/10 text-primary flex items-center justify-center shrink-0 font-bold text-xs ring-1 ring-primary/20">
-            {prescriberInitials}
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={prescriberName} className="w-full h-full object-cover" />
+            ) : (
+              prescriberInitials
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold text-on-surface truncate">{prescriberName}</div>
@@ -741,8 +782,12 @@ export default function Layout() {
                 className="flex items-center gap-1.5 p-1 sm:p-1.5 rounded-xl hover:bg-surface-container-high transition-colors duration-150 cursor-pointer"
                 aria-label="Clinician profile options"
               >
-                <div className="w-8 h-8 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-xs">
-                  {prescriberInitials}
+                <div className="w-8 h-8 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-xs overflow-hidden">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={prescriberName} className="w-full h-full object-cover" />
+                  ) : (
+                    prescriberInitials
+                  )}
                 </div>
                 <span className="material-symbols-outlined text-[18px] text-outline hidden sm:block">arrow_drop_down</span>
               </motion.button>
@@ -761,21 +806,30 @@ export default function Layout() {
                       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                       className="fixed top-16 right-3 left-auto w-64 max-w-[calc(100vw-24px)] sm:absolute sm:top-12 sm:right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-2 z-50 space-y-1"
                     >
-                      <div className="p-3 border-b border-surface-container-low bg-surface-container-low/30 rounded-t-xl space-y-1.5">
-                        <div className="font-bold text-xs text-on-surface">
-                          {prescriberName}
+                      <div className="p-3 border-b border-surface-container-low bg-surface-container-low/30 rounded-t-xl flex items-start gap-2.5">
+                        <div className="w-9 h-9 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+                          {avatarUrl ? (
+                            <img src={avatarUrl} alt={prescriberName} className="w-full h-full object-cover" />
+                          ) : (
+                            prescriberInitials
+                          )}
                         </div>
-                        <div className="text-[10px] text-outline uppercase tracking-wider font-semibold">
-                          {prescriberRole}
-                        </div>
-                        <div className="pt-1 flex flex-col gap-1">
-                          <div className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 w-fit">
-                            <span className="material-symbols-outlined text-[13px] text-emerald-600">verified</span>
-                            <span>NPI: {prescriberNpi} • Verified</span>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="font-bold text-xs text-on-surface truncate">
+                            {prescriberName}
                           </div>
-                          <div className="text-[10px] text-outline font-mono flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[12px] text-outline">badge</span>
-                            <span>Unique ID: <span className="text-on-surface font-semibold">{prescriberUniqueId}</span></span>
+                          <div className="text-[10px] text-outline uppercase tracking-wider font-semibold truncate">
+                            {prescriberRole}
+                          </div>
+                          <div className="pt-0.5 flex flex-col gap-1">
+                            <div className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 w-fit">
+                              <span className="material-symbols-outlined text-[13px] text-emerald-600">verified</span>
+                              <span>NPI: {prescriberNpi} • Verified</span>
+                            </div>
+                            <div className="text-[10px] text-outline font-mono flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px] text-outline">badge</span>
+                              <span>Unique ID: <span className="text-on-surface font-semibold">{prescriberUniqueId}</span></span>
+                            </div>
                           </div>
                         </div>
                       </div>

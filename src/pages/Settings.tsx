@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authApi } from '../services/authApi';
 import { signInWithGooglePopup } from '../services/firebase';
+import AvatarCropModal from '../components/AvatarCropModal';
 import {
   ActiveSessionItem,
   LoginHistoryItem,
@@ -27,6 +28,7 @@ export interface ClinicalProfile {
   allergiesDescription?: string;
   avatarInitials: string;
   avatarColor: string;
+  avatarUrl?: string;
   isGoogleLinked?: boolean;
   hasPassword?: boolean;
 }
@@ -74,6 +76,12 @@ function loadRealUserProfile(): ClinicalProfile {
     .slice(0, 2)
     .join('') || 'RX';
 
+  const emailLower = email.toLowerCase().trim();
+  const avatarUrl =
+    (typeof window !== 'undefined' && emailLower ? localStorage.getItem(`smileclinic_avatar_${emailLower}`) : '') ||
+    storedUser.photoUrl ||
+    '';
+
   const isGoogleLinked =
     Boolean(storedUser.isGoogleLinked) ||
     (typeof window !== 'undefined' && email ? localStorage.getItem(`google_linked_${email.toLowerCase()}`) === 'true' : false) ||
@@ -98,6 +106,7 @@ function loadRealUserProfile(): ClinicalProfile {
     allergiesDescription: storedUser.allergiesDescription || '',
     avatarInitials: initials,
     avatarColor: 'bg-primary-container text-on-primary',
+    avatarUrl,
     isGoogleLinked,
     hasPassword
   };
@@ -128,6 +137,55 @@ export default function Settings() {
 
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editForm, setEditForm] = useState<ClinicalProfile>(profile);
+
+  // --- Avatar Crop & Cloudflare R2 Upload State ---
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string>('');
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file (JPEG, PNG, WebP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCropImageSrc(reader.result);
+        setCropModalOpen(true);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleAvatarCropSuccess = (newAvatarUrl: string) => {
+    setProfile((prev) => {
+      const updated = { ...prev, avatarUrl: newAvatarUrl };
+      try {
+        localStorage.setItem('smileclinic_rxguard_profile', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setEditForm((prev) => ({ ...prev, avatarUrl: newAvatarUrl }));
+    showToast('Profile photo cropped & saved to Cloudflare R2.');
+  };
+
+  // Sync avatar updates if triggered anywhere else
+  useEffect(() => {
+    const handleAvatarUpdate = (e: any) => {
+      const newUrl = e?.detail?.avatarUrl || e?.detail?.url;
+      const targetEmail = e?.detail?.email;
+      if (newUrl && (!targetEmail || targetEmail.toLowerCase() === profile.email.toLowerCase())) {
+        setProfile((prev) => ({ ...prev, avatarUrl: newUrl }));
+        setEditForm((prev) => ({ ...prev, avatarUrl: newUrl }));
+      }
+    };
+    window.addEventListener('smileclinic_avatar_updated', handleAvatarUpdate);
+    return () => window.removeEventListener('smileclinic_avatar_updated', handleAvatarUpdate);
+  }, [profile.email]);
 
   // --- Security & Password State ---
   type VerificationMethod = 'email' | 'sms' | 'password_otp';
@@ -800,18 +858,40 @@ export default function Settings() {
           {/* Main Profile Masthead Card */}
           <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col md:flex-row items-start justify-between gap-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <div className="relative">
-                <div className={`w-24 h-24 rounded-2xl ${profile.avatarColor} flex items-center justify-center font-bold text-3xl shadow-md tracking-wider`}>
-                  {profile.avatarInitials}
+              <div className="relative group">
+                <div className={`w-24 h-24 rounded-2xl ${profile.avatarColor} flex items-center justify-center font-bold text-3xl shadow-md tracking-wider overflow-hidden border-2 border-surface-container-high/60 relative`}>
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt={profile.fullName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{profile.avatarInitials}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => avatarFileInputRef.current?.click()}
+                    className="absolute inset-0 bg-black/45 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer backdrop-blur-2xs rounded-2xl"
+                    title="Change profile photo"
+                    aria-label="Change profile photo"
+                  >
+                    <span className="material-symbols-outlined text-[24px]">photo_camera</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Change</span>
+                  </button>
                 </div>
                 <button
                   type="button"
-                  onClick={handleOpenEditProfile}
-                  className="absolute -bottom-2 -right-2 p-1.5 bg-surface-container-lowest text-primary rounded-xl border border-surface-container-high shadow hover:bg-surface-container cursor-pointer transition-transform hover:scale-105"
-                  title="Edit Profile Avatar"
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  className="absolute -bottom-2 -right-2 p-2 bg-primary text-white rounded-xl border-2 border-surface-container-lowest shadow hover:bg-primary/90 cursor-pointer transition-transform hover:scale-110 active:scale-95 flex items-center justify-center"
+                  title="Upload & Crop Profile Photo"
+                  aria-label="Upload profile photo"
                 >
-                  <span className="material-symbols-outlined text-[18px] block">edit</span>
+                  <span className="material-symbols-outlined text-[18px] block">upload</span>
                 </button>
+                <input
+                  ref={avatarFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/jpg"
+                  className="hidden"
+                  onChange={handleAvatarFileSelect}
+                />
               </div>
 
               <div className="flex flex-col">
@@ -2401,6 +2481,16 @@ export default function Settings() {
         </AnimatePresence>,
         document.body
       )}
+
+      {/* Avatar Crop & R2 Upload Modal */}
+      <AvatarCropModal
+        isOpen={cropModalOpen}
+        imageSrc={cropImageSrc}
+        userEmail={profile.email}
+        userName={profile.fullName}
+        onClose={() => setCropModalOpen(false)}
+        onSuccess={handleAvatarCropSuccess}
+      />
     </div>
   );
 }

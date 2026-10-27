@@ -163,6 +163,7 @@ export default function NewCheck() {
   } | null>(null);
   const [extractedMedicines, setExtractedMedicines] = useState<PrescriptionItem[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [emptyQueueAlertOpen, setEmptyQueueAlertOpen] = useState(false);
 
   // Read active logged-in user profile
   let storedUser: any = null;
@@ -571,7 +572,7 @@ export default function NewCheck() {
   // --- START AUTOMATED SAFETY CHECK PIPELINE ---
   const handleStartSafetyCheck = () => {
     if (!prescriptions || prescriptions.length === 0) {
-      alert('Please enter or queue at least one prescribed medication before running the clinical safety check.');
+      setEmptyQueueAlertOpen(true);
       return;
     }
 
@@ -2253,6 +2254,49 @@ export default function NewCheck() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* UI Matching Clinical Alert Modal (Replaces browser alert) */}
+      {createPortal(
+        <AnimatePresence>
+          {emptyQueueAlertOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+                onClick={() => setEmptyQueueAlertOpen(false)}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 14 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 10 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className="relative w-full max-w-md bg-surface-container-lowest border border-surface-container-high rounded-2xl shadow-2xl p-6 flex flex-col items-center text-center gap-4 z-10"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-600 flex items-center justify-center shadow-xs">
+                  <span className="material-symbols-outlined text-[30px]">warning</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-bold text-on-surface">Prescription Queue Required</h3>
+                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                    Please enter or stage at least one candidate medication before running the clinical safety screening. You can upload a document, snap a camera photo, click a quick preset, or write medication names.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setEmptyQueueAlertOpen(false)}
+                  className="w-full py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  Acknowledge &amp; Add Medication
+                </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
