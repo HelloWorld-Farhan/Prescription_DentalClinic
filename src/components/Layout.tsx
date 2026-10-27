@@ -286,7 +286,7 @@ export default function Layout() {
     { name: 'New Safety Check', path: '/check', icon: 'add_circle' },
     { name: 'Alerts Queue', path: '/alerts', icon: 'warning' },
     { name: 'Audit Log', path: '/audit-log', icon: 'verified' },
-    { name: 'Rules & Data', path: '/rules', icon: 'database' },
+    { name: 'History & Data', path: '/rules', icon: 'history_edu' },
   ];
 
   const getPageInfo = (pathname: string) => {
@@ -300,7 +300,7 @@ export default function Layout() {
       return { title: 'HIPAA Notarized Audit Trail', icon: 'verified' };
     }
     if (pathname.startsWith('/rules') || pathname.startsWith('/dashboard/rules')) {
-      return { title: 'Rules & Interaction Database', icon: 'database' };
+      return { title: 'History & Data Governance', icon: 'history_edu' };
     }
     if (pathname.startsWith('/settings') || pathname.startsWith('/dashboard/settings')) {
       return { title: 'Clinician Settings & Security', icon: 'settings' };

@@ -4,7 +4,7 @@ const STORAGE_KEYS = {
   PATIENTS: 'smileclinic_patients_v3',
   CHECKS: 'smileclinic_checks',
   AUDIT: 'smileclinic_audit',
-  RULES: 'smileclinic_rules_v5'
+  RULES: 'smileclinic_rules_v6'
 };
 
 export const isMockPatient = (p: any): boolean => {
@@ -34,11 +34,13 @@ export const isDummyCheck = (c: any): boolean => {
   return false;
 };
 
-// Purge legacy mock rules, audits, mock patient seeds, and dummy checks if present
+// Clean legacy mock items and safely migrate rules
 try {
   localStorage.removeItem('smileclinic_rules');
-  localStorage.removeItem('smileclinic_rules_v5');
-  localStorage.removeItem('smileclinic_audit');
+  const legacyV5 = localStorage.getItem('smileclinic_rules_v5');
+  if (legacyV5 && !localStorage.getItem(STORAGE_KEYS.RULES)) {
+    localStorage.setItem(STORAGE_KEYS.RULES, legacyV5);
+  }
   localStorage.removeItem('smileclinic_patients');
   localStorage.removeItem('smileclinic_patients_v2');
   localStorage.removeItem('smileclinic_custom_prescriber_password');
@@ -74,12 +76,17 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
 export const INITIAL_RULES: InteractionRule[] = [];
 
 export class PrescriptionStorage {
-  static getRules(): InteractionRule[] {
+  static getRules(userId?: string): InteractionRule[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.RULES);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          if (userId) {
+            return parsed.filter(r => !r.userId || r.userId === userId || r.userId === 'user-current');
+          }
+          return parsed;
+        }
       }
       return INITIAL_RULES;
     } catch {

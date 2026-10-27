@@ -83,4 +83,9 @@ export interface InteractionRule {
   category: 'Drug-Drug' | 'Drug-Allergy' | 'Drug-Condition' | 'Renal Dose Adjustment' | string;
   description: string;
   active: boolean;
+  userId?: string;
+  authorName?: string;
+  createdAt?: string;
+  sourceFile?: string;
+  storageUrl?: string;
 }

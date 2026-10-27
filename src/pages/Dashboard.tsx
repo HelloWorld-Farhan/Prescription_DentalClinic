@@ -429,9 +429,9 @@ export default function Dashboard() {
                 navigate('/rules');
               }}
               className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#553C9A] bg-[#FAF5FF] hover:bg-[#553C9A] hover:text-white transition-colors duration-150 text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
-              title="Manage Clinical CDS Rules & Data"
+              title="Manage Clinical History & Data"
             >
-              <span>Rules &amp; Data</span>
+              <span>History &amp; Data</span>
               <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
             </button>
           </div>
