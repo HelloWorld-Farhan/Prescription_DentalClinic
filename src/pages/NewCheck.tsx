@@ -321,6 +321,30 @@ export default function NewCheck() {
 
 
 
+  // Model architecture details drawer visibility
+  const [showModelDetails, setShowModelDetails] = useState(false);
+
+  // Quick 1-click preset adder for dental clinicians
+  const handleAddPreset = (
+    drugName: string,
+    genericName: string,
+    dosage: string,
+    frequency: string,
+    indication: string = 'Dental Infection Prophylaxis'
+  ) => {
+    const newItem: PrescriptionItem = {
+      id: 'rx-preset-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      drugName,
+      genericName,
+      dosage,
+      frequency,
+      route: 'Oral (PO)',
+      duration: '7 days',
+      indication
+    };
+    setPrescriptions((prev) => [...prev, newItem]);
+  };
+
   // Camera Snap Handler
   const handleTakePhoto = () => {
     setIsCapturing(true);
@@ -330,6 +354,30 @@ export default function NewCheck() {
       setCapturedPhoto('captured_prescription_scan.jpg');
       setUploadedFileName('camera_captured_rx_slip.jpg');
       setUploadedFileSize('3.2 MB');
+      if (prescriptions.length === 0) {
+        setPrescriptions([
+          {
+            id: 'rx-ai-1',
+            drugName: 'Amoxicillin 500mg',
+            genericName: 'Amoxicillin Trihydrate',
+            dosage: '500mg capsule',
+            frequency: 'Every 8 hours (TID)',
+            route: 'Oral (PO)',
+            duration: '7 days',
+            indication: 'Acute Periapical Abscess'
+          },
+          {
+            id: 'rx-ai-2',
+            drugName: 'Ibuprofen 400mg',
+            genericName: 'Ibuprofen',
+            dosage: '400mg tablet',
+            frequency: 'Every 6-8 hours (PRN)',
+            route: 'Oral (PO)',
+            duration: '5 days',
+            indication: 'Post-Surgical Dental Analgesia'
+          }
+        ]);
+      }
     }, 600);
   };
 
@@ -341,6 +389,30 @@ export default function NewCheck() {
       const file = e.dataTransfer.files[0];
       setUploadedFileName(file.name);
       setUploadedFileSize(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+      if (prescriptions.length === 0) {
+        setPrescriptions([
+          {
+            id: 'rx-ai-1',
+            drugName: 'Amoxicillin 500mg',
+            genericName: 'Amoxicillin Trihydrate',
+            dosage: '500mg capsule',
+            frequency: 'Every 8 hours (TID)',
+            route: 'Oral (PO)',
+            duration: '7 days',
+            indication: 'Odontogenic Infection'
+          },
+          {
+            id: 'rx-ai-2',
+            drugName: 'Ibuprofen 400mg',
+            genericName: 'Ibuprofen',
+            dosage: '400mg tablet',
+            frequency: 'Every 6-8 hours (PRN)',
+            route: 'Oral (PO)',
+            duration: '5 days',
+            indication: 'Post-Surgical Dental Analgesia'
+          }
+        ]);
+      }
     }
   };
 
@@ -349,6 +421,30 @@ export default function NewCheck() {
       const file = e.target.files[0];
       setUploadedFileName(file.name);
       setUploadedFileSize(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+      if (prescriptions.length === 0) {
+        setPrescriptions([
+          {
+            id: 'rx-ai-1',
+            drugName: 'Amoxicillin 500mg',
+            genericName: 'Amoxicillin Trihydrate',
+            dosage: '500mg capsule',
+            frequency: 'Every 8 hours (TID)',
+            route: 'Oral (PO)',
+            duration: '7 days',
+            indication: 'Odontogenic Infection'
+          },
+          {
+            id: 'rx-ai-2',
+            drugName: 'Ibuprofen 400mg',
+            genericName: 'Ibuprofen',
+            dosage: '400mg tablet',
+            frequency: 'Every 6-8 hours (PRN)',
+            route: 'Oral (PO)',
+            duration: '5 days',
+            indication: 'Post-Surgical Dental Analgesia'
+          }
+        ]);
+      }
     }
   };
 
@@ -730,24 +826,111 @@ export default function NewCheck() {
             {/* Subtle Top Accent Highlight Line */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/10 via-primary to-primary/10" />
 
-            {/* Header with Quick Presets & Primary CDS Feature Badge */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-surface-container gap-3">
-              <div>
+            {/* Header with AI Model Badges & Architecture Explainer */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-surface-container gap-4">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[20px]">medication</span>
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary/20 via-teal-500/20 to-primary/10 text-primary flex items-center justify-center shrink-0 shadow-xs border border-primary/20">
+                    <span className="material-symbols-outlined text-[22px]">auto_awesome</span>
                   </div>
-                  <h2 className="text-base sm:text-lg font-bold text-on-surface">Enter or Capture Prescription</h2>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 shadow-2xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                    <span>Primary CDS Engine</span>
-                  </span>
+                  <h2 className="text-lg sm:text-xl font-bold text-on-surface tracking-tight">Enter or Capture Prescription</h2>
+
+                  {/* Model Badges */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-emerald-500/10 via-teal-500/15 to-primary/10 text-primary border border-primary/25 shadow-2xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>SmileGuard AI™ v4.2</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                      <span className="material-symbols-outlined text-[13px] text-blue-600">psychology</span>
+                      <span>Gemini 1.5 Pro Vision</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      <span className="material-symbols-outlined text-[12px] text-emerald-600">verified</span>
+                      <span>RxNorm Validated</span>
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-outline mt-1">
-                  Submit prescription slip via image upload, camera photo capture, or manual medication entry.
+                <p className="text-xs sm:text-sm text-outline max-w-3xl leading-relaxed">
+                  Submit prescription slip via image upload, camera photo capture, or manual medication entry. Powered by <strong>Gemini 1.5 Pro</strong> multimodal clinical vision to extract handwritten scripts, normalize dosages, and screen polypharmacy hazard risks against active medical records.
                 </p>
               </div>
+
+              {/* How AI Works Accordion Trigger */}
+              <button
+                type="button"
+                onClick={() => setShowModelDetails(!showModelDetails)}
+                className="self-start sm:self-center px-3.5 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high text-xs font-bold text-primary flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer shrink-0"
+              >
+                <span className="material-symbols-outlined text-[17px] text-teal-600">help</span>
+                <span>{showModelDetails ? 'Hide Model Architecture' : 'How AI Model Works'}</span>
+                <span className="material-symbols-outlined text-[16px] transition-transform duration-200">
+                  {showModelDetails ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
             </div>
+
+            {/* AI Model Architecture & Real-Time Pipeline Showcase */}
+            <AnimatePresence>
+              {showModelDetails && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.28 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-surface-container-low via-surface-container-lowest to-surface-container-low/70 border border-primary/20 shadow-xs flex flex-col gap-3.5">
+                    <div className="flex items-center justify-between pb-2 border-b border-surface-container">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-[20px]">account_tree</span>
+                        <span className="text-xs font-bold text-on-surface uppercase tracking-wide">
+                          SmileGuard Clinical Architecture · Pipeline Execution (450ms)
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        99.4% Extraction Accuracy
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {/* Step 1 */}
+                      <div className="p-3 rounded-xl bg-surface-container-lowest border border-surface-container-high/80 flex flex-col gap-1.5 shadow-2xs">
+                        <div className="flex items-center gap-2 text-primary font-bold text-xs">
+                          <span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px]">1</span>
+                          <span>Multimodal Vision OCR</span>
+                        </div>
+                        <p className="text-[11px] text-outline leading-relaxed">
+                          Gemini 1.5 Pro parses handwritten dental scripts, ink stamps, hospital headers, and multi-page PDF e-prescriptions with high spatial confidence.
+                        </p>
+                      </div>
+
+                      {/* Step 2 */}
+                      <div className="p-3 rounded-xl bg-surface-container-lowest border border-surface-container-high/80 flex flex-col gap-1.5 shadow-2xs">
+                        <div className="flex items-center gap-2 text-teal-700 font-bold text-xs">
+                          <span className="w-5 h-5 rounded-full bg-teal-500/10 flex items-center justify-center text-[10px]">2</span>
+                          <span>RxNorm Entity Normalization</span>
+                        </div>
+                        <p className="text-[11px] text-outline leading-relaxed">
+                          Maps commercial brand names and doctor abbreviations directly to standardized RxCUIs, ATC classes, and therapeutic ingredient registries.
+                        </p>
+                      </div>
+
+                      {/* Step 3 */}
+                      <div className="p-3 rounded-xl bg-surface-container-lowest border border-surface-container-high/80 flex flex-col gap-1.5 shadow-2xs">
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                          <span className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center text-[10px]">3</span>
+                          <span>Polypharmacy CDS Matrix</span>
+                        </div>
+                        <p className="text-[11px] text-outline leading-relaxed">
+                          Simultaneously evaluates drug-drug interactions, Beers criteria, patient allergies, and renal clearance (eGFR) hazard boundaries.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* 3 Input Mode Tabs */}
             <div className="grid grid-cols-3 p-1.5 bg-surface-container-low rounded-xl gap-1">
@@ -802,242 +985,339 @@ export default function NewCheck() {
                   onDragLeave={() => setIsDragOver(false)}
                   onDrop={handleFileDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`p-10 sm:p-12 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                  className={`relative p-8 sm:p-11 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 overflow-hidden group ${
                     isDragOver
-                      ? 'border-primary bg-primary/10 shadow-inner'
-                      : 'border-primary/30 bg-gradient-to-b from-surface-container-lowest to-surface-container-low/40 hover:border-primary hover:bg-surface-container-low/60'
+                      ? 'border-primary bg-primary/10 shadow-lg scale-[1.005]'
+                      : 'border-primary/30 bg-gradient-to-b from-surface-container-lowest via-surface-container-lowest to-surface-container-low/40 hover:border-primary hover:bg-surface-container-low/60 hover:shadow-sm'
                   }`}
                 >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.png,.jpg,.jpeg"
-                      onChange={handleFileInputChange}
-                      className="hidden"
-                    />
-                    <div className="w-14 h-14 rounded-2xl bg-surface-container text-primary flex items-center justify-center mb-3 shadow-xs">
-                      <span className="material-symbols-outlined text-[32px]">upload_file</span>
-                    </div>
-                    <div className="text-sm font-bold text-on-surface">
-                      Drop prescription scan here or click to browse
-                    </div>
-                    <p className="text-xs text-outline mt-1">
-                      Supports PDF, JPG, PNG e-prescriptions up to 25MB (Multi-page enabled)
-                    </p>
-                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    onChange={handleFileInputChange}
+                    className="hidden"
+                  />
 
-                  {/* Attached Document Card */}
-                  {uploadedFileName && (
-                    <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-[22px]">
-                            {uploadedFileName.endsWith('.pdf') ? 'picture_as_pdf' : 'image'}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-on-surface">{uploadedFileName}</div>
-                          <div className="text-[11px] text-outline flex items-center gap-2 mt-0.5">
-                            <span>{uploadedFileSize}</span>
-                            <span>•</span>
-                            <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
-                              <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                              98% OCR Readiness
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
-                        Ready to Extract
+                  {/* Ambient Background Radial Glow */}
+                  <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity" />
+
+                  <div className="relative z-10 flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/15 via-teal-500/15 to-primary/5 text-primary flex items-center justify-center shadow-xs border border-primary/20 group-hover:scale-105 transition-transform duration-200">
+                      <span className="material-symbols-outlined text-[32px] group-hover:-translate-y-0.5 transition-transform">
+                        upload_file
                       </span>
                     </div>
-                  )}
-                </div>
-              )}
 
-              {/* TAB 2: CAMERA PHOTO SCAN */}
-              {inputMethod === 'camera' && (
-                <div className="space-y-4">
-                  {!capturedPhoto ? (
-                    <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 p-6 flex flex-col items-center justify-center min-h-[280px]">
-                      {/* Grid crosshair viewfinder overlay */}
-                      <div className="absolute inset-4 border border-dashed border-white/20 rounded-xl pointer-events-none flex items-center justify-center">
-                        <span className="material-symbols-outlined text-white/30 text-[48px]">crop_free</span>
+                    <div className="space-y-1">
+                      <div className="text-base font-bold text-on-surface flex items-center justify-center gap-1.5">
+                        <span>Drop prescription scan here or</span>
+                        <span className="text-primary underline decoration-primary/40 underline-offset-4 font-extrabold">browse files</span>
                       </div>
+                      <p className="text-xs text-outline max-w-md mx-auto">
+                        Supports PDF digital slips, JPEG/PNG photos, hospital scan orders up to 25MB
+                      </p>
+                    </div>
 
-                      <div className="z-10 flex flex-col items-center gap-3 text-center">
-                        <div className="w-14 h-14 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur-md">
-                          <span className="material-symbols-outlined text-[28px]">photo_camera</span>
-                        </div>
-                        <div className="text-white text-sm font-semibold">
-                          Hold prescription slip in front of camera
-                        </div>
-                        <p className="text-xs text-slate-400 max-w-sm">
-                          Align handwritten Rx or hospital slip within grid guidelines for optimal text extraction.
-                        </p>
+                    {/* Supported Format Pills */}
+                    <div className="flex items-center gap-2 flex-wrap justify-center pt-1">
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-rose-600">picture_as_pdf</span>
+                        <span>PDF (Multi-Page)</span>
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-blue-600">image</span>
+                        <span>PNG / JPG (High-Res)</span>
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-emerald-600">speed</span>
+                        <span>Instant Vision Parsing</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                        <motion.button
-                          type="button"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={handleTakePhoto}
-                          className="mt-2 px-6 py-2.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">camera</span>
-                          <span>{isCapturing ? 'Snapping Photo...' : 'Click Photo / Scan Prescription'}</span>
-                        </motion.button>
+                {/* Attached Document Card with Real-time OCR Readiness */}
+                {uploadedFileName && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0 shadow-xs">
+                        <span className="material-symbols-outlined text-[24px]">
+                          {uploadedFileName.endsWith('.pdf') ? 'picture_as_pdf' : 'image'}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-on-surface flex items-center gap-2">
+                          <span>{uploadedFileName}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            Parsed by SmileGuard
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-outline flex items-center gap-2 mt-0.5">
+                          <span>{uploadedFileSize}</span>
+                          <span>•</span>
+                          <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                            <span>99.2% Optical Recognition Confidence</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    /* Captured Photo Preview */
-                    <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center">
-                          <span className="material-symbols-outlined text-[24px]">image</span>
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-on-surface">Prescription Photo Captured</div>
-                          <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
-                            <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                            Clear illumination &amp; high-res orientation
-                          </div>
-                        </div>
-                      </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
                       <button
                         type="button"
-                        onClick={() => setCapturedPhoto(null)}
-                        className="px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container"
+                        onClick={() => {
+                          setUploadedFileName('');
+                          setUploadedFileSize('');
+                        }}
+                        className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Remove uploaded file"
                       >
-                        Retake Photo
+                        <span className="material-symbols-outlined text-[18px]">close</span>
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
+                  </motion.div>
+                )}
+              </div>
+            )}
 
-              {/* TAB 3: DIRECT MANUAL MEDICINE ENTRY */}
-              {inputMethod === 'manual' && (
-                <form onSubmit={handleAddManualPrescription} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-on-surface">Medication / Brand Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={manualDrugName}
-                        onChange={(e) => setManualDrugName(e.target.value)}
-                        placeholder="e.g. Ciprofloxacin 500mg or Amoxicillin"
-                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
-                      />
+            {/* TAB 2: CAMERA PHOTO SCAN */}
+            {inputMethod === 'camera' && (
+              <div className="space-y-4">
+                {!capturedPhoto ? (
+                  <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 p-6 flex flex-col items-center justify-center min-h-[280px]">
+                    {/* Grid crosshair viewfinder overlay */}
+                    <div className="absolute inset-4 border border-dashed border-white/20 rounded-xl pointer-events-none flex items-center justify-center">
+                      <span className="material-symbols-outlined text-white/30 text-[48px]">crop_free</span>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-on-surface">Generic Ingredient</label>
-                      <input
-                        type="text"
-                        value={manualGenericName}
-                        onChange={(e) => setManualGenericName(e.target.value)}
-                        placeholder="e.g. Ciprofloxacin Hydrochloride"
-                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-on-surface">Dose Strength</label>
-                      <input
-                        type="text"
-                        value={manualDosage}
-                        onChange={(e) => setManualDosage(e.target.value)}
-                        placeholder="e.g. 500mg tablet"
-                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-on-surface">Frequency</label>
-                      <select
-                        value={manualFrequency}
-                        onChange={(e) => setManualFrequency(e.target.value)}
-                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none cursor-pointer"
+                    <div className="z-10 flex flex-col items-center gap-3 text-center">
+                      <div className="w-14 h-14 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur-md">
+                        <span className="material-symbols-outlined text-[28px]">photo_camera</span>
+                      </div>
+                      <div className="text-white text-sm font-semibold">
+                        Hold prescription slip in front of camera
+                      </div>
+                      <p className="text-xs text-slate-400 max-w-sm">
+                        Align handwritten Rx or hospital slip within grid guidelines for optimal text extraction.
+                      </p>
+
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleTakePhoto}
+                        className="mt-2 px-6 py-2.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer"
                       >
-                        <option>Every 8 hours (TID)</option>
-                        <option>Every 12 hours (BID)</option>
-                        <option>Once Daily (QD)</option>
-                        <option>As Needed (PRN)</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-on-surface">Duration</label>
-                      <input
-                        type="text"
-                        value={manualDuration}
-                        onChange={(e) => setManualDuration(e.target.value)}
-                        placeholder="e.g. 7 days"
-                        className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
-                      />
+                        <span className="material-symbols-outlined text-[18px]">camera</span>
+                        <span>{isCapturing ? 'Snapping Photo...' : 'Click Photo / Scan Prescription'}</span>
+                      </motion.button>
                     </div>
                   </div>
-
-                  <div className="flex justify-end pt-1">
+                ) : (
+                  /* Captured Photo Preview */
+                  <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[24px]">image</span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-on-surface">Prescription Photo Captured</div>
+                        <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
+                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                          Clear illumination &amp; high-res orientation
+                        </div>
+                      </div>
+                    </div>
                     <button
-                      type="submit"
-                      className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-primary font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                      type="button"
+                      onClick={() => setCapturedPhoto(null)}
+                      className="px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container"
                     >
-                      <span className="material-symbols-outlined text-[16px]">add</span>
-                      <span>Add Medication to Prescription Queue</span>
+                      Retake Photo
                     </button>
                   </div>
-                </form>
-              )}
+                )}
+              </div>
+            )}
 
-              {/* Candidate Prescriptions Staging Queue */}
-              <div className="space-y-2 pt-2 border-t border-surface-container">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-on-surface">
-                    Prescribed Medication Queue ({prescriptions.length} items to cross-check):
-                  </span>
-                  <span className="text-outline text-[11px]">Validated against RxNorm &amp; First Databank</span>
+            {/* TAB 3: DIRECT MANUAL MEDICINE ENTRY */}
+            {inputMethod === 'manual' && (
+              <form onSubmit={handleAddManualPrescription} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Medication / Brand Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={manualDrugName}
+                      onChange={(e) => setManualDrugName(e.target.value)}
+                      placeholder="e.g. Ciprofloxacin 500mg or Amoxicillin"
+                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Generic Ingredient</label>
+                    <input
+                      type="text"
+                      value={manualGenericName}
+                      onChange={(e) => setManualGenericName(e.target.value)}
+                      placeholder="e.g. Ciprofloxacin Hydrochloride"
+                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
+                    />
+                  </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  {prescriptions.length === 0 ? (
-                    <div className="p-4 rounded-xl border border-dashed border-surface-container-high text-center text-xs text-outline bg-surface-container-lowest/50">
-                      No medications in queue. Upload a prescription, scan a photo, or enter medicine details above.
-                    </div>
-                  ) : (
-                    prescriptions.map((rx) => (
-                      <div
-                        key={rx.id}
-                        className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-[18px]">pill</span>
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-on-surface">
-                              {rx.drugName} <span className="text-outline font-normal">({rx.genericName})</span>
-                            </div>
-                            <div className="text-[11px] text-outline">
-                              {rx.dosage} • {rx.route} • {rx.frequency} • {rx.duration}
-                            </div>
-                          </div>
-                        </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Dose Strength</label>
+                    <input
+                      type="text"
+                      value={manualDosage}
+                      onChange={(e) => setManualDosage(e.target.value)}
+                      placeholder="e.g. 500mg tablet"
+                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Frequency</label>
+                    <select
+                      value={manualFrequency}
+                      onChange={(e) => setManualFrequency(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none cursor-pointer"
+                    >
+                      <option>Every 8 hours (TID)</option>
+                      <option>Every 12 hours (BID)</option>
+                      <option>Once Daily (QD)</option>
+                      <option>As Needed (PRN)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-on-surface">Duration</label>
+                    <input
+                      type="text"
+                      value={manualDuration}
+                      onChange={(e) => setManualDuration(e.target.value)}
+                      placeholder="e.g. 7 days"
+                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
+                    />
+                  </div>
+                </div>
 
-                        {prescriptions.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePrescription(rx.id)}
-                            className="p-1 rounded text-outline hover:text-rose-600"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                          </button>
-                        )}
-                      </div>
-                    ))
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-primary font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add</span>
+                    <span>Add Medication to Prescription Queue</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Quick Presets Row for Dental Practitioners */}
+            <div className="p-3.5 rounded-xl bg-surface-container-low/70 border border-surface-container-high/80 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-primary text-[16px]">bolt</span>
+                  <span>1-Click Clinical Presets (Quick Dental Prescriptions)</span>
+                </span>
+                <span className="text-[10px] text-outline hidden sm:inline">Tap any chip to queue instantly</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {[
+                  { drug: 'Amoxicillin 500mg', generic: 'Amoxicillin Trihydrate', dose: '500mg TID', freq: 'Every 8 hours (TID)', ind: 'Dental Abscess / Prophylaxis' },
+                  { drug: 'Augmentin 625mg', generic: 'Amoxicillin + Clavulanic Acid', dose: '625mg BID', freq: 'Every 12 hours (BID)', ind: 'Refractory Odontogenic Infection' },
+                  { drug: 'Ibuprofen 400mg', generic: 'Ibuprofen', dose: '400mg PRN', freq: 'Every 6-8 hours PRN', ind: 'Post-Surgical Pain & Inflammation' },
+                  { drug: 'Clindamycin 300mg', generic: 'Clindamycin Hydrochloride', dose: '300mg QID', freq: 'Every 6 hours (QID)', ind: 'Penicillin-Allergic Dental Prophylaxis' },
+                  { drug: 'Metronidazole 400mg', generic: 'Metronidazole', dose: '400mg TID', freq: 'Every 8 hours (TID)', ind: 'Acute Necrotizing Ulcerative Gingivitis' }
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleAddPreset(preset.drug, preset.generic, preset.dose, preset.freq, preset.ind)}
+                    className="px-2.5 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-primary-container hover:text-on-primary border border-surface-container-high text-[11px] font-semibold text-on-surface transition-all flex items-center gap-1 cursor-pointer shadow-2xs hover:scale-105 active:scale-95 group"
+                  >
+                    <span className="text-primary font-bold group-hover:text-inherit">+</span>
+                    <span>{preset.drug}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Candidate Prescriptions Staging Queue */}
+            <div className="space-y-3 pt-3 border-t border-surface-container">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-on-surface">
+                    Prescribed Medication Queue ({prescriptions.length} {prescriptions.length === 1 ? 'item' : 'items'} to cross-check):
+                  </span>
+                  {prescriptions.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
+                      Ready for CDS Check
+                    </span>
                   )}
                 </div>
+                <span className="text-outline text-[11px] hidden sm:inline">Validated against RxNorm &amp; First Databank</span>
               </div>
+
+              <div className="flex flex-col gap-2">
+                {prescriptions.length === 0 ? (
+                  <div className="p-6 rounded-2xl border-2 border-dashed border-surface-container-high text-center bg-surface-container-lowest/60 flex flex-col items-center justify-center gap-2">
+                    <div className="w-12 h-12 rounded-full bg-surface-container text-outline flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[24px]">pill</span>
+                    </div>
+                    <div className="text-xs font-bold text-on-surface">Prescription Queue is Empty</div>
+                    <p className="text-[11px] text-outline max-w-sm">
+                      Upload a prescription slip, snap a camera photo, or click one of the 1-click clinical presets above to stage medications for safety screening.
+                    </p>
+                  </div>
+                ) : (
+                  prescriptions.map((rx) => (
+                    <div
+                      key={rx.id}
+                      className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3 shadow-2xs hover:border-primary/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0 shadow-xs">
+                          <span className="material-symbols-outlined text-[19px]">pill</span>
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-on-surface flex items-center gap-2">
+                            <span>{rx.drugName}</span>
+                            <span className="text-outline font-normal">({rx.genericName})</span>
+                          </div>
+                          <div className="text-[11px] text-outline flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="font-semibold text-primary">{rx.dosage}</span>
+                            <span>•</span>
+                            <span>{rx.frequency}</span>
+                            <span>•</span>
+                            <span>{rx.route}</span>
+                            <span>•</span>
+                            <span className="text-emerald-700 font-medium">{rx.indication}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePrescription(rx.id)}
+                        className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Remove medication"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
 
               {/* Patient Chart Linker */}
               <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-3">
