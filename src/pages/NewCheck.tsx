@@ -1,10 +1,123 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, INITIAL_PATIENTS, isMockPatient } from '../services/prescriptionService';
 import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import PrintableReportModal from '../components/PrintableReportModal';
+
+interface AllergyDetailInfo {
+  name: string;
+  category: string;
+  crossReactivities: string[];
+  severity: 'contraindicated' | 'major' | 'moderate';
+  clinicalNote: string;
+  screeningRule: string;
+}
+
+const ALLERGY_KNOWLEDGE_MAP: Record<string, Partial<AllergyDetailInfo>> = {
+  amoxicillin: {
+    category: 'Beta-Lactam Antibiotic',
+    crossReactivities: ['Penicillin V', 'Ampicillin', 'Augmentin (Amoxicillin/Clavulanate)', 'Cephalexin (1st gen Cephalosporins)'],
+    severity: 'contraindicated',
+    clinicalNote: 'Severe Type-1 hypersensitivity risk (anaphylaxis, urticaria, angioedema). Avoid all penicillins and use extreme caution with cephalosporins.',
+    screeningRule: 'RULE-AL-01: Beta-Lactam Cross-Sensitivity Matrix'
+  },
+  penicillin: {
+    category: 'Beta-Lactam Antibiotic',
+    crossReactivities: ['Amoxicillin', 'Ampicillin', 'Augmentin', 'Dicloxacillin', 'Piperacillin'],
+    severity: 'contraindicated',
+    clinicalNote: 'Immediate IgE-mediated anaphylaxis risk. Substitute with Clindamycin 300mg, Azithromycin 500mg, or Clarithromycin.',
+    screeningRule: 'RULE-AL-01: Penicillin Core Structure Allergy'
+  },
+  'nsaids / aspirin': {
+    category: 'Cyclooxygenase (COX-1/2) Inhibitor',
+    crossReactivities: ['Ibuprofen', 'Ketorolac', 'Naproxen', 'Diclofenac', 'Celecoxib', 'Aspirin'],
+    severity: 'contraindicated',
+    clinicalNote: 'Samter’s triad or cross-reactive bronchospasm / severe gastric bleeding risk. Use Acetaminophen (Paracetamol) or Tramadol for post-op dental analgesia.',
+    screeningRule: 'RULE-AL-03: NSAID/Aspirin Induced Respiratory/Cutaneous Disease'
+  },
+  nsaids: {
+    category: 'Non-Steroidal Anti-Inflammatory',
+    crossReactivities: ['Ibuprofen', 'Ketorolac', 'Naproxen', 'Aspirin'],
+    severity: 'contraindicated',
+    clinicalNote: 'Cross-reactive bronchospasm risk. Prescribe Acetaminophen for dental pain management.',
+    screeningRule: 'RULE-AL-03: NSAID Sensitivity Screening'
+  },
+  aspirin: {
+    category: 'Salicylate / NSAID',
+    crossReactivities: ['Ibuprofen', 'Naproxen', 'Ketorolac', 'Diflunisal'],
+    severity: 'contraindicated',
+    clinicalNote: 'Avoid all non-steroidal analgesics. Use Acetaminophen 500-1000mg PO.',
+    screeningRule: 'RULE-AL-03: Salicylate Sensitivity'
+  },
+  'lidocaine (local anesthetic)': {
+    category: 'Amide-type Local Anesthetic',
+    crossReactivities: ['Mepivacaine', 'Articaine (minimal)', 'Bupivacaine', 'Prilocaine'],
+    severity: 'contraindicated',
+    clinicalNote: 'Verify true amide vs methylparaben preservative allergy. Consider preservative-free formulations, Mepivacaine, or skin testing prior to dental nerve block.',
+    screeningRule: 'RULE-AL-04: Local Anesthetic Amide Screening'
+  },
+  lidocaine: {
+    category: 'Amide Local Anesthetic',
+    crossReactivities: ['Mepivacaine', 'Articaine', 'Bupivacaine'],
+    severity: 'contraindicated',
+    clinicalNote: 'Confirm true allergy vs vasovagal reaction or epinephrine tachycardia. Consider skin prick testing.',
+    screeningRule: 'RULE-AL-04: Amide Anesthetic Screening'
+  },
+  'sulfa drugs': {
+    category: 'Sulfonamide Antibacterial',
+    crossReactivities: ['Sulfamethoxazole', 'Trimethoprim/Sulfamethoxazole (Bactrim)', 'Sulfadiazine'],
+    severity: 'contraindicated',
+    clinicalNote: 'Risk of Stevens-Johnson syndrome (SJS) or severe cutaneous drug reactions. Avoid sulfamethoxazole combinations.',
+    screeningRule: 'RULE-AL-05: Sulfonamide Hypersensitivity'
+  },
+  sulfa: {
+    category: 'Sulfonamide Antibacterial',
+    crossReactivities: ['Bactrim', 'Sulfamethoxazole', 'Sulfasalazine'],
+    severity: 'contraindicated',
+    clinicalNote: 'Severe hypersensitivity risk. Avoid sulfonamide antimicrobials.',
+    screeningRule: 'RULE-AL-05: Sulfonamide Hypersensitivity'
+  },
+  latex: {
+    category: 'Natural Rubber Latex Contact Allergen',
+    crossReactivities: ['Latex dental dams', 'Latex gloves', 'Rubber stopper vials', 'Prophy cups'],
+    severity: 'major',
+    clinicalNote: 'Ensure 100% latex-free dental operatory: nitrile gloves, silicone dams, non-latex emergency kits.',
+    screeningRule: 'RULE-AL-06: Operatory Contact Allergen Safety Protocol'
+  },
+  codeine: {
+    category: 'Opioid Analgesic (Phenanthrene)',
+    crossReactivities: ['Morphine', 'Oxycodone', 'Hydrocodone'],
+    severity: 'contraindicated',
+    clinicalNote: 'Histamine release vs true opioid allergy. Consider Tramadol or non-opioid multimodal analgesia.',
+    screeningRule: 'RULE-AL-07: Opioid Class Cross-Sensitivity'
+  }
+};
+
+const getAllergyDetails = (allergenName: string): AllergyDetailInfo => {
+  const key = allergenName.toLowerCase().trim();
+  const matched = Object.entries(ALLERGY_KNOWLEDGE_MAP).find(([k]) => key.includes(k) || k.includes(key));
+  if (matched) {
+    const info = matched[1];
+    return {
+      name: allergenName,
+      category: info.category || 'Documented Clinical Allergen',
+      crossReactivities: info.crossReactivities || ['Related pharmacological class agents'],
+      severity: info.severity || 'contraindicated',
+      clinicalNote: info.clinicalNote || 'Active clinical warning flag. Verify prescription against patient hypersensitivity records.',
+      screeningRule: info.screeningRule || 'RULE-AL-GEN: Clinical CDS Hypersensitivity Audit'
+    };
+  }
+  return {
+    name: allergenName,
+    category: 'Documented Hypersensitivity',
+    crossReactivities: ['Substances with similar chemical structure or preservatives'],
+    severity: 'contraindicated',
+    clinicalNote: 'Flagged by attending clinician. Any matching drugs or excipients will trigger an automatic red-flag contraindication alert.',
+    screeningRule: 'RULE-AL-GEN: Patient Hypersensitivity Reconciler'
+  };
+};
 
 export default function NewCheck() {
   const navigate = useNavigate();
@@ -55,7 +168,7 @@ export default function NewCheck() {
     : parseFloat(storedUser?.weight) || 65;
   const userHasAllergies = Boolean(storedUser?.hasAllergies);
   const userAllergies = userHasAllergies && storedUser?.allergiesDescription
-    ? [storedUser.allergiesDescription]
+    ? storedUser.allergiesDescription.split(/,\s*/).map((s: string) => s.trim()).filter(Boolean)
     : userHasAllergies
     ? ['Documented Allergy']
     : [];
@@ -106,9 +219,22 @@ export default function NewCheck() {
     ? `${selectedPatient.weightKg} kg`
     : (userWeightRaw.toString().includes('kg') ? userWeightRaw : `${userWeightRaw} kg`);
 
-  const allergyList = allergies.length > 0 ? allergies : userAllergies;
-  const allergySummary = allergyList.length > 0 ? allergyList.join(', ') : 'None documented (NKDA)';
-  const hasDocumentedAllergies = allergyList.length > 0;
+  const parsedAllergies: string[] = useMemo(() => {
+    const raw = (allergies.length > 0 ? allergies : userAllergies) || [];
+    return Array.from<string>(
+      new Set<string>(
+        raw
+          .flatMap((item: string) => item.split(/,\s*/))
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+      )
+    );
+  }, [allergies, userAllergies]);
+  const hasDocumentedAllergies = parsedAllergies.length > 0;
+  const allergySummary = hasDocumentedAllergies ? parsedAllergies.join(', ') : 'None documented (NKDA)';
+
+  // Modal State for inspecting individual allergy safety details
+  const [inspectingAllergy, setInspectingAllergy] = useState<string | null>(null);
 
   // Prescriptions List (Clean empty initial phase)
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([]);
@@ -250,7 +376,7 @@ export default function NewCheck() {
         weightKg: customWeight,
         egfr: customEgfr,
         activeMedications: activeMeds,
-        allergies: allergies
+        allergies: parsedAllergies
       };
 
       const evaluatedAlerts = VirtualDb.evaluateScreening(updatedPatient, prescriptions);
@@ -471,46 +597,99 @@ export default function NewCheck() {
       </div>
 
       {/* Patient Demographic & Clinical Context Strip */}
-      <div className="w-full bg-surface-container-low rounded-xl border border-surface-container px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-primary font-bold text-xs shrink-0">
-            PT
-          </div>
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span className="font-bold text-on-surface">{ptKey}</span>
-            <span className="text-outline">•</span>
-            <span className="text-on-surface font-semibold">
-              {patientDisplayName}
-            </span>
-            <span className="text-outline">•</span>
-            <span className="text-on-surface-variant">
-              ({patientAge ? `${patientAge}y` : 'Age N/A'} {patientGender || ''})
-            </span>
-            <span className="text-outline">•</span>
-            <span className="text-on-surface-variant">
-              Ht: <strong className="text-on-surface">{patientHeight}</strong>
-            </span>
-            <span className="text-outline">•</span>
-            <span className="text-on-surface-variant">
-              Wt: <strong className="text-on-surface">{patientWeightFormatted}</strong>
-            </span>
-            <span className="text-outline">•</span>
-            <span className="inline-flex items-center gap-1 text-on-surface">
-              <span className={`w-2 h-2 rounded-full ${customEgfr < 50 ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
-              eGFR: <strong className={customEgfr < 50 ? 'text-rose-600' : 'text-slate-900'}>{customEgfr} mL/min</strong>
-            </span>
-            <span className="text-outline">•</span>
-            <span className={`inline-flex items-center gap-1 font-bold ${hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'text-rose-600' : 'text-on-surface-variant'}`}>
-              <span className="material-symbols-outlined text-[14px]">
-                {hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'emergency' : 'verified'}
+      <div className="w-full bg-surface-container-lowest rounded-2xl border border-surface-container-high/70 shadow-2xs overflow-hidden">
+        {/* Tier 1: Patient Header, Vitals, and Attending Prescriber */}
+        <div className="p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-surface-container-high/50">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            {/* Patient Avatar Badge */}
+            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs ring-1 ring-primary/20 shrink-0 shadow-2xs mt-0.5 sm:mt-0">
+              PT
+            </div>
+
+            {/* Demographics & Clinical Metrics */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 text-xs">
+              <span className="font-mono font-bold text-primary tracking-tight text-xs sm:text-sm">
+                {ptKey}
               </span>
-              Allergy: {allergySummary}
+              <span className="text-outline/60">•</span>
+              <span className="font-extrabold text-on-surface text-xs sm:text-sm">
+                {patientDisplayName}
+              </span>
+              <span className="text-outline/60">•</span>
+              <span className="text-on-surface-variant font-medium">
+                ({patientAge ? `${patientAge}y` : 'Age N/A'} {patientGender || ''})
+              </span>
+              <span className="text-outline/60">•</span>
+              <span className="text-on-surface-variant">
+                Ht: <strong className="text-on-surface font-semibold">{patientHeight}</strong>
+              </span>
+              <span className="text-outline/60">•</span>
+              <span className="text-on-surface-variant">
+                Wt: <strong className="text-on-surface font-semibold">{patientWeightFormatted}</strong>
+              </span>
+              <span className="text-outline/60">•</span>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-container-low border border-surface-container-high">
+                <span className={`w-2 h-2 rounded-full ${customEgfr < 50 ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
+                <span className="text-[11px] font-semibold text-on-surface">
+                  eGFR: <strong className={customEgfr < 50 ? 'text-rose-600' : 'text-emerald-700'}>{customEgfr} mL/min</strong>
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* Attending Prescriber */}
+          <div className="flex items-center gap-1.5 text-xs text-on-surface-variant shrink-0 bg-surface-container-low/70 px-3 py-1.5 rounded-xl border border-surface-container-high/60 w-fit self-start md:self-auto">
+            <span className="material-symbols-outlined text-[16px] text-primary">stethoscope</span>
+            <span>
+              Prescriber: <strong className="text-on-surface font-semibold">{prescriberDisplayName}</strong> ({prescriberRoleDisplay})
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-on-surface-variant shrink-0">
-          <span className="material-symbols-outlined text-[16px] text-primary">stethoscope</span>
-          <span>Prescriber: <strong className="text-on-surface">{prescriberDisplayName}</strong> ({prescriberRoleDisplay})</span>
+
+        {/* Tier 2: Documented Allergies Single-Line Row with Separate Pill Buttons */}
+        <div className="px-3.5 py-2.5 sm:px-4 bg-surface-container-low/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={`material-symbols-outlined text-[16px] ${hasDocumentedAllergies ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {hasDocumentedAllergies ? 'emergency' : 'verified_user'}
+            </span>
+            <span className={`font-bold uppercase tracking-wider text-[11px] ${hasDocumentedAllergies ? 'text-rose-800' : 'text-emerald-800'}`}>
+              Documented Allergies {hasDocumentedAllergies && `(${parsedAllergies.length})`}:
+            </span>
+          </div>
+
+          {/* Single-line scrollable pills on desktop & mobile */}
+          <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5">
+            {hasDocumentedAllergies ? (
+              <div className="flex items-center gap-1.5 flex-nowrap sm:flex-wrap">
+                {parsedAllergies.map((allergy) => (
+                  <motion.button
+                    key={allergy}
+                    type="button"
+                    whileHover={{ scale: 1.03, y: -1 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => setInspectingAllergy(allergy)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200/90 shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0 group"
+                    title={`Click to check ${allergy} cross-reactivity and safety rules`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 group-hover:scale-125 transition-transform"></span>
+                    <span>{allergy}</span>
+                    <span className="material-symbols-outlined text-[14px] text-rose-500/70 group-hover:text-rose-700 transition-colors">info</span>
+                  </motion.button>
+                ))}
+              </div>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>No known drug allergies on file (NKDA)</span>
+              </span>
+            )}
+          </div>
+
+          {hasDocumentedAllergies && (
+            <span className="text-[10px] text-outline font-medium shrink-0 hidden lg:inline-block">
+              Click any allergy button to check cross-reactivity
+            </span>
+          )}
         </div>
       </div>
 
@@ -918,14 +1097,38 @@ export default function NewCheck() {
                 </div>
 
                 <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high flex items-start gap-2.5">
-                  <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'emergency' : 'verified'}
+                  <span className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${hasDocumentedAllergies ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    {hasDocumentedAllergies ? 'emergency' : 'verified'}
                   </span>
-                  <div>
-                    <div className="font-bold text-on-surface">Documented Allergies</div>
-                    <div className={`text-[11px] font-semibold mt-0.5 ${hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'text-rose-700' : 'text-emerald-700'}`}>
-                      {allergySummary}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-on-surface text-xs flex items-center justify-between">
+                      <span>Documented Allergies</span>
+                      {hasDocumentedAllergies && (
+                        <span className="px-1.5 py-0.2 rounded-md bg-rose-100 text-rose-800 text-[10px] font-bold">
+                          {parsedAllergies.length}
+                        </span>
+                      )}
                     </div>
+                    {hasDocumentedAllergies ? (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {parsedAllergies.map((allergy) => (
+                          <button
+                            key={allergy}
+                            type="button"
+                            onClick={() => setInspectingAllergy(allergy)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                            title={`Click to check ${allergy}`}
+                          >
+                            <span className="w-1 h-1 rounded-full bg-rose-500"></span>
+                            <span>{allergy}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] font-semibold mt-0.5 text-emerald-700">
+                        None documented (NKDA)
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1364,11 +1567,26 @@ export default function NewCheck() {
                       {activeMeds.length > 0 ? activeMeds.join(', ') : 'None documented'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-outline">Verified Allergies:</span>
-                    <span className={`font-bold ${hasDocumentedAllergies && allergySummary !== 'None documented (NKDA)' ? 'text-rose-600' : 'text-emerald-700'}`}>
-                      {allergySummary}
-                    </span>
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-outline shrink-0">Verified Allergies:</span>
+                    <div className="text-right flex flex-wrap justify-end gap-1">
+                      {hasDocumentedAllergies ? (
+                        parsedAllergies.map((allergy) => (
+                          <button
+                            key={allergy}
+                            type="button"
+                            onClick={() => setInspectingAllergy(allergy)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold cursor-pointer transition-colors"
+                            title={`Click to check ${allergy}`}
+                          >
+                            <span className="w-1 h-1 rounded-full bg-rose-500"></span>
+                            <span>{allergy}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <span className="font-bold text-emerald-700 text-xs">None documented (NKDA)</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-outline">Attending Prescriber:</span>
@@ -1380,6 +1598,113 @@ export default function NewCheck() {
           </div>
         </motion.div>
       )}
+
+      {/* Allergy Safety Inspection Dialog */}
+      <AnimatePresence>
+        {inspectingAllergy && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setInspectingAllergy(null)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 26 }}
+              className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-5 sm:p-6 z-10 space-y-5"
+            >
+              {(() => {
+                const details = getAllergyDetails(inspectingAllergy);
+                return (
+                  <>
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3 pb-3 border-b border-surface-container">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                          <span className="material-symbols-outlined text-[24px]">emergency</span>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-bold text-base text-on-surface">{details.name}</h3>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 uppercase tracking-wider">
+                              {details.severity}
+                            </span>
+                          </div>
+                          <p className="text-xs text-outline mt-0.5">{details.category}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setInspectingAllergy(null)}
+                        className="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container transition-colors cursor-pointer"
+                        title="Close"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">close</span>
+                      </button>
+                    </div>
+
+                    {/* CDS Rule Status */}
+                    <div className="p-3 bg-surface-container-low rounded-xl border border-surface-container flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-2 text-on-surface min-w-0">
+                        <span className="material-symbols-outlined text-primary text-[18px] shrink-0">verified</span>
+                        <span className="font-semibold truncate">{details.screeningRule}</span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Active in Engine
+                      </span>
+                    </div>
+
+                    {/* Cross-Reactivity Drug Classes */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-on-surface uppercase tracking-wider">
+                        Known Cross-Reactive Dental Drugs &amp; Classes
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {details.crossReactivities.map((drug) => (
+                          <span
+                            key={drug}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200"
+                          >
+                            <span className="material-symbols-outlined text-[14px] text-rose-600">block</span>
+                            <span>{drug}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Clinical Note */}
+                    <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1">
+                      <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-amber-700">clinical_notes</span>
+                        <span>Clinical Safety Guidance</span>
+                      </div>
+                      <p className="text-xs text-amber-900/90 leading-relaxed">
+                        {details.clinicalNote}
+                      </p>
+                    </div>
+
+                    {/* Action */}
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setInspectingAllergy(null)}
+                        className="py-2.5 px-5 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold text-xs transition-colors cursor-pointer"
+                      >
+                        Acknowledge &amp; Dismiss
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Alert Detail Drawer for Overrides & Safer Substitutions */}
       <AlertDetailDrawer
