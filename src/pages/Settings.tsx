@@ -247,6 +247,17 @@ export default function Settings() {
     fetchRemoteSessions();
   }, [profile.email]);
 
+  // Live listener for real-time session & login history updates across app
+  useEffect(() => {
+    const handleHistoryUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setLoginHistory(e.detail);
+      }
+    };
+    window.addEventListener('smileclinic_session_history_updated', handleHistoryUpdate);
+    return () => window.removeEventListener('smileclinic_session_history_updated', handleHistoryUpdate);
+  }, []);
+
   // Detect whether current session is authenticated via Google OAuth
   const isGoogleUser = useMemo(() => {
     try {
@@ -477,6 +488,12 @@ export default function Settings() {
           setShowOtpModal(false);
           setIsOtpSuccess(false);
           setTwoFactorConfigured(true);
+          const ev = recordLoginEvent(
+            '2FA Verified',
+            `Credential security: Two-Factor Authentication (2FA) verified & configured (${profile.email})`,
+            profile.email
+          );
+          setLoginHistory((prev) => [ev, ...prev.filter(p => p.id !== ev.id)]);
           showToast('Two-Factor Authentication reconfigured and verified successfully.');
         }, 1200);
       }
@@ -515,10 +532,10 @@ export default function Settings() {
       setCurrentPasswordInput('');
       const ev = recordLoginEvent(
         'Success',
-        `Clinical password updated in database (${profile.email})`,
+        `Credential security: Clinical password updated in database (${profile.email})`,
         profile.email
       );
-      setLoginHistory((prev) => [ev, ...prev]);
+      setLoginHistory((prev) => [ev, ...prev.filter(p => p.id !== ev.id)]);
       showToast('Clinical password updated successfully in the database.');
     } catch (err: any) {
       showToast(err.message || 'Failed to update password.');

@@ -147,9 +147,11 @@ export default function Login() {
       const errMsg = apiErr.message || 'Invalid credentials. No registered clinician account matches these credentials.';
       setErrorMessage(errMsg);
 
-      // If account is locked due to 3 failed attempts, record audit event and pop open Reset Password modal
+      // Record every failed / blocked credential entry in audit history
+      recordLoginEvent('Blocked', `Failed authentication attempt: ${errMsg}`, inputEmail);
+
+      // If account is locked due to 3 failed attempts, pop open Reset Password modal
       if (errMsg.toLowerCase().includes('account locked') || errMsg.toLowerCase().includes('3 failed login attempts')) {
-        recordLoginEvent('Blocked', errMsg, inputEmail);
         setTimeout(() => {
           setShowForgotPasswordModal(true);
         }, 1100);

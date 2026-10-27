@@ -255,6 +255,7 @@ export default function Signup() {
           res.user.phone = sessionStorage.getItem('rxguard_prescriber_phone') || localStorage.getItem('rxguard_prescriber_phone') || (selectedCountry.dial + ' ' + phone.trim());
         }
         authApi.saveSession(res.token, res.user);
+        recordLoginEvent('Success', `Account created & authorized session established (${res.user.fullName})`, res.user.email);
       }
       setOtpStatus('success');
       setTimeout(() => {

@@ -256,25 +256,63 @@ export function saveActiveSessions(sessions: ActiveSessionItem[], email?: string
 }
 
 /**
+ * Helper to resolve clinician display name
+ */
+export function resolveClinicianName(email?: string): string {
+  if (typeof window !== 'undefined') {
+    const name = sessionStorage.getItem('rxguard_prescriber_name') || localStorage.getItem('rxguard_prescriber_name');
+    if (name) return name;
+    try {
+      const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
+      if (u && u.fullName) return u.fullName;
+    } catch {}
+  }
+  return email && email.includes('@') ? email.split('@')[0] : 'Authorized Clinician';
+}
+
+/**
  * Retrieve login and security audit history scoped to the specific clinician email
  */
-export function getLoginHistory(email?: string, _clinicianName?: string): LoginHistoryItem[] {
+export function getLoginHistory(email?: string, clinicianName?: string): LoginHistoryItem[] {
   if (typeof window === 'undefined') return [];
   const { history: key } = getStorageKeys(email);
+  const currentDevId = getDeviceId();
+  const env = detectClientEnvironment();
 
   try {
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed: LoginHistoryItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.filter(
+        const cleaned = parsed.filter(
           (p) => !p.details?.startsWith('Interactive clinical session initiated by')
         );
+        if (cleaned.length > 0) return cleaned;
       }
     }
   } catch {}
 
-  return [];
+  // If no history exists yet, guarantee the active workstation session login event
+  const name = clinicianName || resolveClinicianName(email);
+  const initialSessionEvent: LoginHistoryItem = {
+    id: `AUTH-${Math.floor(1000 + Math.random() * 9000)}`,
+    timestamp: `Today at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`,
+    device: env.device,
+    browserOs: env.browserOs,
+    ip: env.ip,
+    location: env.location,
+    status: 'Success',
+    details: `Authorized session established (${name})`,
+    deviceId: currentDevId,
+    isCurrent: true
+  };
+
+  const initialList = [initialSessionEvent];
+  try {
+    localStorage.setItem(key, JSON.stringify(initialList));
+  } catch {}
+
+  return initialList;
 }
 
 /**
@@ -324,6 +362,9 @@ export function recordLoginEvent(
       }
       const updated = [newItem, ...existing.filter((item) => item.id !== newItem.id)].slice(0, 50);
       localStorage.setItem(key, JSON.stringify(updated));
+
+      // Dispatch event for real-time reactivity in UI components
+      window.dispatchEvent(new CustomEvent('smileclinic_session_history_updated', { detail: updated }));
     } catch {}
 
     // Asynchronously record session in backend PostgreSQL database
