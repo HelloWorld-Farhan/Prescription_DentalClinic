@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authApi } from '../services/authApi';
 import {
@@ -1608,16 +1609,28 @@ export default function Settings() {
       {/* ========================================================================= */}
       {/* MODAL 1: EDIT CLINICAL PROFILE MODAL */}
       {/* ========================================================================= */}
-      <AnimatePresence>
-        {showEditProfileModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="w-full max-w-xl bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
-            >
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showEditProfileModal && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+              {/* Full-Screen Animated Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                onClick={() => setShowEditProfileModal(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+                animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+                transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative z-10 w-full max-w-xl bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
+              >
               {/* Modal Header */}
               <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
                 <div className="flex items-center gap-2.5">
@@ -1831,26 +1844,40 @@ export default function Settings() {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL 2: 6-DIGIT SQUARE OTP MODAL WITH TICK & SHAKE ANIMATIONS */}
       {/* ========================================================================= */}
-      <AnimatePresence>
-        {showOtpModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={
-                isOtpError
-                  ? { x: [-12, 12, -8, 8, -4, 4, 0], scale: 1, opacity: 1, y: 0 }
-                  : { opacity: 1, scale: 1, y: 0 }
-              }
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showOtpModal && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+              {/* Full-Screen Animated Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                onClick={() => setShowOtpModal(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+                animate={
+                  isOtpError
+                    ? { x: [-12, 12, -8, 8, -4, 4, 0], scale: 1, opacity: 1, y: 0, filter: 'blur(0px)' }
+                    : { opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }
+                }
+                exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+                transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
               className={`w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border flex flex-col max-h-[90vh] overflow-hidden transition-colors ${
                 isOtpSuccess
                   ? 'border-emerald-500 shadow-emerald-500/10'
@@ -2049,136 +2076,166 @@ export default function Settings() {
                   </button>
                 </div>
               )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL 3: TERMINATE ALL REMOTE SESSIONS CONFIRMATION */}
       {/* ========================================================================= */}
-      <AnimatePresence>
-        {showTerminateAllModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
-            >
-              {/* Modal Top Header */}
-              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[18px]">logout</span>
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showTerminateAllModal && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+              {/* Full-Screen Animated Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                onClick={() => setShowTerminateAllModal(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+                animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+                transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative z-10 w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
+              >
+                {/* Modal Top Header */}
+                <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">logout</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-on-surface">Terminate All Remote Sessions?</h3>
+                      <p className="text-[11px] text-on-surface-variant">Immediate global credential invalidation</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-on-surface">Terminate All Remote Sessions?</h3>
-                    <p className="text-[11px] text-on-surface-variant">Immediate global credential invalidation</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTerminateAllModal(false)}
+                    className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                    title="Close"
+                    aria-label="Close"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowTerminateAllModal(false)}
-                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
-                  title="Close"
-                  aria-label="Close"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
 
-              {/* Modal Body */}
-              <div className="py-4 overflow-y-auto flex-1 text-xs text-on-surface-variant leading-relaxed">
-                This will immediately revoke active JWT bearer authorization for all other connected nodes (including Ward Tablet Cart #12 and Consultation Room 2). Only your current workstation will remain authenticated.
-              </div>
+                {/* Modal Body */}
+                <div className="py-4 overflow-y-auto flex-1 text-xs text-on-surface-variant leading-relaxed">
+                  This will immediately revoke active JWT bearer authorization for all other connected nodes (including Ward Tablet Cart #12 and Consultation Room 2). Only your current workstation will remain authenticated.
+                </div>
 
-              {/* Modal Bottom Actions */}
-              <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowTerminateAllModal(false)}
-                  className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmTerminateAllRemote}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[16px]">logout</span>
-                  <span>Terminate All Remote</span>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                {/* Modal Bottom Actions */}
+                <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowTerminateAllModal(false)}
+                    className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmTerminateAllRemote}
+                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">logout</span>
+                    <span>Terminate All Remote</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL 4: SINGLE SESSION REVOCATION CONFIRMATION */}
       {/* ========================================================================= */}
-      <AnimatePresence>
-        {sessionToRevoke && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
-            >
-              {/* Modal Top Header */}
-              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[18px]">phonelink_erase</span>
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {sessionToRevoke && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+              {/* Full-Screen Animated Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                onClick={() => setSessionToRevoke(null)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+                animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+                transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative z-10 w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 sm:p-6 shadow-2xl border border-surface-container-high flex flex-col max-h-[90vh] overflow-hidden"
+              >
+                {/* Modal Top Header */}
+                <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">phonelink_erase</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-on-surface">Revoke Session {sessionToRevoke.id}?</h3>
+                      <p className="text-[11px] text-on-surface-variant">{sessionToRevoke.name}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-on-surface">Revoke Session {sessionToRevoke.id}?</h3>
-                    <p className="text-[11px] text-on-surface-variant">{sessionToRevoke.name}</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSessionToRevoke(null)}
+                    className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                    title="Close"
+                    aria-label="Close"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSessionToRevoke(null)}
-                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
-                  title="Close"
-                  aria-label="Close"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
 
-              {/* Modal Body */}
-              <div className="py-4 overflow-y-auto flex-1 text-xs text-on-surface-variant leading-relaxed">
-                Are you sure you want to revoke authorized access for <strong>{sessionToRevoke.name}</strong> ({sessionToRevoke.details})? The remote terminal will be forced to log out immediately.
-              </div>
+                {/* Modal Body */}
+                <div className="py-4 overflow-y-auto flex-1 text-xs text-on-surface-variant leading-relaxed">
+                  Are you sure you want to revoke authorized access for <strong>{sessionToRevoke.name}</strong> ({sessionToRevoke.details})? The remote terminal will be forced to log out immediately.
+                </div>
 
-              {/* Modal Bottom Actions */}
-              <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setSessionToRevoke(null)}
-                  className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmRevokeSingle}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[16px]">phonelink_erase</span>
-                  <span>Confirm Revoke</span>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                {/* Modal Bottom Actions */}
+                <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSessionToRevoke(null)}
+                    className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmRevokeSingle}
+                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">phonelink_erase</span>
+                    <span>Confirm Revoke</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

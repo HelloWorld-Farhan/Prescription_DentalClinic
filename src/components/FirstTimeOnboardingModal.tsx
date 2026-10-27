@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authApi, UserProfile } from '../services/authApi';
 
@@ -225,11 +226,13 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
     ? 'Please configure your clinical vitals and allergy safety parameters before proceeding.'
     : `Welcome ${displayName}! Please complete your clinical vitals and allergy safety parameters before proceeding.`;
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div 
-          className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center p-0 sm:p-4 md:p-6 overflow-hidden overscroll-contain h-[100dvh]"
+          className="fixed inset-0 z-[100] flex flex-col sm:items-center sm:justify-center p-0 sm:p-4 md:p-6 overflow-hidden overscroll-contain h-[100dvh]"
           style={{ overscrollBehavior: 'contain' }}
         >
           {/* Subtle Backdrop - Closes off background interaction */}
@@ -238,7 +241,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm"
           />
 
           {/* Unified Minimal Modal Container Matching App UI */}
@@ -617,6 +620,7 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

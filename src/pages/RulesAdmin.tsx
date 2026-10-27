@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, AlertSeverity } from '../types';
@@ -630,124 +631,150 @@ export default function RulesAdmin() {
       )}
 
       {/* Inspect Rule AST Modal */}
-      <AnimatePresence>
-        {inspectRule && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
-              animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
-              transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-              className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-            >
-              {/* Modal Top Header */}
-              <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[18px]">account_tree</span>
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {inspectRule && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+              {/* Animated Full-Screen Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                onClick={() => setInspectRule(null)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+                animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+                transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative z-10 bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+              >
+                {/* Modal Top Header */}
+                <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">account_tree</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-on-surface">Compiled Rule AST Inspector</h3>
+                      <p className="text-[11px] text-on-surface-variant font-mono font-bold text-primary">
+                        {inspectRule.id}
+                      </p>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setInspectRule(null)}
+                    className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+                    title="Close"
+                    aria-label="Close"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="py-4 overflow-y-auto flex-1 space-y-3.5 text-xs pr-1">
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-on-surface">Compiled Rule AST Inspector</h3>
-                    <p className="text-[11px] text-on-surface-variant font-mono font-bold text-primary">
-                      {inspectRule.id}
+                    <span className="text-outline font-semibold block mb-1">Target Interactions:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">
+                        {inspectRule.drugA}
+                      </span>
+                      <span className="material-symbols-outlined text-outline text-[14px]">sync_alt</span>
+                      <span className="font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">
+                        {inspectRule.drugB}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-outline font-semibold block mb-1">Deterministic AST Pattern:</span>
+                    <div className="bg-slate-950 text-emerald-400 font-mono text-[11px] p-3 rounded-xl border border-slate-800 leading-relaxed overflow-x-auto">
+                      {`IF candidate_prescription.matches("${inspectRule.drugA}")\n` +
+                        `AND patient.active_medications.contains("${inspectRule.drugB}")\n` +
+                        `THEN TRIGGER_CDS_ALERT(\n` +
+                        `    severity = "${inspectRule.severity.toUpperCase()}",\n` +
+                        `    category = "${inspectRule.category}",\n` +
+                        `    mechanism = "Pharmacokinetic enzyme pathway interference",\n` +
+                        `    evidence_grade = "Level 1 - FDB Core",\n` +
+                        `    action_required = TRUE\n` +
+                        `);`}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-outline font-semibold block mb-1">Clinical Impact & Description:</span>
+                    <p className="text-on-surface-variant bg-surface-container-low p-3 rounded-xl border border-surface-container leading-relaxed">
+                      {inspectRule.description}
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setInspectRule(null)}
-                  className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
-                  title="Close"
-                  aria-label="Close"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
 
-              {/* Modal Body */}
-              <div className="py-4 overflow-y-auto flex-1 space-y-3.5 text-xs pr-1">
-                <div>
-                  <span className="text-outline font-semibold block mb-1">Target Interactions:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">
-                      {inspectRule.drugA}
+                {/* Modal Bottom Actions */}
+                <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setInspectRule(null)}
+                    className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                  >
+                    Close Inspector
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleToggle(inspectRule.id);
+                      setInspectRule({ ...inspectRule, active: !inspectRule.active });
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      inspectRule.active
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
+                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      {inspectRule.active ? 'check_circle' : 'pause_circle'}
                     </span>
-                    <span className="material-symbols-outlined text-outline text-[14px]">sync_alt</span>
-                    <span className="font-mono bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">
-                      {inspectRule.drugB}
-                    </span>
-                  </div>
+                    <span>{inspectRule.active ? 'Active & Enforced' : 'Disabled / Staged'}</span>
+                  </button>
                 </div>
-
-                <div>
-                  <span className="text-outline font-semibold block mb-1">Deterministic AST Pattern:</span>
-                  <div className="bg-slate-950 text-emerald-400 font-mono text-[11px] p-3 rounded-xl border border-slate-800 leading-relaxed overflow-x-auto">
-                    {`IF candidate_prescription.matches("${inspectRule.drugA}")\n` +
-                      `AND patient.active_medications.contains("${inspectRule.drugB}")\n` +
-                      `THEN TRIGGER_CDS_ALERT(\n` +
-                      `    severity = "${inspectRule.severity.toUpperCase()}",\n` +
-                      `    category = "${inspectRule.category}",\n` +
-                      `    mechanism = "Pharmacokinetic enzyme pathway interference",\n` +
-                      `    evidence_grade = "Level 1 - FDB Core",\n` +
-                      `    action_required = TRUE\n` +
-                      `);`}
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-outline font-semibold block mb-1">Clinical Impact & Description:</span>
-                  <p className="text-on-surface-variant bg-surface-container-low p-3 rounded-xl border border-surface-container leading-relaxed">
-                    {inspectRule.description}
-                  </p>
-                </div>
-              </div>
-
-              {/* Modal Bottom Actions */}
-              <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setInspectRule(null)}
-                  className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
-                >
-                  Close Inspector
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleToggle(inspectRule.id);
-                    setInspectRule({ ...inspectRule, active: !inspectRule.active });
-                  }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    inspectRule.active
-                      ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
-                      : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    {inspectRule.active ? 'check_circle' : 'pause_circle'}
-                  </span>
-                  <span>{inspectRule.active ? 'Active & Enforced' : 'Disabled / Staged'}</span>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
 
 
       {/* Add Rule Multi-Step Modal */}
-      <AnimatePresence>
-        {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
-              animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
-              transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-              className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-2xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-            >
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isAddModalOpen && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+              {/* Animated Full-Screen Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                onClick={() => setIsAddModalOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+                animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+                transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative z-10 bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-2xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+              >
               {/* Modal Top Header */}
               <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
                 <div className="flex items-center gap-2.5">
@@ -1152,9 +1179,11 @@ export default function RulesAdmin() {
                 )}
               </div>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Sync Knowledge Modal */}
       <SyncKnowledgeModal

@@ -850,7 +850,7 @@ export default function Layout() {
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
               transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full transform-gpu will-change-transform"
+              className="w-full"
             >
               <Outlet />
             </motion.div>
@@ -885,7 +885,7 @@ export default function Layout() {
       {/* Universal Responsive Clinical Search Command Palette */}
       <AnimatePresence>
         {isSearchOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 sm:pt-20 px-3 sm:px-4">
+          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-12 sm:pt-20 px-3 sm:px-4">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}

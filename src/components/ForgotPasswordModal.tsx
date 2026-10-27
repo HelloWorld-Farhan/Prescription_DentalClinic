@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import OtpVerificationInput from './OtpVerificationInput';
 import PasswordStrengthMeter from './PasswordStrengthMeter';
@@ -259,28 +260,31 @@ export default function ForgotPasswordModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-        />
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+          />
 
-        {/* Modal Window Container */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 18, filter: 'blur(5px)' }}
-          animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(3px)' }}
-          transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col"
-        >
+          {/* Modal Window Container */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+            animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+            transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col"
+          >
           {/* Top Clinical Header Strip */}
           <div className="bg-gradient-to-r from-primary/10 via-surface-container-low to-transparent p-5 sm:p-6 border-b border-surface-container-high/60 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -763,6 +767,8 @@ export default function ForgotPasswordModal({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
-  );
+    )}
+  </AnimatePresence>,
+  document.body
+);
 }

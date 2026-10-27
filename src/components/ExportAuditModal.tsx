@@ -137,20 +137,31 @@ export default function ExportAuditModal({
     };
   }, [isOpen, isExporting]);
 
-  if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 print:hidden">
-        {/* Modal Window Container matching Sync Knowledge Base Popup */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 18, filter: 'blur(5px)' }}
-          animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(3px)' }}
-          transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-        >
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4 print:hidden">
+          {/* Animated Full-Screen Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            onClick={handleModalClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+          />
+
+          {/* Modal Window Container matching Sync Knowledge Base Popup */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+            animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+            transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-10 bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+          >
           {/* Top Modal Header */}
           <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
             <div className="flex items-center gap-2.5">
@@ -338,8 +349,9 @@ export default function ExportAuditModal({
               <span>{isExporting ? 'Exporting...' : 'Download Export'}</span>
             </motion.button>
           </div>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
+      )}
     </AnimatePresence>,
     document.body
   );
