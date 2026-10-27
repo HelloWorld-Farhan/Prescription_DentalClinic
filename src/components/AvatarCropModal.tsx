@@ -40,8 +40,8 @@ export default function AvatarCropModal({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const replaceFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Display crop frame dimensions (360px on desktop, 300px on mobile)
-  const displayCropSize = 360;
+  // Display crop frame dimensions (270px fits all viewports with guaranteed 4-corner visibility)
+  const displayCropSize = 270;
 
   // Sync image source when prop updates
   useEffect(() => {
@@ -380,8 +380,8 @@ export default function AvatarCropModal({
           )}
 
           {/* Interactive Crop Viewport Area (Clean White Light Theme) */}
-          <div className="p-5 sm:p-6 flex flex-col items-center justify-center bg-white relative overflow-hidden border-y border-surface-container">
-            {/* Viewport Frame with generous size */}
+          <div className="py-4 sm:py-5 px-4 sm:px-6 flex flex-col items-center justify-center bg-slate-50/70 relative overflow-hidden border-y border-surface-container shrink-0">
+            {/* Viewport Frame with guaranteed all 4 corners visible */}
             <div
               ref={containerRef}
               onPointerDown={handlePointerDown}
@@ -390,24 +390,30 @@ export default function AvatarCropModal({
               style={{
                 width: `${displayCropSize}px`,
                 height: `${displayCropSize}px`,
-                maxWidth: '100%',
-                maxHeight: '100%',
+                maxWidth: 'calc(100vw - 48px)',
+                maxHeight: '38vh',
                 aspectRatio: '1 / 1',
               }}
-              className="relative rounded-2xl overflow-hidden border-2 border-primary/60 cursor-grab active:cursor-grabbing shadow-lg flex items-center justify-center touch-none bg-white shrink-0 select-none"
+              className="relative rounded-2xl overflow-hidden border-2 border-primary cursor-grab active:cursor-grabbing shadow-xl flex items-center justify-center touch-none bg-white shrink-0 select-none my-1"
             >
+              {/* 4 Optical Corner Brackets (Guarantees All 4 Corners Are 100% Visible & Distinct) */}
+              <div className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] border-primary rounded-tl-xl pointer-events-none z-30" />
+              <div className="absolute top-0 right-0 w-6 h-6 border-t-[3px] border-r-[3px] border-primary rounded-tr-xl pointer-events-none z-30" />
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-[3px] border-l-[3px] border-primary rounded-bl-xl pointer-events-none z-30" />
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-[3px] border-r-[3px] border-primary rounded-br-xl pointer-events-none z-30" />
+
               {/* Profile Avatar Squircle Frame Matching User Profile Badge */}
               <div
-                className="absolute inset-0 rounded-2xl border-2 border-primary/60 pointer-events-none z-20 shadow-[0_0_0_9999px_rgba(255,255,255,0.78)]"
+                className="absolute inset-0 rounded-2xl border-2 border-primary/70 pointer-events-none z-20 shadow-[0_0_0_9999px_rgba(255,255,255,0.85)]"
               />
 
               {/* Dashed Inner Trim Guide */}
               <div
-                className="absolute inset-0 rounded-2xl border border-dashed border-primary/30 pointer-events-none z-20"
+                className="absolute inset-1 rounded-xl border border-dashed border-primary/40 pointer-events-none z-20"
               />
 
               {/* Center Guidance Crosshair Marker */}
-              <div className="absolute w-5 h-5 pointer-events-none z-20 flex items-center justify-center text-primary/40">
+              <div className="absolute w-5 h-5 pointer-events-none z-20 flex items-center justify-center text-primary/50">
                 <span className="material-symbols-outlined text-[20px]">add</span>
               </div>
 

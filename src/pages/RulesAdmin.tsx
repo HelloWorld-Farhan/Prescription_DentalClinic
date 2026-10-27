@@ -1223,7 +1223,7 @@ export default function RulesAdmin() {
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {isAddModalOpen && (
-            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-5">
               {/* Animated Full-Screen Backdrop */}
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1240,7 +1240,7 @@ export default function RulesAdmin() {
                 exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
                 transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative z-10 bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-2xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+                className="relative z-10 bg-surface-container-lowest rounded-3xl p-4 sm:p-6 max-w-2xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[88dvh] sm:max-h-[90vh] overflow-hidden my-auto"
               >
               {/* Modal Top Header */}
               <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
@@ -1423,18 +1423,18 @@ export default function RulesAdmin() {
                       </label>
 
                       {uploadFormat === 'image' && !uploadedFile && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 mb-2.5">
                           <button
                             type="button"
                             onClick={() => setIsCameraModalOpen(true)}
-                            className="p-3.5 rounded-xl border-2 border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all text-left flex items-center gap-3 cursor-pointer group shadow-2xs"
+                            className="p-3 sm:p-3.5 rounded-xl border-2 border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all text-left flex items-center gap-2.5 sm:gap-3 cursor-pointer group shadow-2xs"
                           >
-                            <div className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
-                              <span className="material-symbols-outlined text-[20px]">photo_camera</span>
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
+                              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">photo_camera</span>
                             </div>
-                            <div>
-                              <span className="text-xs font-bold text-primary block group-hover:underline">Open Live Camera</span>
-                              <span className="text-[10px] text-on-surface-variant">Phone &amp; laptop front/back scanner</span>
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-primary block group-hover:underline truncate">Open Live Camera</span>
+                              <span className="text-[10px] text-on-surface-variant truncate block">Phone &amp; laptop front/back scanner</span>
                             </div>
                           </button>
 
@@ -1444,14 +1444,14 @@ export default function RulesAdmin() {
                               setUploadSource('file');
                               fileInputRef.current?.click();
                             }}
-                            className="p-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container transition-all text-left flex items-center gap-3 cursor-pointer group shadow-2xs"
+                            className="p-3 sm:p-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container transition-all text-left flex items-center gap-2.5 sm:gap-3 cursor-pointer group shadow-2xs"
                           >
-                            <div className="w-9 h-9 rounded-xl bg-surface-container-high text-on-surface flex items-center justify-center shrink-0">
-                              <span className="material-symbols-outlined text-[20px]">folder_open</span>
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-surface-container-high text-on-surface flex items-center justify-center shrink-0">
+                              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">folder_open</span>
                             </div>
-                            <div>
-                              <span className="text-xs font-bold text-on-surface block group-hover:underline">Browse Image File</span>
-                              <span className="text-[10px] text-outline">PNG, JPG, JPEG, WEBP</span>
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-on-surface block group-hover:underline truncate">Browse Image File</span>
+                              <span className="text-[10px] text-outline truncate block">PNG, JPG, JPEG, WEBP</span>
                             </div>
                           </button>
                         </div>
@@ -1463,7 +1463,7 @@ export default function RulesAdmin() {
                             setUploadSource('file');
                             fileInputRef.current?.click();
                           }}
-                          className="border-2 border-dashed border-surface-container-high hover:border-primary rounded-2xl p-7 text-center cursor-pointer bg-surface-container-low/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2"
+                          className="border-2 border-dashed border-surface-container-high hover:border-primary rounded-2xl p-4 sm:p-6 text-center cursor-pointer bg-surface-container-low/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2"
                         >
                           <div className="w-12 h-12 rounded-xl bg-surface-container text-primary flex items-center justify-center">
                             <span className="material-symbols-outlined text-[26px]">cloud_upload</span>
@@ -2119,7 +2119,7 @@ export default function RulesAdmin() {
                 exit={{ opacity: 0, scale: 0.96, y: 12 }}
                 transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 z-10 max-h-[90vh] overflow-hidden"
+                className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl p-4 sm:p-6 flex flex-col gap-3.5 sm:gap-4 z-10 max-h-[88dvh] sm:max-h-[90vh] overflow-hidden my-auto"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-surface-container pb-3">
