@@ -6,6 +6,7 @@ import { InteractionRule, AlertSeverity } from '../types';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
 import CustomDropdown from '../components/CustomDropdown';
 import CameraCaptureModal from '../components/CameraCaptureModal';
+import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import {
   uploadToR2,
   getDocumentHistory,
@@ -84,6 +85,8 @@ export default function RulesAdmin() {
     storageUrl: string;
     format: string;
   } | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [inspectDocModal, setInspectDocModal] = useState<UploadedDocumentRecord | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -96,6 +99,7 @@ export default function RulesAdmin() {
     }
     setIsAddModalOpen(false);
     setUploadedFile(null);
+    setImagePreviewUrl(null);
     setUploadSource('file');
     setIsExtracting(false);
     setManualFormError(null);
@@ -110,6 +114,7 @@ export default function RulesAdmin() {
       await deleteDocumentRecord('', extractedFileMeta.storageUrl);
       setDocumentHistory(getDocumentHistory(currentUserId));
     }
+    setImagePreviewUrl(null);
     setExtractedFileMeta(null);
     setExtractedPreviewRules([]);
     setAddModalMode('upload');
@@ -117,13 +122,14 @@ export default function RulesAdmin() {
 
   // Lock body scroll and handle Escape key for active modals
   useEffect(() => {
-    if (!isAddModalOpen && !inspectRule && !isCameraModalOpen) return;
+    if (!isAddModalOpen && !inspectRule && !isCameraModalOpen && !inspectDocModal) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isCameraModalOpen) setIsCameraModalOpen(false);
+        if (inspectDocModal) setInspectDocModal(null);
+        else if (isCameraModalOpen) setIsCameraModalOpen(false);
         else if (inspectRule) setInspectRule(null);
         else if (isAddModalOpen) handleCloseAddModal();
       }
@@ -134,12 +140,13 @@ export default function RulesAdmin() {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isAddModalOpen, inspectRule, isCameraModalOpen, extractedFileMeta]);
+  }, [isAddModalOpen, inspectRule, isCameraModalOpen, inspectDocModal, extractedFileMeta]);
 
   const handleOpenAddModal = () => {
     setAddModalMode('select');
     setUploadFormat('pdf');
     setUploadedFile(null);
+    setImagePreviewUrl(null);
     setUploadSource('file');
     setIsExtracting(false);
     setManualFormError(null);
@@ -153,6 +160,7 @@ export default function RulesAdmin() {
     setUploadedFile(file);
     setUploadSource('camera');
     setUploadFormat('image');
+    setImagePreviewUrl(URL.createObjectURL(file));
   };
 
   const handleDraftChange = (id: string, field: keyof DraftRuleItem, value: any) => {
@@ -222,6 +230,20 @@ export default function RulesAdmin() {
     setIsExtracting(true);
 
     try {
+      const isImage =
+        uploadFormat === 'image' ||
+        uploadSource === 'camera' ||
+        uploadedFile.type.startsWith('image/');
+
+      if (isImage && !imagePreviewUrl) {
+        setImagePreviewUrl(URL.createObjectURL(uploadedFile));
+      }
+
+      // Allow optical scan laser animation to run for visual clarity
+      if (isImage) {
+        await new Promise((r) => setTimeout(r, 1400));
+      }
+
       // 1. Upload to Cloudflare R2 (handles duplicate names automatically)
       const r2Result = await uploadToR2(uploadedFile, currentUserId, currentClinicianName);
 
@@ -897,15 +919,37 @@ export default function RulesAdmin() {
                         <tr key={doc.id} className="hover:bg-surface-container-low/40 transition-colors">
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <button
+                                type="button"
+                                disabled={!doc.storageUrl}
+                                onClick={() => {
+                                  if (doc.storageUrl) setInspectDocModal(doc);
+                                }}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+                                  doc.storageUrl
+                                    ? 'bg-primary/10 text-primary hover:bg-primary hover:text-white cursor-pointer shadow-2xs hover:scale-105'
+                                    : 'bg-primary/10 text-primary cursor-default'
+                                }`}
+                                title={doc.storageUrl ? 'Click to inspect document scan & OCR' : 'Form Stored'}
+                              >
                                 <span className="material-symbols-outlined text-[18px]">
                                   {isCamera ? 'photo_camera' : isManual ? 'edit_note' : isPdf ? 'picture_as_pdf' : isWord ? 'description' : isCsv ? 'table_chart' : 'image'}
                                 </span>
-                              </div>
+                              </button>
                               <div className="min-w-0">
-                                <span className="font-bold text-xs text-on-surface block truncate max-w-xs">
-                                  {doc.filename}
-                                </span>
+                                {doc.storageUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setInspectDocModal(doc)}
+                                    className="font-bold text-xs text-on-surface hover:text-primary text-left block truncate max-w-xs cursor-pointer transition-colors"
+                                  >
+                                    {doc.filename}
+                                  </button>
+                                ) : (
+                                  <span className="font-bold text-xs text-on-surface block truncate max-w-xs">
+                                    {doc.filename}
+                                  </span>
+                                )}
                                 <span className="text-[10px] text-outline">
                                   {doc.fileSize > 0 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : 'Direct Form Input'}
                                 </span>
@@ -935,20 +979,32 @@ export default function RulesAdmin() {
                           </td>
 
                           <td className="py-3.5 px-4">
-                            {doc.storageUrl ? (
-                              <a
-                                href={doc.storageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-primary/10 text-primary transition-colors text-[11px] font-bold border border-surface-container-high"
-                                title="Open in Cloudflare R2"
-                              >
-                                <span className="material-symbols-outlined text-[14px]">cloud_download</span>
-                                <span>Cloudflare R2</span>
-                              </a>
-                            ) : (
-                              <span className="text-[11px] text-outline italic">Form Stored</span>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              {doc.storageUrl ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setInspectDocModal(doc)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-primary/10 text-primary transition-colors text-[11px] font-bold border border-surface-container-high cursor-pointer shadow-2xs"
+                                  title="Inspect Document & OCR Extraction"
+                                >
+                                  <span className="material-symbols-outlined text-[14px]">visibility</span>
+                                  <span>Inspect</span>
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-outline italic">Form Stored</span>
+                              )}
+                              {doc.storageUrl && (
+                                <a
+                                  href={doc.storageUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors"
+                                  title="Open raw file in Cloudflare R2"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+                                </a>
+                              )}
+                            </div>
                           </td>
 
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
@@ -1379,7 +1435,13 @@ export default function RulesAdmin() {
                       }
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
-                          setUploadedFile(e.target.files[0]);
+                          const file = e.target.files[0];
+                          setUploadedFile(file);
+                          if (uploadFormat === 'image' || file.type.startsWith('image/')) {
+                            setImagePreviewUrl(URL.createObjectURL(file));
+                          } else {
+                            setImagePreviewUrl(null);
+                          }
                         }
                       }}
                     />
@@ -1452,37 +1514,55 @@ export default function RulesAdmin() {
                           </div>
                         </div>
                       ) : (
-                        <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                              <span className="material-symbols-outlined text-[20px]">
-                                {uploadSource === 'camera' ? 'photo_camera' : uploadFormat === 'image' ? 'image' : uploadFormat === 'pdf' ? 'picture_as_pdf' : uploadFormat === 'csv' ? 'table_chart' : 'description'}
-                              </span>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-on-surface truncate block">
-                                  {uploadedFile.name}
-                                </span>
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary shrink-0">
-                                  {uploadSource === 'camera' ? 'Camera Scan' : 'Uploaded File'}
+                        <div className="space-y-3">
+                          {imagePreviewUrl && (
+                            <OpticalScanOverlay
+                              imageUrl={imagePreviewUrl}
+                              isScanning={isExtracting}
+                              title={
+                                isExtracting
+                                  ? 'Optical Scan & Rule Extraction in Progress...'
+                                  : uploadSource === 'camera'
+                                  ? 'Camera Optical Scan Ready'
+                                  : 'Image Optical Scan Ready'
+                              }
+                              className="max-h-[300px]"
+                            />
+                          )}
+
+                          <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[20px]">
+                                  {uploadSource === 'camera' ? 'photo_camera' : uploadFormat === 'image' ? 'image' : uploadFormat === 'pdf' ? 'picture_as_pdf' : uploadFormat === 'csv' ? 'table_chart' : 'description'}
                                 </span>
                               </div>
-                              <span className="text-[11px] text-outline">
-                                {(uploadedFile.size / 1024).toFixed(1)} KB · Ready to save to Cloudflare R2 &amp; parse
-                              </span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-on-surface truncate block">
+                                    {uploadedFile.name}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary shrink-0">
+                                    {uploadSource === 'camera' ? 'Camera Scan' : 'Uploaded File'}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] text-outline">
+                                  {(uploadedFile.size / 1024).toFixed(1)} KB · Ready to save to Cloudflare R2 &amp; parse
+                                </span>
+                              </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUploadedFile(null);
+                                setImagePreviewUrl(null);
+                                setUploadSource('file');
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              Remove
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUploadedFile(null);
-                              setUploadSource('file');
-                            }}
-                            className="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          >
-                            Remove
-                          </button>
                         </div>
                       )}
                     </div>
@@ -1619,6 +1699,14 @@ export default function RulesAdmin() {
                 {/* STEP 2C: Extraction Preview & Verification */}
                 {addModalMode === 'preview' && (
                   <div className="space-y-4">
+                    {imagePreviewUrl && (
+                      <OpticalScanOverlay
+                        imageUrl={imagePreviewUrl}
+                        isScanning={false}
+                        title="Optical OCR & Rules Extracted"
+                        className="max-h-[240px]"
+                      />
+                    )}
                     {/* Cloudflare R2 Storage Confirmation Card */}
                     <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                       <div className="flex items-center gap-3">
@@ -2031,6 +2119,163 @@ export default function RulesAdmin() {
                     <span className="material-symbols-outlined text-[16px]">delete</span>
                     <span>Delete Rule</span>
                   </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ========================================================================= */}
+      {/* DOCUMENT IMAGE INSPECTION & OCR MODAL */}
+      {/* ========================================================================= */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {inspectDocModal && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-5">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                onClick={() => setInspectDocModal(null)}
+                className="fixed inset-0 bg-black/75 backdrop-blur-md cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 z-10 max-h-[90vh] overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-surface-container pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[22px]">
+                        {inspectDocModal.filename.toLowerCase().includes('camera') ? 'photo_camera' : 'document_scanner'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-on-surface truncate max-w-sm">
+                        {inspectDocModal.filename}
+                      </h3>
+                      <p className="text-[11px] text-on-surface-variant">
+                        Ingested {inspectDocModal.uploadedAt} · {inspectDocModal.extractedRulesCount} clinical rules active
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setInspectDocModal(null)}
+                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                {/* Body Content */}
+                <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+                  {/* Optical Scan Display for Images */}
+                  {inspectDocModal.storageUrl && (
+                    <OpticalScanOverlay
+                      imageUrl={inspectDocModal.storageUrl}
+                      isScanning={false}
+                      title="Optical Scan Verified"
+                      className="max-h-[340px]"
+                    />
+                  )}
+
+                  {/* Associated Rules List */}
+                  <div>
+                    <h4 className="text-xs font-bold text-on-surface mb-2 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-primary">rule</span>
+                      <span>Extracted Clinical Rules from this Document</span>
+                    </h4>
+
+                    {(() => {
+                      const matchedRules = rules.filter((r) => r.sourceFile === inspectDocModal.filename);
+                      if (matchedRules.length === 0) {
+                        return (
+                          <div className="p-3.5 rounded-xl bg-surface-container-low text-xs text-outline text-center">
+                            No rules currently linked to this exact document filename.
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                          {matchedRules.map((r) => (
+                            <div
+                              key={r.id}
+                              className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 flex items-start justify-between gap-3 text-xs"
+                            >
+                              <div className="min-w-0">
+                                <span className="font-bold text-on-surface">
+                                  {r.drugA} + {r.drugB}
+                                </span>
+                                <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-2">
+                                  {r.description}
+                                </p>
+                              </div>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                                  r.severity === 'contraindicated'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : r.severity === 'major'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}
+                              >
+                                {r.severity}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Footer Controls */}
+                <div className="flex items-center justify-between border-t border-surface-container pt-3">
+                  {inspectDocModal.storageUrl ? (
+                    <a
+                      href={inspectDocModal.storageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container-high hover:bg-primary/10 text-primary text-xs font-bold transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                      <span>Open in Cloudflare R2</span>
+                    </a>
+                  ) : (
+                    <span />
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = inspectDocModal;
+                        setInspectDocModal(null);
+                        setDocToDelete(target);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">delete</span>
+                      <span>Delete Document</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInspectDocModal(null)}
+                      className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition-colors cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </div>

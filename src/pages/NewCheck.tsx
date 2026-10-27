@@ -6,6 +6,7 @@ import { PrescriptionStorage as VirtualDb, INITIAL_PATIENTS, isMockPatient } fro
 import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
+import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import { uploadToR2, updateDocumentExtractedCount, deleteDocumentRecord } from '../services/storageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 
@@ -376,9 +377,16 @@ export default function NewCheck() {
 
   // Main file processing handler: Uploads to Cloudflare R2 and extracts medicines
   const handleProcessIncomingFile = async (file: File, source: 'upload' | 'camera') => {
+    const isImage = file.type.startsWith('image/') || source === 'camera';
+    let localPreviewUrl: string | null = null;
+    if (isImage) {
+      localPreviewUrl = URL.createObjectURL(file);
+      setCapturedPhoto(localPreviewUrl);
+    }
     setIsProcessingDocument(true);
     const currentUserId = storedUser?.id || 'clinician-user';
     try {
+      // 1. Upload to Cloudflare R2
       const r2Result = await uploadToR2(file, currentUserId, prescriberDisplayName);
       setUploadedFileName(r2Result.filename);
       const sizeStr =
@@ -389,10 +397,16 @@ export default function NewCheck() {
 
       const ext =
         r2Result.filename.split('.').pop()?.toUpperCase() || (source === 'camera' ? 'CAMERA SCAN' : 'FILE');
+
+      // Allow optical scanning HUD animation to scan document
+      if (isImage) {
+        await new Promise((resolve) => setTimeout(resolve, 1400));
+      }
+
       const { medicines: extracted, patient: extractedPatient } = await extractPrescriptionsFromDocument(file, source);
       updateDocumentExtractedCount(r2Result.url, extracted.length);
 
-      const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+      const previewUrl = localPreviewUrl || (file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
       if (source === 'camera' || previewUrl) {
         setCapturedPhoto(previewUrl || 'camera_captured_rx_slip.jpg');
       }
@@ -1015,9 +1029,22 @@ export default function NewCheck() {
 
                   {/* Processing / Extracting Spinner Overlay */}
                   {isProcessingDocument && (
-                    <div className="absolute inset-0 bg-surface-container-lowest/90 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-20">
-                      <span className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></span>
-                      <span className="text-xs font-bold text-on-surface">Saving to Cloudflare R2 &amp; Extracting Clinical Entities...</span>
+                    <div className="absolute inset-0 bg-surface-container-lowest/95 backdrop-blur-xs flex flex-col items-center justify-center p-3 z-20">
+                      {capturedPhoto ? (
+                        <div className="w-full h-full max-w-xl">
+                          <OpticalScanOverlay
+                            imageUrl={capturedPhoto}
+                            isScanning={true}
+                            title="AI Vision OCR & Clinical Entity Scan"
+                            className="w-full h-full max-h-[290px]"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <span className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></span>
+                          <span className="text-xs font-bold text-on-surface">Saving to Cloudflare R2 &amp; Extracting Clinical Entities...</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1173,60 +1200,70 @@ export default function NewCheck() {
                     </div>
                   </div>
                 ) : (
-                  /* Captured Photo Preview */
-                  <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {extractedMeta?.previewUrl ? (
-                        <img
-                          src={extractedMeta.previewUrl}
-                          alt="Captured Slip"
-                          className="w-16 h-16 rounded-xl object-cover border border-surface-container-high shrink-0 shadow-2xs"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-[24px]">image</span>
+                  /* Optical Scan HUD & Action Toolbar */
+                  <div className="space-y-3">
+                    <OpticalScanOverlay
+                      imageUrl={capturedPhoto}
+                      isScanning={isProcessingDocument}
+                      title={
+                        isProcessingDocument
+                          ? 'AI Vision Optical OCR Processing...'
+                          : 'Optical OCR & Multimodal Scan Verified'
+                      }
+                      className="min-h-[260px] max-h-[420px]"
+                    />
+
+                    <div className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[18px]">verified</span>
                         </div>
-                      )}
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-on-surface truncate">
-                          {extractedMeta?.filename || 'Prescription Photo Captured'}
-                        </div>
-                        <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
-                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                          <span>Uploaded to Cloudflare R2 &amp; Parsed</span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-on-surface truncate">
+                            {extractedMeta?.filename || 'Prescription Photo Captured'}
+                          </div>
+                          <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                            <span>
+                              {extractedMedicines.length > 0
+                                ? `Extracted ${extractedMedicines.length} medications from prescription slip`
+                                : 'Analyzing clinical entities...'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (extractedMeta?.storageUrl) {
-                            await deleteDocumentRecord(extractedMeta.storageKey || '', extractedMeta.storageUrl);
-                          }
-                          if (extractedMedicines.length > 0) {
-                            const extractedNames = new Set(extractedMedicines.map((m) => m.drugName.toLowerCase()));
-                            setPrescriptions((prev) => prev.filter((p) => !extractedNames.has(p.drugName.toLowerCase())));
-                          }
-                          setCapturedPhoto(null);
-                          setExtractedMeta(null);
-                          setExtractedMedicines([]);
-                          setToastMessage('Captured prescription deleted from Cloudflare R2.');
-                          setTimeout(() => setToastMessage(null), 3500);
-                        }}
-                        className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-                        title="Delete photo and purge from Cloudflare R2"
-                      >
-                        <span className="material-symbols-outlined text-[15px]">delete</span>
-                        <span>Delete Photo</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsCameraModalOpen(true)}
-                        className="px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer"
-                      >
-                        Retake / Switch Camera
-                      </button>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (extractedMeta?.storageUrl) {
+                              await deleteDocumentRecord(extractedMeta.storageKey || '', extractedMeta.storageUrl);
+                            }
+                            if (extractedMedicines.length > 0) {
+                              const extractedNames = new Set(extractedMedicines.map((m) => m.drugName.toLowerCase()));
+                              setPrescriptions((prev) => prev.filter((p) => !extractedNames.has(p.drugName.toLowerCase())));
+                            }
+                            setCapturedPhoto(null);
+                            setExtractedMeta(null);
+                            setExtractedMedicines([]);
+                            setToastMessage('Captured prescription deleted from Cloudflare R2.');
+                            setTimeout(() => setToastMessage(null), 3500);
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                          title="Delete photo and purge from Cloudflare R2"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">delete</span>
+                          <span>Delete Photo</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsCameraModalOpen(true)}
+                          className="px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer"
+                        >
+                          Retake / Switch Camera
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
