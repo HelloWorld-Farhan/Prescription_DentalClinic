@@ -68,6 +68,17 @@ export default function Alerts() {
     return matchesTab && matchesSearch;
   });
 
+  // 10 alerts per page pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedAlerts = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const handleOverride = (alertId: string, reason: string) => {
     const target = allAlerts.find(a => a.alert.id === alertId);
     if (target) {
@@ -151,7 +162,7 @@ export default function Alerts() {
             <p className="text-xs text-on-surface-variant">All current patient interactions in this category have been resolved or cleared.</p>
           </div>
         ) : (
-          filtered.map((item) => {
+          paginatedAlerts.map((item) => {
             const isContra = item.alert.severity === 'contraindicated';
             const isMajor = item.alert.severity === 'major';
 
@@ -195,7 +206,7 @@ export default function Alerts() {
                       className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[16px]">menu_book</span>
-                      Review Monograph & Override
+                      Review Monograph &amp; Override
                     </button>
                   </div>
                 </div>
@@ -224,6 +235,41 @@ export default function Alerts() {
               </div>
             );
           })
+        )}
+
+        {/* 10 Items per Page Pagination Bar */}
+        {filtered.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-surface-container-lowest rounded-2xl border border-surface-container-high shadow-xs gap-3">
+            <span className="text-xs text-on-surface-variant font-medium">
+              Showing <strong className="text-on-surface font-semibold">{(currentPage - 1) * pageSize + 1}</strong>–<strong className="text-on-surface font-semibold">{Math.min(currentPage * pageSize, filtered.length)}</strong> of <strong className="text-on-surface font-semibold">{filtered.length}</strong> safety alerts
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                <span>Previous</span>
+              </button>
+
+              <span className="text-xs font-bold text-outline px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              >
+                <span>Next</span>
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

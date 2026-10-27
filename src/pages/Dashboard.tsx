@@ -105,6 +105,19 @@ export default function Dashboard() {
     });
   }, [checks, selectedUnit, searchFilter]);
 
+  // 5 Recent Screening Checks per page pagination
+  const [checksPage, setChecksPage] = useState(1);
+  const checksPageSize = 5;
+
+  useEffect(() => {
+    setChecksPage(1);
+  }, [searchFilter, selectedUnit]);
+
+  const totalChecksPages = Math.max(1, Math.ceil(filteredChecks.length / checksPageSize));
+  const paginatedChecks = useMemo(() => {
+    return filteredChecks.slice((checksPage - 1) * checksPageSize, checksPage * checksPageSize);
+  }, [filteredChecks, checksPage, checksPageSize]);
+
   useEffect(() => {
     if (!units.includes(selectedUnit)) {
       setSelectedUnit('All Units');
@@ -516,7 +529,7 @@ export default function Dashboard() {
                     </td>
                   </tr>
                 ) : (
-                  filteredChecks.map((check) => {
+                  paginatedChecks.map((check) => {
                     const hasContra = check.alerts.some(a => a.severity === 'contraindicated');
                     const hasMajor = check.alerts.some(a => a.severity === 'major');
 
@@ -624,14 +637,40 @@ export default function Dashboard() {
 
           {/* Footer of Table */}
           <div className="flex flex-col sm:flex-row items-center justify-between pt-3 border-t border-surface-container gap-2">
-            <span className="text-xs text-on-surface-variant">
-              Showing {filteredChecks.length} of {checks.length} screening checks
+            <span className="text-xs text-on-surface-variant font-medium">
+              Showing <strong className="text-on-surface font-semibold">{filteredChecks.length === 0 ? 0 : (checksPage - 1) * checksPageSize + 1}</strong>–<strong className="text-on-surface font-semibold">{Math.min(checksPage * checksPageSize, filteredChecks.length)}</strong> of <strong className="text-on-surface font-semibold">{filteredChecks.length}</strong> screening checks
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                disabled={checksPage <= 1}
+                onClick={() => setChecksPage((p) => Math.max(1, p - 1))}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                <span>Previous</span>
+              </button>
+
+              <span className="text-xs font-bold text-outline px-1">
+                {checksPage} / {totalChecksPages}
+              </span>
+
+              <button
+                type="button"
+                disabled={checksPage >= totalChecksPages}
+                onClick={() => setChecksPage((p) => Math.min(totalChecksPages, p + 1))}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              >
+                <span>Next</span>
+                <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+              </button>
+
+              <div className="h-4 w-px bg-surface-container-high mx-1" />
+
+              <button
+                type="button"
                 onClick={() => navigate('/audit-log')}
-                className="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer transition-colors duration-150"
+                className="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer transition-colors duration-150 ml-1"
               >
                 <span>View Full Audit Registry</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>

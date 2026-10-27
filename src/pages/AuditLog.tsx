@@ -40,6 +40,17 @@ export default function AuditLog() {
     return matchesAction && matchesSearch;
   });
 
+  // 10 logs per page pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterAction, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  const paginatedLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -148,7 +159,7 @@ export default function AuditLog() {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => {
+                paginatedLogs.map((log) => {
                 const isContra = log.severity === 'contraindicated';
                 const isMajor = log.severity === 'major';
                 const isSafe = log.severity === 'safe';
@@ -206,6 +217,41 @@ export default function AuditLog() {
             </tbody>
           </table>
         </div>
+
+        {/* 10 Items per Page Pagination Bar */}
+        {filteredLogs.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-surface-container-high bg-surface-container-lowest gap-3">
+            <span className="text-xs text-on-surface-variant font-medium">
+              Showing <strong className="text-on-surface font-semibold">{(currentPage - 1) * pageSize + 1}</strong>–<strong className="text-on-surface font-semibold">{Math.min(currentPage * pageSize, filteredLogs.length)}</strong> of <strong className="text-on-surface font-semibold">{filteredLogs.length}</strong> audit records
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                <span>Previous</span>
+              </button>
+
+              <span className="text-xs font-bold text-outline px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              >
+                <span>Next</span>
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Animated HIPAA Export Modal */}

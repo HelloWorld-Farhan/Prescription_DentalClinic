@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
@@ -379,6 +379,28 @@ export default function RulesAdmin() {
     return matchesCategory && matchesStatus && matchesSearch;
   });
 
+  // 5 items per page pagination for Tab 1 (Clinical History)
+  const [rulesPage, setRulesPage] = useState(1);
+  const rulesPageSize = 5;
+
+  useEffect(() => {
+    setRulesPage(1);
+  }, [categoryFilter, statusFilter, searchQuery]);
+
+  const totalRulesPages = Math.max(1, Math.ceil(filteredRules.length / rulesPageSize));
+  const paginatedRules = useMemo(() => {
+    return filteredRules.slice((rulesPage - 1) * rulesPageSize, rulesPage * rulesPageSize);
+  }, [filteredRules, rulesPage, rulesPageSize]);
+
+  // 5 items per page pagination for Tab 2 (Import & Upload History)
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyPageSize = 5;
+
+  const totalHistoryPages = Math.max(1, Math.ceil(documentHistory.length / historyPageSize));
+  const paginatedHistory = useMemo(() => {
+    return documentHistory.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
+  }, [documentHistory, historyPage, historyPageSize]);
+
   return (
     <div className="flex flex-col w-full gap-6 max-w-7xl mx-auto px-1 sm:px-2">
       {/* Top Page Header Section */}
@@ -477,7 +499,7 @@ export default function RulesAdmin() {
             }`}
           >
             <span className="material-symbols-outlined text-[18px]">rule_folder</span>
-            <span>Clinical Rules</span>
+            <span>Clinical History</span>
             <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px]">
               {rules.length} active rules
             </span>
@@ -663,7 +685,7 @@ export default function RulesAdmin() {
                       </td>
                     </tr>
                   ) : (
-                    filteredRules.map((rule) => {
+                    paginatedRules.map((rule) => {
                     const isContra = rule.severity === 'contraindicated';
                     return (
                       <tr key={rule.id} className="hover:bg-surface-container-low/50 transition-colors">
@@ -759,6 +781,41 @@ export default function RulesAdmin() {
                 </tbody>
               </table>
             </div>
+
+            {/* 5 Items per Page Pagination Bar for Clinical History */}
+            {filteredRules.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-surface-container-high bg-surface-container-lowest gap-3">
+                <span className="text-xs text-on-surface-variant font-medium">
+                  Showing <strong className="text-on-surface font-semibold">{(rulesPage - 1) * rulesPageSize + 1}</strong>–<strong className="text-on-surface font-semibold">{Math.min(rulesPage * rulesPageSize, filteredRules.length)}</strong> of <strong className="text-on-surface font-semibold">{filteredRules.length}</strong> clinical history rules
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={rulesPage <= 1}
+                    onClick={() => setRulesPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                    <span>Previous</span>
+                  </button>
+
+                  <span className="text-xs font-bold text-outline px-2">
+                    Page {rulesPage} of {totalRulesPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={rulesPage >= totalRulesPages}
+                    onClick={() => setRulesPage((p) => Math.min(totalRulesPages, p + 1))}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  >
+                    <span>Next</span>
+                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -853,7 +910,7 @@ export default function RulesAdmin() {
                       </td>
                     </tr>
                   ) : (
-                    documentHistory.map((doc) => {
+                    paginatedHistory.map((doc) => {
                       const isCamera = doc.filename.toLowerCase().includes('camera') || doc.fileType.includes('camera');
                       const isManual = doc.fileType === 'Manual Entry';
                       const isPdf = doc.filename.toLowerCase().endsWith('.pdf');
@@ -936,6 +993,41 @@ export default function RulesAdmin() {
                 </tbody>
               </table>
             </div>
+
+            {/* 5 Items per Page Pagination Bar for Ingested Documents */}
+            {documentHistory.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-surface-container-high bg-surface-container-lowest gap-3">
+                <span className="text-xs text-on-surface-variant font-medium">
+                  Showing <strong className="text-on-surface font-semibold">{(historyPage - 1) * historyPageSize + 1}</strong>–<strong className="text-on-surface font-semibold">{Math.min(historyPage * historyPageSize, documentHistory.length)}</strong> of <strong className="text-on-surface font-semibold">{documentHistory.length}</strong> ingested records
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={historyPage <= 1}
+                    onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                    <span>Previous</span>
+                  </button>
+
+                  <span className="text-xs font-bold text-outline px-2">
+                    Page {historyPage} of {totalHistoryPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={historyPage >= totalHistoryPages}
+                    onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  >
+                    <span>Next</span>
+                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
