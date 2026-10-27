@@ -63,6 +63,9 @@ export interface SafetyCheckRecord {
   reviewerName?: string;
   fhirSynced: boolean;
   notes?: string;
+  sourceDocumentUrl?: string;
+  sourceDocumentName?: string;
+  sourceType?: 'upload' | 'camera' | 'manual';
 }
 
 export interface AuditLogEntry {
