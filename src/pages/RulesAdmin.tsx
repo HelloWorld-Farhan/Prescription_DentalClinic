@@ -36,6 +36,23 @@ const emptyDraftRule = (): DraftRuleItem => ({
   description: '',
 });
 
+function getRelativeSyncText(): string {
+  if (typeof window === 'undefined') return 'Just now';
+  try {
+    const raw = localStorage.getItem('smileclinic_last_rules_sync');
+    if (!raw) return 'Just now';
+    const diff = Math.max(0, Date.now() - new Date(raw).getTime());
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return new Date(raw).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } catch {
+    return 'Just now';
+  }
+}
+
 export default function RulesAdmin() {
   // Read active logged-in user profile
   let storedUser: any = null;
@@ -60,6 +77,7 @@ export default function RulesAdmin() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [syncStatusText, setSyncStatusText] = useState('');
+  const [lastSyncText, setLastSyncText] = useState<string>(() => getRelativeSyncText());
   const [inspectRule, setInspectRule] = useState<InteractionRule | null>(null);
 
   // Deletion Modal States
@@ -94,7 +112,7 @@ export default function RulesAdmin() {
     if (extractedFileMeta?.storageUrl) {
       await deleteDocumentRecord('', extractedFileMeta.storageUrl);
       setDocumentHistory(getDocumentHistory(currentUserId));
-      showConfirmation(`Cancelled: Staged document "${extractedFileMeta.filename}" purged from Cloudflare R2.`, 'info');
+      showConfirmation(`Cancelled: Staged document "${extractedFileMeta.filename}" purged from secure vault.`, 'info');
     }
     setIsAddModalOpen(false);
     setUploadedFile(null);
@@ -320,7 +338,7 @@ export default function RulesAdmin() {
       VirtualDb.deleteRulesBySource(docToDelete.filename);
       setRules(VirtualDb.getRules(currentUserId));
       setDocumentHistory(getDocumentHistory(currentUserId));
-      showConfirmation(`Document "${docToDelete.filename}" and extracted rules vanished from database & R2.`, 'success');
+      showConfirmation(`Document "${docToDelete.filename}" and extracted rules vanished from database & secure vault.`, 'success');
       setDocToDelete(null);
     } catch {
       showConfirmation('Failed to delete document from storage.', 'error');
@@ -413,11 +431,11 @@ export default function RulesAdmin() {
               </h1>
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-surface-container-high text-primary text-xs font-bold">
                 <span className="material-symbols-outlined text-[16px]">cloud_done</span>
-                Cloudflare R2 Encrypted Storage • Active
+                Encrypted Cloud Vault • Active
               </span>
             </div>
             <p className="text-xs sm:text-sm text-on-surface-variant mt-1 max-w-4xl">
-              Manage clinical decision rules, ingest multi-format documents (PDF, Word, Excel, Camera Scans) backed by Cloudflare R2 storage, and track per-user historical records.
+              Manage clinical decision rules, ingest multi-format documents (PDF, Word, Excel, Camera Scans) backed by encrypted cloud vault storage, and track per-user historical records.
             </p>
           </div>
 
@@ -456,18 +474,26 @@ export default function RulesAdmin() {
               <span className="material-symbols-outlined text-[20px]">cloud_sync</span>
             </div>
             <div>
-              <span className="text-xs font-bold text-on-surface block">Cloudflare R2 Object Storage &amp; AST Engine</span>
+              <span className="text-xs font-bold text-on-surface block">Clinical Document Vault &amp; Decision Engine</span>
               <span className="text-[11px] text-on-surface-variant">
-                Uploaded PDF, Word, Excel, and Camera Scans are persisted to Cloudflare R2 bucket <code className="px-1.5 py-0.5 rounded bg-surface-container text-primary font-mono text-[10px]">dental-clinic-records</code> and parsed into zero-drift clinical rules.
+                Uploaded clinical documents and prescription scans are safely preserved in your encrypted vault and parsed into active clinical decision rules.
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="flex h-2.5 w-2.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-bold text-emerald-700">
+                Vault &amp; Engine: Synced ({lastSyncText || 'Just now'})
+              </span>
+            </div>
+            <span className="hidden sm:inline text-xs text-outline">•</span>
+            <span className="text-[11px] font-medium text-on-surface-variant">
+              {rules.filter((r) => r.active).length} Rules Active • {documentHistory.length} Vault Records
             </span>
-            <span className="text-xs font-bold text-emerald-700">Storage &amp; Engine: 100% Synced</span>
           </div>
         </div>
       </div>
@@ -812,8 +838,8 @@ export default function RulesAdmin() {
                 <span className="material-symbols-outlined text-[22px]">cloud_done</span>
               </div>
               <div>
-                <span className="text-xs font-bold text-emerald-800 block leading-tight">Cloudflare R2 Bucket</span>
-                <span className="text-[11px] text-outline font-mono">dental-clinic-records (APAC)</span>
+                <span className="text-xs font-bold text-emerald-800 block leading-tight">Encrypted Storage Vault</span>
+                <span className="text-[11px] text-outline font-mono">Protected Health Data (APAC)</span>
               </div>
             </div>
 
@@ -834,7 +860,7 @@ export default function RulesAdmin() {
               <div>
                 <h3 className="text-sm font-bold text-on-surface">Clinical Document Ingestion &amp; Storage Audit</h3>
                 <p className="text-xs text-on-surface-variant">
-                  Chronological records of PDF, Word, Excel, and Camera Scans persisted to Cloudflare R2 object storage.
+                  Chronological records of PDF, Word, Excel, and Camera Scans securely archived in encrypted vault.
                 </p>
               </div>
               <button
@@ -856,7 +882,7 @@ export default function RulesAdmin() {
                     <th className="py-3 px-4">Uploaded By</th>
                     <th className="py-3 px-4">Date &amp; Time</th>
                     <th className="py-3 px-4">Extracted Rules</th>
-                    <th className="py-3 px-4">R2 Cloud Storage</th>
+                    <th className="py-3 px-4">Vault Document Status</th>
                     <th className="py-3 px-4 text-right">Action</th>
                   </tr>
                 </thead>
@@ -973,7 +999,7 @@ export default function RulesAdmin() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="p-1 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors"
-                                  title="Open raw file in Cloudflare R2"
+                                  title="Open original file from secure vault"
                                 >
                                   <span className="material-symbols-outlined text-[15px]">open_in_new</span>
                                 </a>
@@ -986,7 +1012,7 @@ export default function RulesAdmin() {
                               type="button"
                               onClick={() => setDocToDelete(doc)}
                               className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              title="Delete Document & Vanish from R2"
+                              title="Delete Document &amp; Purge from Vault"
                               aria-label="Delete document"
                             >
                               <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -1250,7 +1276,7 @@ export default function RulesAdmin() {
                         : addModalMode === 'upload'
                         ? 'Select document format, upload the file, and extract interaction rules.'
                         : addModalMode === 'preview'
-                        ? 'Verify extracted drug pairs, clinical mechanisms, and Cloudflare R2 storage link.'
+                        ? 'Verify extracted drug pairs, clinical mechanisms, and secure vault storage link.'
                         : 'Author single or multiple interaction rules directly with clinical formulas.'}
                     </p>
                   </div>
@@ -1491,7 +1517,7 @@ export default function RulesAdmin() {
                                   </span>
                                 </div>
                                 <span className="text-[11px] text-outline">
-                                  {(uploadedFile.size / 1024).toFixed(1)} KB · Ready to save to Cloudflare R2 &amp; parse
+                                  {(uploadedFile.size / 1024).toFixed(1)} KB · Ready to save to secure vault &amp; parse
                                 </span>
                               </div>
                             </div>
@@ -1651,7 +1677,7 @@ export default function RulesAdmin() {
                         className="max-h-[240px]"
                       />
                     )}
-                    {/* Cloudflare R2 Storage Confirmation Card */}
+                    {/* Secure Vault Storage Confirmation Card */}
                     <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                       <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -1663,7 +1689,7 @@ export default function RulesAdmin() {
                               {extractedFileMeta?.filename}
                             </span>
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900 shrink-0">
-                              Cloudflare R2 Stored
+                              Securely Stored in Vault
                             </span>
                           </div>
                           <p className="text-[11px] text-emerald-800 mt-0.5 font-medium">
@@ -1678,10 +1704,10 @@ export default function RulesAdmin() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition-colors shadow-2xs self-start sm:self-center shrink-0"
-                          title="Open original file from Cloudflare R2 bucket"
+                          title="Open original file from secure vault"
                         >
                           <span className="material-symbols-outlined text-[15px]">open_in_new</span>
-                          <span>View in Cloudflare R2</span>
+                          <span>View Original File</span>
                         </a>
                       )}
                     </div>
@@ -1783,7 +1809,7 @@ export default function RulesAdmin() {
                         >
                           <span className="material-symbols-outlined text-[17px]">sync</span>
                         </motion.span>
-                        <span className="tracking-wide">Saving to R2 &amp; Extracting...</span>
+                        <span className="tracking-wide">Saving to Secure Vault &amp; Extracting...</span>
                       </>
                     ) : (
                       <>
@@ -1801,7 +1827,7 @@ export default function RulesAdmin() {
                         type="button"
                         onClick={handleCloseAddModal}
                         className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-rose-200 text-xs font-bold text-rose-700 bg-rose-50/70 hover:bg-rose-100 cursor-pointer transition-colors flex items-center justify-center gap-1.5"
-                        title="Discard rules and purge document from Cloudflare R2"
+                        title="Discard rules and purge document from secure vault"
                       >
                         <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
                         <span>Cancel &amp; Discard</span>
@@ -1855,8 +1881,9 @@ export default function RulesAdmin() {
         isOpen={isSyncModalOpen}
         onClose={() => setIsSyncModalOpen(false)}
         onSyncComplete={() => {
+          setLastSyncText('Just now');
           setSyncStatusText('Knowledge feeds synchronized just now');
-          showConfirmation('Knowledge Base Feeds Synchronized & Verified', 'success');
+          showConfirmation('Vault & Knowledge Bases Synchronized Successfully', 'success');
         }}
       />
 
@@ -1895,7 +1922,7 @@ export default function RulesAdmin() {
                         Delete Document &amp; Vanish Data?
                       </h3>
                       <p className="text-[11px] text-outline mt-0.5">
-                        Permanent purge from Cloudflare R2 and database.
+                        Permanent purge from secure vault and database.
                       </p>
                     </div>
                   </div>
@@ -1933,7 +1960,7 @@ export default function RulesAdmin() {
                     <span className="text-outline">Cloud Storage:</span>
                     <span className="text-[11px] font-mono text-primary flex items-center gap-1">
                       <span className="material-symbols-outlined text-[14px]">cloud</span>
-                      <span>Cloudflare R2 Bucket</span>
+                      <span>Encrypted Cloud Vault</span>
                     </span>
                   </div>
                 </div>
@@ -1942,7 +1969,7 @@ export default function RulesAdmin() {
                 <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 leading-relaxed">
                   <span className="material-symbols-outlined text-[18px] text-rose-600 shrink-0 mt-0.5">warning</span>
                   <span>
-                    This action will permanently delete this image/document from Cloudflare R2 object storage, delete its audit ledger entry, and cascade-remove all {docToDelete.extractedRulesCount} extracted rules from the active decision matrix.
+                    This action will permanently delete this image/document from secure encrypted vault storage, delete its audit ledger entry, and cascade-remove all {docToDelete.extractedRulesCount} extracted rules from the active decision matrix.
                   </span>
                 </div>
 
@@ -2192,7 +2219,7 @@ export default function RulesAdmin() {
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container-high hover:bg-primary/10 text-primary text-xs font-bold transition-colors"
                     >
                       <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-                      <span>Open in Cloudflare R2</span>
+                      <span>Open Original File</span>
                     </a>
                   ) : (
                     <span />

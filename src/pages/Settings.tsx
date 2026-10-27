@@ -172,7 +172,7 @@ export default function Settings() {
       return updated;
     });
     setEditForm((prev) => ({ ...prev, avatarUrl: newAvatarUrl }));
-    showToast('Profile photo cropped & saved to Cloudflare R2.');
+    showToast('Profile photo cropped & saved to secure cloud storage.');
   };
 
   // Sync avatar updates if triggered anywhere else

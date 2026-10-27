@@ -32,7 +32,7 @@ export default function AvatarCropModal({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isSaving, setIsSaving] = useState(false);
-  const [savingStage, setSavingStage] = useState('Saving to Cloudflare R2...');
+  const [savingStage, setSavingStage] = useState('Saving to secure storage...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
@@ -213,7 +213,7 @@ export default function AvatarCropModal({
       ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.restore();
 
-      setSavingStage('Uploading to Cloudflare R2...');
+      setSavingStage('Uploading to secure storage...');
 
       // Convert canvas to JPEG Blob with high quality
       const blob = await new Promise<Blob | null>((resolve) =>
@@ -299,7 +299,7 @@ export default function AvatarCropModal({
       onClose();
     } catch (err: any) {
       console.error('Avatar cropping / R2 upload error:', err);
-      setErrorMessage(err?.message || 'Failed to upload cropped image to Cloudflare R2.');
+      setErrorMessage(err?.message || 'Failed to upload cropped image to secure cloud storage.');
     } finally {
       setIsSaving(false);
     }
@@ -542,10 +542,10 @@ export default function AvatarCropModal({
                 />
               </div>
 
-              {/* R2 Cloudflare Indicator */}
+              {/* Encrypted Cloud Storage Indicator */}
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 font-bold">
                 <span className="material-symbols-outlined text-[14px] text-emerald-600">cloud_done</span>
-                <span>Direct Cloudflare R2</span>
+                <span>Encrypted Cloud Storage</span>
               </div>
             </div>
           </div>

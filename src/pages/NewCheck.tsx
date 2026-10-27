@@ -439,7 +439,7 @@ export default function NewCheck() {
       });
 
       showConfirmation(
-        `Extracted ${extracted.length} medications from ${r2Result.filename} and saved to Cloudflare R2.`,
+        `Extracted ${extracted.length} medications from ${r2Result.filename} and saved to secure vault.`,
         'success'
       );
     } catch (err: any) {
@@ -1044,7 +1044,7 @@ export default function NewCheck() {
                       ) : (
                         <div className="flex flex-col items-center justify-center gap-2">
                           <span className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></span>
-                          <span className="text-xs font-bold text-on-surface">Saving to Cloudflare R2 &amp; Extracting Clinical Entities...</span>
+                          <span className="text-xs font-bold text-on-surface">Saving to Secure Vault &amp; Extracting Clinical Entities...</span>
                         </div>
                       )}
                     </div>
@@ -1090,7 +1090,7 @@ export default function NewCheck() {
                       </span>
                       <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[13px] text-emerald-600">cloud_done</span>
-                        <span>Cloudflare R2 Stored</span>
+                        <span>Securely Stored in Vault</span>
                       </span>
                     </div>
                   </div>
@@ -1136,7 +1136,7 @@ export default function NewCheck() {
                           className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1"
                         >
                           <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                          <span>R2 File</span>
+                          <span>Vault File</span>
                         </a>
                       )}
                       <button
@@ -1154,10 +1154,10 @@ export default function NewCheck() {
                           setExtractedMeta(null);
                           setExtractedMedicines([]);
                           setCapturedPhoto(null);
-                          showConfirmation('Document deleted from Cloudflare R2 and unsaved medications removed.', 'info');
+                          showConfirmation('Document deleted from secure vault and unsaved medications removed.', 'info');
                         }}
                         className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title="Remove uploaded file and delete from Cloudflare R2"
+                        title="Remove uploaded file and delete from secure vault"
                       >
                         <span className="material-symbols-outlined text-[18px]">close</span>
                       </button>
@@ -1248,10 +1248,10 @@ export default function NewCheck() {
                             setCapturedPhoto(null);
                             setExtractedMeta(null);
                             setExtractedMedicines([]);
-                            showConfirmation('Captured prescription deleted from Cloudflare R2.', 'info');
+                            showConfirmation('Captured prescription deleted from secure vault.', 'info');
                           }}
                           className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-                          title="Delete photo and purge from Cloudflare R2"
+                          title="Delete photo and purge from secure vault"
                         >
                           <span className="material-symbols-outlined text-[15px]">delete</span>
                           <span>Delete Photo</span>
@@ -1384,12 +1384,12 @@ export default function NewCheck() {
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"
-                          title="View secured object in Cloudflare R2 bucket"
+                          title="View secured object in encrypted vault"
                         >
                           <span className="material-symbols-outlined text-[12px] text-emerald-600">
                             cloud_done
                           </span>
-                          <span>Cloudflare R2 Stored</span>
+                          <span>Securely Stored in Vault</span>
                           <span className="material-symbols-outlined text-[10px]">
                             open_in_new
                           </span>
@@ -1428,10 +1428,10 @@ export default function NewCheck() {
                         setUploadedFileName('');
                         setUploadedFileSize('');
                         setCapturedPhoto(null);
-                        showConfirmation('Document purged from Cloudflare R2 and unsaved items cleared.', 'info');
+                        showConfirmation('Document purged from secure vault and unsaved items cleared.', 'info');
                       }}
                       className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50/60 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors flex items-center gap-1 cursor-pointer"
-                      title="Clear extracted items and purge document from Cloudflare R2"
+                      title="Clear extracted items and purge document from secure vault"
                     >
                       <span className="material-symbols-outlined text-[14px]">
                         delete_sweep
