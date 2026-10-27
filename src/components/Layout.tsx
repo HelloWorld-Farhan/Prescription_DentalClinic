@@ -131,13 +131,18 @@ export default function Layout() {
           return;
         }
 
+        if (res?.user) {
+          setCurrentUser(res.user);
+          localStorage.setItem('smileclinic_auth_user', JSON.stringify(res.user));
+          if (res.user.photoUrl) {
+            setAvatarUrl(res.user.photoUrl);
+            localStorage.setItem(`smileclinic_avatar_${email}`, res.user.photoUrl);
+          }
+        }
+
         if (res && res.profileCompleted) {
           setShowOnboarding(false);
           localStorage.setItem(`profile_completed_${email}`, 'true');
-          if (res.user) {
-            setCurrentUser(res.user);
-            localStorage.setItem('smileclinic_auth_user', JSON.stringify(res.user));
-          }
         }
       } catch {
         // Resilience: network timeout keeps existing state
@@ -712,7 +717,7 @@ export default function Layout() {
                 {notificationsOpen && (
                   <>
                     <div
-                      className="fixed inset-0 bg-black/30 backdrop-blur-2xs z-40 sm:hidden"
+                      className="fixed inset-0 z-40 sm:hidden"
                       onClick={() => setNotificationsOpen(false)}
                     />
                     <motion.div
@@ -796,7 +801,7 @@ export default function Layout() {
                 {profileOpen && (
                   <>
                     <div
-                      className="fixed inset-0 bg-black/30 backdrop-blur-2xs z-40 sm:hidden"
+                      className="fixed inset-0 z-40 sm:hidden"
                       onClick={() => setProfileOpen(false)}
                     />
                     <motion.div

@@ -188,6 +188,18 @@ export default function Settings() {
     return () => window.removeEventListener('smileclinic_avatar_updated', handleAvatarUpdate);
   }, [profile.email]);
 
+  // Sync avatar and profile from backend database across all devices (phone, desktop)
+  useEffect(() => {
+    if (!profile.email) return;
+    authApi.getProfileStatus(profile.email).then((res) => {
+      if (res?.user?.photoUrl && res.user.photoUrl !== profile.avatarUrl) {
+        setProfile((prev) => ({ ...prev, avatarUrl: res.user!.photoUrl }));
+        setEditForm((prev) => ({ ...prev, avatarUrl: res.user!.photoUrl }));
+        localStorage.setItem(`smileclinic_avatar_${profile.email.toLowerCase()}`, res.user.photoUrl);
+      }
+    }).catch(() => {});
+  }, [profile.email]);
+
   // --- Security & Password State ---
   type VerificationMethod = 'email' | 'sms' | 'password_otp';
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>('email');

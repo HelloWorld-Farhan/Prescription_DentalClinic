@@ -34,6 +34,7 @@ export interface UserProfile {
   twoFactorEnabled?: boolean;
   isGoogleLinked?: boolean;
   hasPassword?: boolean;
+  photoUrl?: string;
 }
 
 export interface AuthApiResponse {
@@ -417,6 +418,7 @@ export const authApi = {
     has_allergies?: boolean;
     allergies_description?: string;
     profile_completed?: boolean;
+    photo_url?: string;
   }): Promise<AuthApiResponse> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/update-profile`, {

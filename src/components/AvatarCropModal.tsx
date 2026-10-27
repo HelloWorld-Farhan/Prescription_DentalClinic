@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { uploadToR2, deleteFromR2, deleteDocumentRecord } from '../services/storageService';
+import { authApi } from '../services/authApi';
 
 interface AvatarCropModalProps {
   isOpen: boolean;
@@ -255,6 +256,16 @@ export default function AvatarCropModal({
 
       // Persist locally scoped to exact email
       localStorage.setItem(`smileclinic_avatar_${emailKey}`, savedUrl);
+
+      // Persist to backend database so other devices (e.g. mobile phones) get the avatar
+      try {
+        await authApi.updateProfile({
+          email: userEmail,
+          photo_url: savedUrl,
+        });
+      } catch (dbErr) {
+        console.warn('[AvatarCropModal] Failed to sync photoUrl to backend database:', dbErr);
+      }
 
       try {
         const u = JSON.parse(localStorage.getItem('smileclinic_auth_user') || '{}');
