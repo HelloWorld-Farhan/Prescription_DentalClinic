@@ -634,29 +634,16 @@ export default function Layout() {
               <span className="w-2 h-2 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
             </div>
 
-            {/* Quick Search Button (Mobile Only, < md) */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsSearchOpen(true)}
-              className="md:hidden p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors duration-150 cursor-pointer flex items-center justify-center shadow-2xs"
-              title="Search clinical records or actions (⌘K)"
-              aria-label="Search records"
-            >
-              <span className="material-symbols-outlined text-[19px] sm:text-[20px] text-outline hover:text-primary">search</span>
-            </motion.button>
-
-            {/* Quick Action Button: New Check */}
+            {/* Quick Action Button: New Check (Full Visible with Label) */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/check')}
-              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-hover transition-colors duration-150 flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-hover transition-colors duration-150 flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
               title="Start New Prescription Safety Check"
             >
               <span className="material-symbols-outlined text-[17px] sm:text-[18px] shrink-0">add_circle</span>
-              <span className="text-xs font-bold whitespace-nowrap hidden sm:inline">New Check</span>
+              <span className="text-xs font-bold whitespace-nowrap">New Check</span>
             </motion.button>
 
             {/* Notifications Dropdown */}
