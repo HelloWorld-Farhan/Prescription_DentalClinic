@@ -11,6 +11,7 @@ import {
   getDocumentHistory,
   saveDocumentRecord,
   updateDocumentExtractedCount,
+  deleteDocumentRecord,
   UploadedDocumentRecord,
 } from '../services/storageService';
 
@@ -58,6 +59,11 @@ export default function RulesAdmin() {
   const [syncStatusText, setSyncStatusText] = useState('');
   const [inspectRule, setInspectRule] = useState<InteractionRule | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Deletion Modal States
+  const [docToDelete, setDocToDelete] = useState<UploadedDocumentRecord | null>(null);
+  const [isDeletingDoc, setIsDeletingDoc] = useState(false);
+  const [ruleToDelete, setRuleToDelete] = useState<InteractionRule | null>(null);
 
   // Add Rule Multi-Modal Wizard States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -303,10 +309,41 @@ export default function RulesAdmin() {
   };
 
   const handleDelete = (id: string) => {
-    const updated = VirtualDb.deleteRule(id);
+    const target = rules.find((r) => r.id === id);
+    if (target) {
+      setRuleToDelete(target);
+    } else {
+      const updated = VirtualDb.deleteRule(id);
+      setRules([...updated]);
+    }
+  };
+
+  const handleConfirmDeleteDoc = async () => {
+    if (!docToDelete) return;
+    setIsDeletingDoc(true);
+    try {
+      await deleteDocumentRecord(docToDelete.id, docToDelete.storageUrl);
+      VirtualDb.deleteRulesBySource(docToDelete.filename);
+      setRules(VirtualDb.getRules(currentUserId));
+      setDocumentHistory(getDocumentHistory(currentUserId));
+      setToastMessage(`Document "${docToDelete.filename}" and extracted rules vanished from database & R2.`);
+      setTimeout(() => setToastMessage(null), 3500);
+      setDocToDelete(null);
+    } catch {
+      setToastMessage('Failed to delete document from storage.');
+      setTimeout(() => setToastMessage(null), 3500);
+    } finally {
+      setIsDeletingDoc(false);
+    }
+  };
+
+  const handleConfirmDeleteRule = () => {
+    if (!ruleToDelete) return;
+    const updated = VirtualDb.deleteRule(ruleToDelete.id);
     setRules([...updated]);
-    setToastMessage(`Rule ${id} removed.`);
+    setToastMessage(`Rule "${ruleToDelete.drugA} + ${ruleToDelete.drugB}" permanently removed.`);
     setTimeout(() => setToastMessage(null), 3000);
+    setRuleToDelete(null);
   };
 
   const handleRunRegression = () => {
@@ -791,12 +828,13 @@ export default function RulesAdmin() {
                     <th className="py-3 px-4">Date &amp; Time</th>
                     <th className="py-3 px-4">Extracted Rules</th>
                     <th className="py-3 px-4">R2 Cloud Storage</th>
+                    <th className="py-3 px-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container text-on-surface">
                   {documentHistory.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-14 text-center">
+                      <td colSpan={7} className="py-14 text-center">
                         <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
                           <span className="material-symbols-outlined text-4xl text-outline">history_edu</span>
                           <span className="font-bold text-sm text-on-surface">0 Ingested Records in History</span>
@@ -878,6 +916,18 @@ export default function RulesAdmin() {
                             ) : (
                               <span className="text-[11px] text-outline italic">Form Stored</span>
                             )}
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setDocToDelete(doc)}
+                              className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Delete Document & Vanish from R2"
+                              aria-label="Delete document"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
                           </td>
                         </tr>
                       );
@@ -1691,6 +1741,216 @@ export default function RulesAdmin() {
           setTimeout(() => setToastMessage(null), 3000);
         }}
       />
+
+      {/* ========================================================================= */}
+      {/* THEMED CONFIRMATION MODAL 1: DELETE DOCUMENT RECORD & R2 VANISH */}
+      {/* ========================================================================= */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {docToDelete && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                onClick={isDeletingDoc ? undefined : () => setDocToDelete(null)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md bg-surface-container-lowest border border-surface-container-high rounded-2xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 z-10"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-200/70 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[22px]">delete_sweep</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-on-surface leading-tight">
+                        Delete Document &amp; Vanish Data?
+                      </h3>
+                      <p className="text-[11px] text-outline mt-0.5">
+                        Permanent purge from Cloudflare R2 and database.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isDeletingDoc}
+                    onClick={() => setDocToDelete(null)}
+                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                {/* Details Box */}
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high/60 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-outline">File Name:</span>
+                    <span className="font-bold text-on-surface truncate max-w-[220px]" title={docToDelete.filename}>
+                      {docToDelete.filename}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-outline">File Size:</span>
+                    <span className="font-mono text-on-surface">
+                      {docToDelete.fileSize > 0 ? `${(docToDelete.fileSize / 1024).toFixed(1)} KB` : 'Direct Form'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-outline">Extracted Rules:</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-200/60">
+                      {docToDelete.extractedRulesCount} rules associated
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-outline">Cloud Storage:</span>
+                    <span className="text-[11px] font-mono text-primary flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">cloud</span>
+                      <span>Cloudflare R2 Bucket</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Warning Banner */}
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 leading-relaxed">
+                  <span className="material-symbols-outlined text-[18px] text-rose-600 shrink-0 mt-0.5">warning</span>
+                  <span>
+                    This action will permanently delete this image/document from Cloudflare R2 object storage, delete its audit ledger entry, and cascade-remove all {docToDelete.extractedRulesCount} extracted rules from the active decision matrix.
+                  </span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-surface-container">
+                  <button
+                    type="button"
+                    disabled={isDeletingDoc}
+                    onClick={() => setDocToDelete(null)}
+                    className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingDoc}
+                    onClick={handleConfirmDeleteDoc}
+                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isDeletingDoc ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span>Vanishing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                        <span>Confirm &amp; Vanish</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ========================================================================= */}
+      {/* THEMED CONFIRMATION MODAL 2: DELETE CLINICAL RULE */}
+      {/* ========================================================================= */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {ruleToDelete && (
+            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                onClick={() => setRuleToDelete(null)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md bg-surface-container-lowest border border-surface-container-high rounded-2xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 z-10"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-200/70 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[22px]">delete</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-on-surface leading-tight">
+                        Delete Clinical Rule?
+                      </h3>
+                      <p className="text-[11px] text-outline mt-0.5">
+                        Permanent removal from the active decision matrix.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRuleToDelete(null)}
+                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                {/* Details */}
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high/60 space-y-1.5">
+                  <div className="text-xs font-bold text-on-surface">
+                    {ruleToDelete.drugA} + {ruleToDelete.drugB}
+                  </div>
+                  <div className="text-[11px] text-on-surface-variant leading-relaxed">
+                    {ruleToDelete.description}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 text-[10px] text-outline">
+                    <span>Severity: <strong className="text-on-surface uppercase">{ruleToDelete.severity}</strong></span>
+                    <span>•</span>
+                    <span>Category: <strong className="text-on-surface">{ruleToDelete.category}</strong></span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-surface-container">
+                  <button
+                    type="button"
+                    onClick={() => setRuleToDelete(null)}
+                    className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeleteRule}
+                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    <span>Delete Rule</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Floating Toast Notification */}
       <AnimatePresence>

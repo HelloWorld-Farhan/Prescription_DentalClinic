@@ -18,7 +18,6 @@ export default function AuditLog() {
     { label: 'Safety Screen', count: logs.filter(l => l.action.includes('Safety Screen')).length },
     { label: 'Alert Overridden', count: logs.filter(l => l.action.includes('Alert Overridden')).length },
     { label: 'Report Printed', count: logs.filter(l => l.action.includes('Report Printed')).length },
-    { label: 'Rule Updated', count: logs.filter(l => l.action.includes('Rule Updated')).length },
   ].filter(item => item.label === 'All' || item.count > 0);
 
   useEffect(() => {

@@ -134,3 +134,44 @@ export function updateDocumentExtractedCount(docUrl: string, count: number): voi
     // ignore
   }
 }
+
+export async function deleteDocumentRecord(
+  docId: string,
+  storageUrl?: string
+): Promise<{ success: boolean; deletedDoc?: UploadedDocumentRecord }> {
+  let deletedDoc: UploadedDocumentRecord | undefined;
+  try {
+    const existing = getDocumentHistory();
+    const index = existing.findIndex((d) => d.id === docId || (storageUrl && d.storageUrl === storageUrl));
+    if (index !== -1) {
+      deletedDoc = existing[index];
+      existing.splice(index, 1);
+      localStorage.setItem(STORAGE_KEY_DOCS, JSON.stringify(existing));
+    }
+  } catch {
+    // ignore
+  }
+
+  // Purge object from Cloudflare R2 storage bucket
+  const urlToDelete = storageUrl || deletedDoc?.storageUrl;
+  if (urlToDelete) {
+    const env = (import.meta as any).env || {};
+    const apiUrl = (env.VITE_API_URL || '').replace(/\/$/, '');
+    if (apiUrl) {
+      try {
+        const formData = new FormData();
+        formData.append('url', urlToDelete);
+        await fetch(`${apiUrl}/api/storage/delete`, {
+          method: 'POST',
+          body: formData,
+        });
+      } catch {
+        // silent fallback
+      }
+    }
+  }
+
+  window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
+  return { success: true, deletedDoc };
+}
+

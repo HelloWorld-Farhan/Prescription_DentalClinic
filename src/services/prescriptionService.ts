@@ -98,15 +98,6 @@ export class PrescriptionStorage {
     const rules = this.getRules();
     rules.unshift(...newRules);
     localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
-    this.addAudit({
-      id: 'aud-' + Date.now(),
-      timestamp: 'Just now',
-      clinicianName: getActiveClinicianName(),
-      action: 'Rule Updated',
-      patientMrn: 'Global Rules',
-      details: `${newRules.length} rule${newRules.length > 1 ? 's' : ''} added to clinical decision matrix.`,
-      severity: newRules[0]?.severity || 'major'
-    });
     return rules;
   }
 
@@ -114,20 +105,24 @@ export class PrescriptionStorage {
     const rules = this.getRules();
     rules.unshift(rule);
     localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
-    this.addAudit({
-      id: 'aud-' + Date.now(),
-      timestamp: 'Just now',
-      clinicianName: getActiveClinicianName(),
-      action: 'Rule Updated',
-      patientMrn: 'Global Rules',
-      details: `Rule "${rule.drugA} + ${rule.drugB}" created.`,
-      severity: rule.severity
-    });
     return rules;
   }
 
   static deleteRule(ruleId: string): InteractionRule[] {
     const rules = this.getRules().filter(r => r.id !== ruleId);
+    localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+    return rules;
+  }
+
+  static deleteRulesBySource(sourceFile: string): InteractionRule[] {
+    const rules = this.getRules().filter(r => {
+      if (!r.sourceFile) return true;
+      const match =
+        r.sourceFile === sourceFile ||
+        sourceFile.includes(r.sourceFile) ||
+        r.sourceFile.includes(sourceFile);
+      return !match;
+    });
     localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
     return rules;
   }
@@ -138,15 +133,6 @@ export class PrescriptionStorage {
     if (rule) {
       rule.active = !rule.active;
       localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
-      this.addAudit({
-        id: 'aud-' + Date.now(),
-        timestamp: 'Just now',
-        clinicianName: getActiveClinicianName(),
-        action: 'Rule Updated',
-        patientMrn: 'Global Rules',
-        details: `Rule "${rule.drugA} + ${rule.drugB}" set to ${rule.active ? 'ACTIVE' : 'DISABLED'}.`,
-        severity: rule.severity
-      });
     }
     return rules;
   }
@@ -264,9 +250,16 @@ export class PrescriptionStorage {
   static getAuditLogs(): AuditLogEntry[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.AUDIT);
-      return raw ? JSON.parse(raw) : INITIAL_AUDIT_LOGS;
+      const list: AuditLogEntry[] = raw ? JSON.parse(raw) : INITIAL_AUDIT_LOGS;
+      const safetyOnly = (Array.isArray(list) ? list : []).filter(
+        (log) => log.action !== 'Rule Updated' && !log.action.includes('Rule')
+      );
+      if (raw && safetyOnly.length !== list.length) {
+        localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(safetyOnly));
+      }
+      return safetyOnly;
     } catch {
-      return INITIAL_AUDIT_LOGS;
+      return INITIAL_AUDIT_LOGS.filter((l) => l.action !== 'Rule Updated' && !l.action.includes('Rule'));
     }
   }
 
