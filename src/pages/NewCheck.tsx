@@ -6,7 +6,7 @@ import { PrescriptionStorage as VirtualDb, INITIAL_PATIENTS, isMockPatient } fro
 import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
-import { uploadToR2, updateDocumentExtractedCount } from '../services/storageService';
+import { uploadToR2, updateDocumentExtractedCount, deleteDocumentRecord } from '../services/storageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 
 interface AllergyDetailInfo {
@@ -1112,13 +1112,24 @@ export default function NewCheck() {
                       )}
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
+                          if (extractedMeta?.storageUrl) {
+                            await deleteDocumentRecord(extractedMeta.storageKey || '', extractedMeta.storageUrl);
+                          }
+                          if (extractedMedicines.length > 0) {
+                            const extractedNames = new Set(extractedMedicines.map((m) => m.drugName.toLowerCase()));
+                            setPrescriptions((prev) => prev.filter((p) => !extractedNames.has(p.drugName.toLowerCase())));
+                          }
                           setUploadedFileName('');
                           setUploadedFileSize('');
                           setExtractedMeta(null);
+                          setExtractedMedicines([]);
+                          setCapturedPhoto(null);
+                          setToastMessage('Document deleted from Cloudflare R2 and unsaved medications removed.');
+                          setTimeout(() => setToastMessage(null), 3500);
                         }}
-                        className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Remove uploaded file"
+                        className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Remove uploaded file and delete from Cloudflare R2"
                       >
                         <span className="material-symbols-outlined text-[18px]">close</span>
                       </button>
@@ -1187,6 +1198,28 @@ export default function NewCheck() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (extractedMeta?.storageUrl) {
+                            await deleteDocumentRecord(extractedMeta.storageKey || '', extractedMeta.storageUrl);
+                          }
+                          if (extractedMedicines.length > 0) {
+                            const extractedNames = new Set(extractedMedicines.map((m) => m.drugName.toLowerCase()));
+                            setPrescriptions((prev) => prev.filter((p) => !extractedNames.has(p.drugName.toLowerCase())));
+                          }
+                          setCapturedPhoto(null);
+                          setExtractedMeta(null);
+                          setExtractedMedicines([]);
+                          setToastMessage('Captured prescription deleted from Cloudflare R2.');
+                          setTimeout(() => setToastMessage(null), 3500);
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                        title="Delete photo and purge from Cloudflare R2"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">delete</span>
+                        <span>Delete Photo</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => setIsCameraModalOpen(true)}
@@ -1345,19 +1378,29 @@ export default function NewCheck() {
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        if (extractedMeta?.storageUrl) {
+                          await deleteDocumentRecord(extractedMeta.storageKey || '', extractedMeta.storageUrl);
+                        }
+                        if (extractedMedicines.length > 0) {
+                          const extractedNames = new Set(extractedMedicines.map((m) => m.drugName.toLowerCase()));
+                          setPrescriptions((prev) => prev.filter((p) => !extractedNames.has(p.drugName.toLowerCase())));
+                        }
                         setExtractedMeta(null);
                         setExtractedMedicines([]);
                         setUploadedFileName('');
                         setUploadedFileSize('');
                         setCapturedPhoto(null);
+                        setToastMessage('Document purged from Cloudflare R2 and unsaved items cleared.');
+                        setTimeout(() => setToastMessage(null), 3500);
                       }}
-                      className="px-2.5 py-1 rounded-lg border border-surface-container-high text-xs font-medium text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50/60 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Clear extracted items and purge document from Cloudflare R2"
                     >
                       <span className="material-symbols-outlined text-[14px]">
-                        delete
+                        delete_sweep
                       </span>
-                      <span>Clear</span>
+                      <span>Clear &amp; Purge</span>
                     </button>
                   </div>
                 </div>
@@ -2128,19 +2171,20 @@ export default function NewCheck() {
         onCapture={handleCameraCapture}
       />
 
-      {/* Floating Toast Notification */}
+      {/* Floating Toast Notification - Positioned cleanly in bottom-right corner */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-20 right-6 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-emerald-500 backdrop-blur-md"
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 left-5 sm:left-auto max-w-sm sm:max-w-md z-50 bg-emerald-800 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold border border-emerald-600/60 backdrop-blur-md pointer-events-auto"
           >
-            <span className="material-symbols-outlined text-[20px] text-emerald-200">
-              verified
+            <span className="material-symbols-outlined text-[20px] text-emerald-300 shrink-0">
+              check_circle
             </span>
-            <span>{toastMessage}</span>
+            <span className="leading-snug">{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>

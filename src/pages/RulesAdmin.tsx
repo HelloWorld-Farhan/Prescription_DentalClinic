@@ -87,6 +87,34 @@ export default function RulesAdmin() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const handleCloseAddModal = async () => {
+    if (extractedFileMeta?.storageUrl) {
+      await deleteDocumentRecord('', extractedFileMeta.storageUrl);
+      setDocumentHistory(getDocumentHistory(currentUserId));
+      setToastMessage(`Cancelled: Staged document "${extractedFileMeta.filename}" purged from Cloudflare R2.`);
+      setTimeout(() => setToastMessage(null), 3500);
+    }
+    setIsAddModalOpen(false);
+    setUploadedFile(null);
+    setUploadSource('file');
+    setIsExtracting(false);
+    setManualFormError(null);
+    setDraftRules([emptyDraftRule()]);
+    setExtractedPreviewRules([]);
+    setExtractedFileMeta(null);
+    setAddModalMode('select');
+  };
+
+  const handleBackToUpload = async () => {
+    if (extractedFileMeta?.storageUrl) {
+      await deleteDocumentRecord('', extractedFileMeta.storageUrl);
+      setDocumentHistory(getDocumentHistory(currentUserId));
+    }
+    setExtractedFileMeta(null);
+    setExtractedPreviewRules([]);
+    setAddModalMode('upload');
+  };
+
   // Lock body scroll and handle Escape key for active modals
   useEffect(() => {
     if (!isAddModalOpen && !inspectRule && !isCameraModalOpen) return;
@@ -97,7 +125,7 @@ export default function RulesAdmin() {
       if (e.key === 'Escape') {
         if (isCameraModalOpen) setIsCameraModalOpen(false);
         else if (inspectRule) setInspectRule(null);
-        else if (isAddModalOpen) setIsAddModalOpen(false);
+        else if (isAddModalOpen) handleCloseAddModal();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -106,7 +134,7 @@ export default function RulesAdmin() {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isAddModalOpen, inspectRule, isCameraModalOpen]);
+  }, [isAddModalOpen, inspectRule, isCameraModalOpen, extractedFileMeta]);
 
   const handleOpenAddModal = () => {
     setAddModalMode('select');
@@ -1176,7 +1204,7 @@ export default function RulesAdmin() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={handleCloseAddModal}
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
               />
 
@@ -1229,7 +1257,7 @@ export default function RulesAdmin() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={handleCloseAddModal}
                   className="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
@@ -1688,7 +1716,7 @@ export default function RulesAdmin() {
                 {addModalMode !== 'preview' && (
                   <button
                     type="button"
-                    onClick={() => setIsAddModalOpen(false)}
+                    onClick={handleCloseAddModal}
                     className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
                   >
                     Cancel
@@ -1706,16 +1734,24 @@ export default function RulesAdmin() {
                     type="button"
                     disabled={!uploadedFile || isExtracting}
                     onClick={handleExtractFromDocument}
-                    className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                    className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer relative overflow-hidden select-none ${
                       uploadedFile && !isExtracting
                         ? 'bg-primary hover:bg-primary-hover text-white shadow-xs'
+                        : isExtracting
+                        ? 'bg-gradient-to-r from-teal-700 via-primary to-teal-800 text-white shadow-md animate-pulse cursor-wait'
                         : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
                     }`}
                   >
                     {isExtracting ? (
                       <>
-                        <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
-                        <span>Saving to R2 &amp; Extracting...</span>
+                        <motion.span
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 1.1, ease: 'linear' }}
+                          className="inline-flex shrink-0 items-center justify-center"
+                        >
+                          <span className="material-symbols-outlined text-[17px]">sync</span>
+                        </motion.span>
+                        <span className="tracking-wide">Saving to R2 &amp; Extracting...</span>
                       </>
                     ) : (
                       <>
@@ -1727,18 +1763,29 @@ export default function RulesAdmin() {
                 )}
 
                 {addModalMode === 'preview' && (
-                  <div className="flex items-center justify-between w-full">
-                    <button
-                      type="button"
-                      onClick={() => setAddModalMode('upload')}
-                      className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
-                    >
-                      Back to Upload
-                    </button>
+                  <div className="flex flex-col-reverse sm:flex-row items-center justify-between w-full gap-2.5">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={handleCloseAddModal}
+                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-rose-200 text-xs font-bold text-rose-700 bg-rose-50/70 hover:bg-rose-100 cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                        title="Discard rules and purge document from Cloudflare R2"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
+                        <span>Cancel &amp; Discard</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleBackToUpload}
+                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                      >
+                        Back to Upload
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={handleConfirmPreviewRules}
-                      className="px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <span className="material-symbols-outlined text-[16px]">save</span>
                       <span>Confirm &amp; Save All {extractedPreviewRules.length} Rules</span>
@@ -1992,17 +2039,18 @@ export default function RulesAdmin() {
         document.body
       )}
 
-      {/* Floating Toast Notification */}
+      {/* Floating Toast Notification - Positioned cleanly in bottom-right corner */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-20 right-6 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-emerald-500 backdrop-blur-md"
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 left-5 sm:left-auto max-w-sm sm:max-w-md z-50 bg-emerald-800 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold border border-emerald-600/60 backdrop-blur-md pointer-events-auto"
           >
-            <span className="material-symbols-outlined text-[20px] text-emerald-200">verified</span>
-            <span>{toastMessage}</span>
+            <span className="material-symbols-outlined text-[20px] text-emerald-300 shrink-0">check_circle</span>
+            <span className="leading-snug">{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>

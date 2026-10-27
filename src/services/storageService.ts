@@ -169,7 +169,9 @@ export async function deleteDocumentRecord(
   let deletedDoc: UploadedDocumentRecord | undefined;
   try {
     const existing = getDocumentHistory();
-    const index = existing.findIndex((d) => d.id === docId || (storageUrl && d.storageUrl === storageUrl));
+    const index = existing.findIndex(
+      (d) => (docId ? d.id === docId : false) || (storageUrl ? d.storageUrl === storageUrl : false)
+    );
     if (index !== -1) {
       deletedDoc = existing[index];
       existing.splice(index, 1);
