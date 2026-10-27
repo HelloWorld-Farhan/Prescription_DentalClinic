@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, INITIAL_PATIENTS, isMockPatient } from '../services/prescriptionService';
 import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
-import PrintableReportModal from '../components/PrintableReportModal';
 
 interface AllergyDetailInfo {
   name: string;
@@ -339,6 +338,11 @@ export default function NewCheck() {
 
   // --- START AUTOMATED SAFETY CHECK PIPELINE ---
   const handleStartSafetyCheck = () => {
+    if (!prescriptions || prescriptions.length === 0) {
+      alert('Please enter or queue at least one prescribed medication before running the clinical safety check.');
+      return;
+    }
+
     setFlowPhase('analyzing');
     setAnalysisProgress(5);
     setCurrentAnalysisStage(1);
@@ -1508,7 +1512,7 @@ export default function NewCheck() {
                 {/* Fullscreen A4 Report Preview */}
                 <button
                   type="button"
-                  onClick={() => navigate('/report')}
+                  onClick={() => navigate(`/report?id=${savedCheckRecord.id}`)}
                   className="w-full h-10 rounded-xl bg-surface-container-low hover:bg-surface-container text-primary font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">fullscreen</span>
@@ -1713,13 +1717,6 @@ export default function NewCheck() {
         onClose={() => setActiveAlertForDrawer(null)}
         onOverride={handleOverrideFromDrawer}
         onSelectAlternative={handleSelectAlternativeFromDrawer}
-      />
-
-      {/* Printable Report Modal */}
-      <PrintableReportModal
-        check={savedCheckRecord}
-        isOpen={reportModalOpen}
-        onClose={() => setReportModalOpen(false)}
       />
     </div>
   );

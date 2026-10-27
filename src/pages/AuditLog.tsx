@@ -1,14 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
-import { SafetyCheckRecord } from '../types';
-import PrintableReportModal from '../components/PrintableReportModal';
 import ExportAuditModal from '../components/ExportAuditModal';
 
 export default function AuditLog() {
+  const navigate = useNavigate();
   const [filterAction, setFilterAction] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeReportCheck, setActiveReportCheck] = useState<SafetyCheckRecord | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
 
   const logs = VirtualDb.getAuditLogs();
@@ -181,7 +180,8 @@ export default function AuditLog() {
                         type="button"
                         onClick={() => {
                           const targetCheck = checks.find(c => c.mrn === log.patientMrn || c.patientKey === log.patientMrn) || checks[0];
-                          if (targetCheck) setActiveReportCheck(targetCheck);
+                          if (targetCheck) navigate(`/report?id=${targetCheck.id}`);
+                          else navigate('/report');
                         }}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
                         title="View Associated Clinical Decision Report"
@@ -197,13 +197,6 @@ export default function AuditLog() {
           </table>
         </div>
       </div>
-
-      {/* Full Printable Clinical Report Modal */}
-      <PrintableReportModal
-        check={activeReportCheck}
-        isOpen={!!activeReportCheck}
-        onClose={() => setActiveReportCheck(null)}
-      />
 
       {/* Animated HIPAA Export Modal */}
       <ExportAuditModal

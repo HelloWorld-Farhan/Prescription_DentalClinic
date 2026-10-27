@@ -13,7 +13,7 @@ export default function Report() {
 
   const checkId = searchParams.get('id') || searchParams.get('checkId');
   const checks = VirtualDb.getChecks();
-  const currentCheck: SafetyCheckRecord = checks.find(c => c.id === checkId || c.checkNumber === checkId) || checks[0];
+  const currentCheck: SafetyCheckRecord | undefined = checks.find(c => c.id === checkId || c.checkNumber === checkId) || (checkId ? undefined : checks[0]);
 
   // Dynamic logged in prescriber
   let storedUser: any = null;
@@ -23,9 +23,19 @@ export default function Report() {
   } catch {
     storedUser = null;
   }
-  const prescriberName = currentCheck?.prescriberName || storedUser?.fullName || sessionStorage.getItem('rxguard_prescriber_name') || 'Authorized Prescriber';
+  const prescriberName = currentCheck?.prescriberName || currentCheck?.reviewerName || storedUser?.fullName || sessionStorage.getItem('rxguard_prescriber_name') || 'Authorized Prescriber';
   const prescriberRole = storedUser?.role || sessionStorage.getItem('rxguard_prescriber_role') || 'Clinical Prescriber';
   const prescriberNpi = sessionStorage.getItem('rxguard_prescriber_npi') || 'PH-88412';
+
+  const reportIdentifier = currentCheck?.checkNumber || (currentCheck?.id ? 'CHK-' + currentCheck.id.slice(-4).toUpperCase() : 'REP-2025-0419-892');
+  const sessionTrackingId = currentCheck ? `SES-${(currentCheck.id || 'SYN').slice(-8).toUpperCase()}-EHR-SYN` : 'SES-4910-EHR-SYN';
+  const timestampUtc = currentCheck?.timestamp ? `${currentCheck.timestamp} (UTC)` : '2026-04-14 09:32:18 UTC';
+  const clinicalFacility = currentCheck?.unit ? `Smile Clinic Health System — ${currentCheck.unit}` : 'Smile Clinic Health System — Inpatient Surgery & Dental Oncology';
+  const reviewerDisplay = currentCheck?.reviewerName || prescriberName;
+  const overallStatus = currentCheck?.overallStatus || 'Needs Professional Review';
+  const mrnHash = currentCheck?.patientKey || currentCheck?.mrn || 'MRN-HASH-9042-X';
+  const patientDisplayName = currentCheck?.patientName || '64y Male';
+  const patientAgeGender = currentCheck?.patientName ? `${currentCheck.patientName}` : '64y Male';
 
   const handleZoomChange = (val: number) => {
     setZoomScale(val);
@@ -45,23 +55,19 @@ export default function Report() {
 
   const handleExportJson = () => {
     const reportData = {
-      reportId: 'REP-2025-0419-892',
-      sessionTrackingId: 'SES-4910-EHR-SYN',
-      timestampUtc: '2026-04-14 09:32:18 UTC',
-      facility: 'Smile Clinic Health System — Inpatient Surgery & Dental Oncology',
+      reportId: reportIdentifier,
+      sessionTrackingId: sessionTrackingId,
+      timestampUtc: timestampUtc,
+      facility: clinicalFacility,
       reviewer: {
-        name: prescriberName,
+        name: reviewerDisplay,
         role: prescriberRole,
         npi: prescriberNpi,
         signatureHash: '0x93FA892B104E412'
       },
       patient: {
-        mrnHash: 'MRN-HASH-9042-X',
-        age: 64,
-        gender: 'Male',
-        weightKg: 78.5,
-        heightCm: 178,
-        bsa: '1.96 m²',
+        mrnHash: mrnHash,
+        name: patientDisplayName,
         renal: {
           egfr: '42 mL/min/1.73m² (CKD-EPI)',
           stage: 'Stage 3b',
@@ -69,39 +75,53 @@ export default function Report() {
           crcl: '41.2 mL/min (Cockcroft-Gault)'
         }
       },
-      evaluatedPrescription: {
-        drug: 'Ciprofloxacin HCl 500 mg Oral Tablet',
-        brand: 'Cipro',
-        rxNorm: '197507',
-        sig: '1 tab PO Q12H × 7 days',
-        quantity: '14 Tablets',
-        indication: 'Pyelonephritis (ICD-10: N10)',
-        prescriber: `${prescriberName} (NPI: ${prescriberNpi})`
-      },
-      alertsEvaluated: [
-        {
-          ruleId: 'RENAL-ADJ-CIPRO-04',
-          severity: 'High',
-          finding: 'Fluoroquinolone + Reduced Renal Clearance (eGFR 42)',
-          action: 'Reduce oral dose to 250-500 mg Q18-24H',
-          status: 'Overridden with Protocol Justification',
-          justification: 'Attack window high-dose therapy authorized with daily telemetry.'
-        },
-        {
-          ruleId: 'DDI-WARFARIN-CIPRO-12',
-          severity: 'Moderate',
-          finding: 'Drug-Drug: Ciprofloxacin + Warfarin (CYP1A2 inhibition)',
-          action: 'Monitor INR on Days 2, 4, 7; anticipate 20-30% Warfarin reduction',
-          status: 'Acknowledged & Monitored'
-        },
-        {
-          ruleId: 'ADMIN-CHEL-09',
-          severity: 'Info',
-          finding: 'Polyvalent Cation Chelation Timing with oral minerals',
-          action: 'Space ingestion >= 2h before or 6h after multivalent ions',
-          status: 'Resolved'
-        }
-      ],
+      evaluatedPrescription: currentCheck?.prescriptions && currentCheck.prescriptions.length > 0
+        ? currentCheck.prescriptions.map(p => ({
+            drug: `${p.drugName} ${p.dosage}`,
+            sig: `${p.frequency} (${p.route}) × ${p.duration}`,
+            indication: p.indication || 'Dental Therapy'
+          }))
+        : {
+            drug: 'Ciprofloxacin HCl 500 mg Oral Tablet',
+            brand: 'Cipro',
+            rxNorm: '197507',
+            sig: '1 tab PO Q12H × 7 days',
+            quantity: '14 Tablets',
+            indication: 'Pyelonephritis (ICD-10: N10)',
+            prescriber: `${reviewerDisplay} (NPI: ${prescriberNpi})`
+          },
+      alertsEvaluated: currentCheck?.alerts && currentCheck.alerts.length > 0
+        ? currentCheck.alerts.map(a => ({
+            ruleId: a.id,
+            severity: a.severity,
+            finding: a.title,
+            action: a.recommendation,
+            status: a.overridden ? 'Overridden with Protocol Justification' : 'Active Flag'
+          }))
+        : [
+            {
+              ruleId: 'RENAL-ADJ-CIPRO-04',
+              severity: 'High',
+              finding: 'Fluoroquinolone + Reduced Renal Clearance (eGFR 42)',
+              action: 'Reduce oral dose to 250-500 mg Q18-24H',
+              status: 'Overridden with Protocol Justification',
+              justification: 'Attack window high-dose therapy authorized with daily telemetry.'
+            },
+            {
+              ruleId: 'DDI-WARFARIN-CIPRO-12',
+              severity: 'Moderate',
+              finding: 'Drug-Drug: Ciprofloxacin + Warfarin (CYP1A2 inhibition)',
+              action: 'Monitor INR on Days 2, 4, 7; anticipate 20-30% Warfarin reduction',
+              status: 'Acknowledged & Monitored'
+            },
+            {
+              ruleId: 'ADMIN-CHEL-09',
+              severity: 'Info',
+              finding: 'Polyvalent Cation Chelation Timing with oral minerals',
+              action: 'Space ingestion >= 2h before or 6h after multivalent ions',
+              status: 'Resolved'
+            }
+          ],
       compliance: '21 CFR Part 11 and HIPAA Safe Harbor De-Identified Protocol Verified'
     };
 
@@ -109,45 +129,12 @@ export default function Report() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'REP-2025-0419-892-Clinical-Verification.json';
+    link.download = `${reportIdentifier}-Clinical-Verification.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-
-  if (!currentCheck) {
-    return (
-      <div className="flex flex-col w-full bg-background min-h-screen">
-        <header className="sticky top-0 z-30 w-full bg-surface-container-lowest px-4 sm:px-6 py-3 shadow-sm border-b border-surface-container-high/60 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2 text-xs font-bold text-primary hover:underline">
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            <span>Back to Clinical Dashboard</span>
-          </Link>
-        </header>
-
-        <main className="flex-1 flex items-center justify-center p-6">
-          <div className="max-w-md w-full bg-surface-container-lowest rounded-2xl border border-surface-container-high/60 p-8 shadow-xs text-center flex flex-col items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-surface-container text-primary flex items-center justify-center shadow-xs">
-              <span className="material-symbols-outlined text-3xl">description</span>
-            </div>
-            <h2 className="text-base font-bold text-on-surface">No Clinical Safety Report Selected</h2>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              There are no active screening reports evaluated yet. Initiate a clinical drug screening check to generate an authenticated verification report.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/check')}
-              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary-hover transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">add_circle</span>
-              <span>Start New Safety Check</span>
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
 
   return (
     <motion.div
@@ -165,7 +152,7 @@ export default function Report() {
                 Dashboard
               </Link>
               <span>/</span>
-              <span className="text-on-surface font-semibold">Verification Audit #REP-2025-0419-892</span>
+              <span className="text-on-surface font-semibold">Verification Audit #{reportIdentifier}</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container text-secondary text-xs font-semibold">
@@ -309,34 +296,34 @@ export default function Report() {
                     <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-semibold">
                       Report Identifier
                     </span>
-                    <span className="font-semibold text-slate-800 font-mono">REP-2025-0419-892</span>
+                    <span className="font-semibold text-slate-800 font-mono">{reportIdentifier}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-semibold">
                       Session Tracking ID
                     </span>
-                    <span className="font-semibold text-slate-800 font-mono">SES-4910-EHR-SYN</span>
+                    <span className="font-semibold text-slate-800 font-mono">{sessionTrackingId}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-semibold">
                       Timestamp (UTC)
                     </span>
-                    <span className="font-semibold text-slate-800">2026-04-14 09:32:18 UTC</span>
+                    <span className="font-semibold text-slate-800">{timestampUtc}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-semibold">
                       Clinical Facility
                     </span>
                     <span className="font-semibold text-slate-800">
-                      Smile Clinic Health System — Inpatient Surgery
+                      {clinicalFacility}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-semibold">
-                      Reviewing Pharmacist
+                      Reviewing Clinician
                     </span>
                     <span className="font-semibold text-slate-800">
-                      {prescriberName} (Lic #{prescriberNpi})
+                      {reviewerDisplay} (Lic #{prescriberNpi})
                     </span>
                   </div>
                   <div>
@@ -350,23 +337,37 @@ export default function Report() {
             </header>
 
             {/* SECTION B: Overall Clinical Assessment Banner */}
-            <section className="bg-sky-50 border border-sky-100 rounded-xl p-4 flex flex-col gap-2.5">
+            <section className={`border rounded-xl p-4 flex flex-col gap-2.5 ${
+              overallStatus === 'Contraindicated'
+                ? 'bg-rose-50 border-rose-200'
+                : overallStatus === 'Requires Review' || overallStatus === 'Needs Professional Review'
+                ? 'bg-sky-50 border-sky-100'
+                : 'bg-emerald-50 border-emerald-200'
+            }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-800">Overall Screening Status:</span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#007782] text-white text-xs font-bold shadow-xs">
-                    <span className="material-symbols-outlined text-[15px]">rate_review</span>
-                    <span>Needs Professional Review</span>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs font-bold shadow-xs ${
+                    overallStatus === 'Contraindicated'
+                      ? 'bg-rose-700'
+                      : overallStatus === 'Requires Review' || overallStatus === 'Needs Professional Review'
+                      ? 'bg-[#007782]'
+                      : 'bg-emerald-600'
+                  }`}>
+                    <span className="material-symbols-outlined text-[15px]">
+                      {overallStatus === 'Safe to Dispense' ? 'check_circle' : overallStatus === 'Contraindicated' ? 'dangerous' : 'rate_review'}
+                    </span>
+                    <span>{overallStatus}</span>
                   </span>
                 </div>
                 <div className="text-xs text-sky-800 font-semibold">
-                  Dispensing Release: <strong className="text-slate-900">Conditioned on Prescriber Consultation</strong>
+                  Dispensing Release: <strong className="text-slate-900">{overallStatus === 'Safe to Dispense' ? 'Authorized for Dispensing' : 'Conditioned on Prescriber Consultation'}</strong>
                 </div>
               </div>
               <div className="text-xs text-slate-600 bg-white/80 p-2.5 rounded-lg flex items-start gap-2 border border-sky-100">
                 <span className="material-symbols-outlined text-sky-600 text-[18px] shrink-0 mt-0.5">info</span>
                 <span>
-                  Clinical decision support only. Not a definitive safety declaration. Confirm with a licensed prescriber or pharmacist. Quantitative Check Matrix: <strong>9 Checks Evaluated</strong> • <strong>2 Alerts Flagged</strong> • <strong>1 Overridden</strong> • <strong>1 Acknowledged</strong> • <strong>0 Unresolved Blockers</strong>
+                  Clinical decision support only. Not a definitive safety declaration. Confirm with a licensed prescriber or pharmacist. Quantitative Check Matrix: <strong>{currentCheck?.prescriptions ? currentCheck.prescriptions.length * 3 : 9} Checks Evaluated</strong> • <strong>{currentCheck?.alerts ? currentCheck.alerts.length : 2} Alerts Flagged</strong> • <strong>0 Unresolved Blockers</strong>
                 </span>
               </div>
             </section>
@@ -385,11 +386,11 @@ export default function Report() {
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-slate-500">Patient MRN Hash:</span>
-                      <span className="font-mono font-semibold text-slate-800">MRN-HASH-9042-X</span>
+                      <span className="font-mono font-semibold text-slate-800">{mrnHash}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Age &amp; Gender:</span>
-                      <span className="font-semibold text-slate-800">64y Male</span>
+                      <span className="font-semibold text-slate-800">{patientAgeGender}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Weight / Height:</span>
@@ -425,40 +426,69 @@ export default function Report() {
                   <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
                     <span className="text-xs font-bold text-[#005c65]">Evaluated Prescription Order</span>
                     <span className="px-2 py-0.5 rounded bg-[#007782] text-white text-[10px] font-bold">
-                      New Candidate Rx
+                      {currentCheck?.prescriptions?.length || 1} Candidate Rx Item{(currentCheck?.prescriptions?.length || 1) > 1 ? 's' : ''}
                     </span>
                   </div>
-                  <div className="space-y-2.5">
-                    <div>
-                      <div className="text-base font-bold text-slate-900">Ciprofloxacin HCl (Brand: Cipro)</div>
-                      <div className="text-[11px] text-slate-500 font-mono">
-                        RxNorm: 197507 • ATC: J01MA02 • Class: Fluoroquinolone
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Dosage Form:</span>
-                        <span className="font-semibold text-slate-800">500 mg Oral Tablet (Film-Coated)</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Sig &amp; Frequency:</span>
-                        <span className="font-semibold text-slate-800">1 tab PO Q12H × 7 days</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Total Quantity:</span>
-                        <span className="font-semibold text-slate-800">14 Tablets (0 Refills)</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Clinical Indication:</span>
-                        <span className="font-semibold text-slate-800">Acute Dental Infection / Pyelonephritis</span>
-                      </div>
-                    </div>
+                  <div className="space-y-3">
+                    {currentCheck?.prescriptions && currentCheck.prescriptions.length > 0 ? (
+                      currentCheck.prescriptions.map((rx, idx) => (
+                        <div key={rx.id || idx} className="space-y-1.5 pb-2 border-b border-slate-100 last:border-0 last:pb-0">
+                          <div>
+                            <div className="text-base font-bold text-slate-900">{rx.drugName} {rx.genericName ? `(${rx.genericName})` : ''}</div>
+                            <div className="text-[11px] text-slate-500 font-mono">
+                              Dosage: {rx.dosage} • Route: {rx.route || 'Oral (PO)'}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                            <div>
+                              <span className="text-slate-400 block text-[10px] uppercase font-semibold">Sig &amp; Frequency:</span>
+                              <span className="font-semibold text-slate-800">{rx.frequency || 'Standard dosing'}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px] uppercase font-semibold">Duration:</span>
+                              <span className="font-semibold text-slate-800">{rx.duration || '7 days'}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-slate-400 block text-[10px] uppercase font-semibold">Clinical Indication:</span>
+                              <span className="font-semibold text-slate-800">{rx.indication || 'Dental Therapy / Infection Protocol'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        <div>
+                          <div className="text-base font-bold text-slate-900">Ciprofloxacin HCl (Brand: Cipro)</div>
+                          <div className="text-[11px] text-slate-500 font-mono">
+                            RxNorm: 197507 • ATC: J01MA02 • Class: Fluoroquinolone
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-semibold">Dosage Form:</span>
+                            <span className="font-semibold text-slate-800">500 mg Oral Tablet (Film-Coated)</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-semibold">Sig &amp; Frequency:</span>
+                            <span className="font-semibold text-slate-800">1 tab PO Q12H × 7 days</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-semibold">Total Quantity:</span>
+                            <span className="font-semibold text-slate-800">14 Tablets (0 Refills)</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-semibold">Clinical Indication:</span>
+                            <span className="font-semibold text-slate-800">Acute Dental Infection / Pyelonephritis</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="text-[11px] flex flex-col sm:flex-row justify-between text-slate-500 gap-1 pt-3 border-t border-slate-100">
                   <div>
                     <span>Prescriber: </span>
-                    <strong className="text-slate-800">{prescriberName}</strong>
+                    <strong className="text-slate-800">{reviewerDisplay}</strong>
                     <span className="font-mono text-slate-400"> ({prescriberRole})</span>
                   </div>
                   <div className="font-mono text-slate-400 text-[10px]">
@@ -561,87 +591,128 @@ export default function Report() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-800">
-                    {/* Row 1 */}
-                    <tr className="hover:bg-slate-50/50">
-                      <td className="py-3 px-3 align-top">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold">
-                          <span className="material-symbols-outlined text-[13px]">error</span>
-                          High
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 align-top">
-                        <div className="font-bold text-slate-900">Fluoroquinolone + Reduced Renal Clearance</div>
-                        <div className="text-slate-500 mt-0.5 text-[11px]">
-                          eGFR 42 mL/min/1.73m² (CrCl 41.2). Ciprofloxacin accumulation may heighten neurotoxicity and QTc prolongation.
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 align-top">
-                        <div className="font-mono text-[10px] text-[#005c65] font-bold">RENAL-ADJ-CIPRO-04</div>
-                        <div className="text-slate-400 text-[10px]">FDA Boxed / KDIGO 2026</div>
-                      </td>
-                      <td className="py-3 px-3 align-top text-slate-600">
-                        Reduce oral dose to 250–500 mg Q18–24H based on renal trajectory.
-                      </td>
-                      <td className="py-3 px-3 align-top text-right">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-100 text-sky-800 text-[11px] font-semibold">
-                          Overridden
-                        </span>
-                      </td>
-                    </tr>
-                    {/* Row 2 */}
-                    <tr className="bg-amber-50/30 hover:bg-amber-50/50">
-                      <td className="py-3 px-3 align-top">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-bold">
-                          <span className="material-symbols-outlined text-[13px]">warning</span>
-                          Moderate
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 align-top">
-                        <div className="font-bold text-slate-900">Drug-Drug: Ciprofloxacin + Warfarin</div>
-                        <div className="text-slate-500 mt-0.5 text-[11px]">
-                          CYP1A2 inhibition and gut microbiome disruption may significantly increase INR and bleeding risk.
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 align-top">
-                        <div className="font-mono text-[10px] text-[#005c65] font-bold">DDI-WARFARIN-CIPRO-12</div>
-                        <div className="text-slate-400 text-[10px]">Lexicomp / FDB v2026.1</div>
-                      </td>
-                      <td className="py-3 px-3 align-top text-slate-600">
-                        Monitor INR on Days 2, 4, and 7; anticipate 20-30% Warfarin dose reduction.
-                      </td>
-                      <td className="py-3 px-3 align-top text-right">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[11px] font-medium">
-                          Acknowledged
-                        </span>
-                      </td>
-                    </tr>
-                    {/* Row 3 */}
-                    <tr className="hover:bg-slate-50/50">
-                      <td className="py-3 px-3 align-top">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[11px] font-semibold">
-                          <span className="material-symbols-outlined text-[13px]">info</span>
-                          Info
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 align-top">
-                        <div className="font-bold text-slate-900">Polyvalent Cation Chelation Timing</div>
-                        <div className="text-slate-500 mt-0.5 text-[11px]">
-                          Space ingestion ≥2h before or 6h after multivalent ions/dairy supplements.
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 align-top">
-                        <div className="font-mono text-[10px] text-[#005c65] font-bold">ADMIN-CHEL-09</div>
-                        <div className="text-slate-400 text-[10px]">USP Monograph 2026</div>
-                      </td>
-                      <td className="py-3 px-3 align-top text-slate-600">
-                        Append nursing MAR administration interval guidance.
-                      </td>
-                      <td className="py-3 px-3 align-top text-right">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-medium">
-                          Resolved
-                        </span>
-                      </td>
-                    </tr>
+                    {currentCheck?.alerts && currentCheck.alerts.length > 0 ? (
+                      currentCheck.alerts.map((alert) => (
+                        <tr key={alert.id} className="hover:bg-slate-50/50">
+                          <td className="py-3 px-3 align-top">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                              alert.severity === 'contraindicated'
+                                ? 'bg-rose-100 text-rose-800'
+                                : alert.severity === 'major'
+                                ? 'bg-amber-100 text-amber-900'
+                                : 'bg-teal-100 text-teal-800'
+                            }`}>
+                              <span className="material-symbols-outlined text-[13px]">
+                                {alert.severity === 'contraindicated' ? 'error' : alert.severity === 'major' ? 'warning' : 'info'}
+                              </span>
+                              {alert.severity}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 align-top">
+                            <div className="font-bold text-slate-900">{alert.title}</div>
+                            <div className="text-slate-500 mt-0.5 text-[11px]">{alert.description}</div>
+                          </td>
+                          <td className="py-3 px-3 align-top">
+                            <div className="font-mono text-[10px] text-[#005c65] font-bold">{alert.id.toUpperCase()}</div>
+                            <div className="text-slate-400 text-[10px]">{alert.evidenceGrade || 'FDA Boxed / CDS Engine'}</div>
+                          </td>
+                          <td className="py-3 px-3 align-top text-slate-600">
+                            {alert.recommendation}
+                          </td>
+                          <td className="py-3 px-3 align-top text-right">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${
+                              alert.overridden ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-700'
+                            }`}>
+                              {alert.overridden ? 'Overridden' : 'Active Flag'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <>
+                        {/* Row 1 */}
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="py-3 px-3 align-top">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold">
+                              <span className="material-symbols-outlined text-[13px]">error</span>
+                              High
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 align-top">
+                            <div className="font-bold text-slate-900">Fluoroquinolone + Reduced Renal Clearance</div>
+                            <div className="text-slate-500 mt-0.5 text-[11px]">
+                              eGFR 42 mL/min/1.73m² (CrCl 41.2). Ciprofloxacin accumulation may heighten neurotoxicity and QTc prolongation.
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 align-top">
+                            <div className="font-mono text-[10px] text-[#005c65] font-bold">RENAL-ADJ-CIPRO-04</div>
+                            <div className="text-slate-400 text-[10px]">FDA Boxed / KDIGO 2026</div>
+                          </td>
+                          <td className="py-3 px-3 align-top text-slate-600">
+                            Reduce oral dose to 250–500 mg Q18–24H based on renal trajectory.
+                          </td>
+                          <td className="py-3 px-3 align-top text-right">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-100 text-sky-800 text-[11px] font-semibold">
+                              Overridden
+                            </span>
+                          </td>
+                        </tr>
+                        {/* Row 2 */}
+                        <tr className="bg-amber-50/30 hover:bg-amber-50/50">
+                          <td className="py-3 px-3 align-top">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-bold">
+                              <span className="material-symbols-outlined text-[13px]">warning</span>
+                              Moderate
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 align-top">
+                            <div className="font-bold text-slate-900">Drug-Drug: Ciprofloxacin + Warfarin</div>
+                            <div className="text-slate-500 mt-0.5 text-[11px]">
+                              CYP1A2 inhibition and gut microbiome disruption may significantly increase INR and bleeding risk.
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 align-top">
+                            <div className="font-mono text-[10px] text-[#005c65] font-bold">DDI-WARFARIN-CIPRO-12</div>
+                            <div className="text-slate-400 text-[10px]">Lexicomp / FDB v2026.1</div>
+                          </td>
+                          <td className="py-3 px-3 align-top text-slate-600">
+                            Monitor INR on Days 2, 4, and 7; anticipate 20-30% Warfarin dose reduction.
+                          </td>
+                          <td className="py-3 px-3 align-top text-right">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[11px] font-medium">
+                              Acknowledged
+                            </span>
+                          </td>
+                        </tr>
+                        {/* Row 3 */}
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="py-3 px-3 align-top">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[11px] font-semibold">
+                              <span className="material-symbols-outlined text-[13px]">info</span>
+                              Info
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 align-top">
+                            <div className="font-bold text-slate-900">Polyvalent Cation Chelation Timing</div>
+                            <div className="text-slate-500 mt-0.5 text-[11px]">
+                              Space ingestion ≥2h before or 6h after multivalent ions/dairy supplements.
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 align-top">
+                            <div className="font-mono text-[10px] text-[#005c65] font-bold">ADMIN-CHEL-09</div>
+                            <div className="text-slate-400 text-[10px]">USP Monograph 2026</div>
+                          </td>
+                          <td className="py-3 px-3 align-top text-slate-600">
+                            Append nursing MAR administration interval guidance.
+                          </td>
+                          <td className="py-3 px-3 align-top text-right">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-medium">
+                              Resolved
+                            </span>
+                          </td>
+                        </tr>
+                      </>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -720,9 +791,9 @@ export default function Report() {
                     </div>
                   </div>
                   <div className="sm:text-right shrink-0 bg-white px-3 py-2 rounded-lg border border-teal-100 shadow-2xs">
-                    <div className="font-bold text-slate-900 text-xs">{prescriberName}</div>
+                    <div className="font-bold text-slate-900 text-xs">{reviewerDisplay}</div>
                     <div className="text-[10px] text-slate-400 font-mono">Digital Sig: 0x93FA...E412</div>
-                    <div className="text-[10px] text-[#005c65] font-medium">2026-04-14 09:32:18 UTC</div>
+                    <div className="text-[10px] text-[#005c65] font-medium">{timestampUtc}</div>
                   </div>
                 </div>
               </div>
@@ -777,7 +848,7 @@ export default function Report() {
       <DownloadFormatModal
         isOpen={showDownloadModal}
         onClose={() => setShowDownloadModal(false)}
-        check={currentCheck}
+        check={currentCheck || null}
         onPrintFallback={handlePrint}
       />
     </motion.div>

@@ -1,19 +1,18 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
 import { DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
-import PrintableReportModal from '../components/PrintableReportModal';
 
 export default function Alerts() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
 
   const [activeTab, setActiveTab] = useState<'all' | 'contraindicated' | 'major' | 'overridden'>('all');
   const [searchTerm, setSearchTerm] = useState(queryParam);
   const [activeDrawerAlert, setActiveDrawerAlert] = useState<DrugInteractionAlert | null>(null);
-  const [activeReportCheck, setActiveReportCheck] = useState<SafetyCheckRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => {
@@ -162,10 +161,7 @@ export default function Alerts() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        const targetCheck = checks.find(c => c.id === item.checkId);
-                        if (targetCheck) setActiveReportCheck(targetCheck);
-                      }}
+                      onClick={() => navigate(`/report?id=${item.checkId}`)}
                       className="px-3 py-1.5 rounded-xl bg-surface-container text-secondary font-bold text-xs hover:bg-surface-container-high transition-all flex items-center gap-1.5 border border-surface-container-high shadow-2xs cursor-pointer"
                       title="View Clinical Report"
                     >
@@ -215,13 +211,6 @@ export default function Alerts() {
         isOpen={!!activeDrawerAlert}
         onClose={() => setActiveDrawerAlert(null)}
         onOverride={handleOverride}
-      />
-
-      {/* Full Printable Clinical Report Modal */}
-      <PrintableReportModal
-        check={activeReportCheck}
-        isOpen={!!activeReportCheck}
-        onClose={() => setActiveReportCheck(null)}
       />
 
       {/* Floating Signed Protocol Toast */}

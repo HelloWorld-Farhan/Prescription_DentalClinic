@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
 import { SafetyCheckRecord, DrugInteractionAlert } from '../types';
-import PrintableReportModal from '../components/PrintableReportModal';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CustomDropdown from '../components/CustomDropdown';
 import AnimatedCounter from '../components/AnimatedCounter';
@@ -55,7 +54,6 @@ export default function Dashboard() {
   const [selectedUnit, setSelectedUnit] = useState('All Units');
   const [timeRange, setTimeRange] = useState('Today');
   const [searchFilter, setSearchFilter] = useState('');
-  const [activeReportCheck, setActiveReportCheck] = useState<SafetyCheckRecord | null>(null);
   const [activeDrawerAlert, setActiveDrawerAlert] = useState<DrugInteractionAlert | null>(null);
   const [activeDrawerCheckId, setActiveDrawerCheckId] = useState<string>('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -129,9 +127,9 @@ export default function Dashboard() {
       setActiveDrawerCheckId(check.id);
       setIsDrawerOpen(true);
     } else {
-      setActiveReportCheck(check);
+      navigate(`/report?id=${check.id}`);
     }
-  }, []);
+  }, [navigate]);
 
   const handleBatchSync = useCallback(() => {
     setIsBatchSyncing(true);
@@ -583,7 +581,7 @@ export default function Dashboard() {
                             <motion.button
                               type="button"
                               whileTap={{ scale: 0.98 }}
-                              onClick={() => setActiveReportCheck(check)}
+                              onClick={() => navigate(`/report?id=${check.id}`)}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors duration-150 text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
                               title="Open Clinical Decision Report"
                             >
@@ -753,12 +751,6 @@ export default function Dashboard() {
           setToastMessage('Clinical decision signed & recorded into HIPAA audit trail');
           setTimeout(() => setToastMessage(null), 4000);
         }}
-      />
-
-      <PrintableReportModal
-        check={activeReportCheck}
-        isOpen={!!activeReportCheck}
-        onClose={() => setActiveReportCheck(null)}
       />
 
       {/* Floating Signed Protocol Toast */}

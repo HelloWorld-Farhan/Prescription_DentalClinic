@@ -22,7 +22,19 @@ export const isMockPatient = (p: any): boolean => {
   );
 };
 
-// Purge legacy mock rules, audits, and mock patient seeds if present
+export const isDummyCheck = (c: any): boolean => {
+  if (!c || typeof c !== 'object') return true;
+  if (c.checkNumber === 'CHK-2026-5869' || c.id === 'CHK-2026-5869') return true;
+  const rxList = c.prescriptions || [];
+  if (!Array.isArray(rxList) || rxList.length === 0) return true;
+  const hasValidRx = rxList.some(
+    (p: any) => p && p.drugName && p.drugName.trim().length > 0 && p.drugName.trim().toLowerCase() !== 'unspecified'
+  );
+  if (!hasValidRx) return true;
+  return false;
+};
+
+// Purge legacy mock rules, audits, mock patient seeds, and dummy checks if present
 try {
   localStorage.removeItem('smileclinic_rules');
   localStorage.removeItem('smileclinic_rules_v5');
@@ -31,6 +43,15 @@ try {
   localStorage.removeItem('smileclinic_patients_v2');
   localStorage.removeItem('smileclinic_custom_prescriber_password');
   localStorage.removeItem('smileclinic_registered_doctors');
+
+  const rawChecks = localStorage.getItem(STORAGE_KEYS.CHECKS);
+  if (rawChecks) {
+    const parsed = JSON.parse(rawChecks);
+    if (Array.isArray(parsed)) {
+      const realChecks = parsed.filter(c => !isDummyCheck(c));
+      localStorage.setItem(STORAGE_KEYS.CHECKS, JSON.stringify(realChecks));
+    }
+  }
 } catch {
   // ignore
 }
@@ -160,7 +181,14 @@ export class PrescriptionStorage {
   static getChecks(): SafetyCheckRecord[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.CHECKS);
-      return raw ? JSON.parse(raw) : INITIAL_CHECKS;
+      if (!raw) return INITIAL_CHECKS;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return INITIAL_CHECKS;
+      const realOnly = parsed.filter(c => !isDummyCheck(c));
+      if (realOnly.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEYS.CHECKS, JSON.stringify(realOnly));
+      }
+      return realOnly;
     } catch {
       return INITIAL_CHECKS;
     }
@@ -168,6 +196,16 @@ export class PrescriptionStorage {
 
   static getCheckById(id: string): SafetyCheckRecord | undefined {
     return this.getChecks().find(c => c.id === id || c.checkNumber === id);
+  }
+
+  static deleteCheck(id: string): SafetyCheckRecord[] {
+    const checks = this.getChecks().filter(c => c.id !== id && c.checkNumber !== id);
+    localStorage.setItem(STORAGE_KEYS.CHECKS, JSON.stringify(checks));
+    return checks;
+  }
+
+  static clearChecks() {
+    localStorage.removeItem(STORAGE_KEYS.CHECKS);
   }
 
   static addCheck(record: SafetyCheckRecord) {
