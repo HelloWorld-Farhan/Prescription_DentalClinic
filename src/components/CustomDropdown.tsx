@@ -96,7 +96,7 @@ export default function CustomDropdown({
 
         <motion.span
           animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
           className="material-symbols-outlined text-[18px] text-outline shrink-0 ml-1"
         >
           expand_more
@@ -107,10 +107,10 @@ export default function CustomDropdown({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.96 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
+            initial={{ opacity: 0, y: -8, scale: 0.96, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: -6, scale: 0.97, filter: 'blur(2px)' }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             role="listbox"
             className={`absolute top-full mt-1.5 ${
               align === 'right' ? 'right-0' : 'left-0'

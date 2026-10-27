@@ -634,10 +634,10 @@ export default function RulesAdmin() {
         {inspectRule && (
           <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
+              initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+              animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+              transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
               className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
               {/* Modal Top Header */}
@@ -742,9 +742,10 @@ export default function RulesAdmin() {
         {isAddModalOpen && (
           <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+              animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+              transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
               className="bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-2xl w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
             >
               {/* Modal Top Header */}

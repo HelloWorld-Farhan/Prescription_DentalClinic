@@ -517,8 +517,8 @@ export default function Layout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 lg:hidden cursor-pointer touch-none"
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-0 bg-black/45 backdrop-blur-sm z-40 lg:hidden cursor-pointer touch-none"
               onClick={() => setSidebarOpen(false)}
               onPointerDown={() => setSidebarOpen(false)}
               aria-hidden="true"
@@ -528,7 +528,7 @@ export default function Layout() {
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 220, mass: 0.85 }}
               drag="x"
               dragDirectionLock
               dragConstraints={{ left: -320, right: 0 }}
@@ -688,10 +688,10 @@ export default function Layout() {
                       onClick={() => setNotificationsOpen(false)}
                     />
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: 8 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: 8 }}
-                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                      initial={{ opacity: 0, scale: 0.95, y: 10, filter: 'blur(4px)' }}
+                      animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                      exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(2px)' }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                       className="fixed top-16 left-3 right-3 max-w-sm mx-auto sm:absolute sm:top-12 sm:left-auto sm:right-0 sm:w-96 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-50"
                     >
                       <div className="p-4 border-b border-surface-container-low flex items-center justify-between">
@@ -768,10 +768,10 @@ export default function Layout() {
                       onClick={() => setProfileOpen(false)}
                     />
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: 8 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: 8 }}
-                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                      initial={{ opacity: 0, scale: 0.95, y: 10, filter: 'blur(4px)' }}
+                      animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                      exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(2px)' }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                       className="fixed top-16 right-3 left-auto w-64 max-w-[calc(100vw-24px)] sm:absolute sm:top-12 sm:right-0 bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high p-2 z-50 space-y-1"
                     >
                       <div className="p-3 border-b border-surface-container-low bg-surface-container-low/30 rounded-t-xl space-y-1.5">
@@ -846,10 +846,10 @@ export default function Layout() {
           <ErrorBoundary fallbackTitle="Unable to load this clinical safety view">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ type: 'spring', stiffness: 360, damping: 27 }}
+              initial={{ opacity: 0, y: 14, filter: 'blur(3px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
+              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
               className="w-full transform-gpu will-change-transform"
             >
               <Outlet />
@@ -891,18 +891,18 @@ export default function Layout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
               onClick={() => setIsSearchOpen(false)}
-              className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+              className="fixed inset-0 bg-black/45 backdrop-blur-sm"
             />
 
             {/* Modal Dialog Window */}
             <motion.div
               ref={searchContainerRef}
-              initial={{ opacity: 0, y: -16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -16, scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 26 }}
+              initial={{ opacity: 0, y: -20, scale: 0.96, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -12, scale: 0.97, filter: 'blur(2px)' }}
+              transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
               className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col max-h-[82vh] divide-y divide-surface-container-low"
             >
               {/* Search Bar Input */}

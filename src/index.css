@@ -27,11 +27,65 @@
   }
 }
 
-/* 60fps GPU Hardware Acceleration Layer (used strictly on actively animating elements) */
+/* Modern Smooth Motion Design Tokens */
+:root {
+  --ease-modern: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-gentle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Global Smooth Transitions for interactive elements across the website */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+.transition-all,
+.transition-colors,
+.transition-transform,
+.transition-opacity {
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* 60fps GPU Hardware Acceleration Layer (used on actively animating elements) */
 .gpu-layer {
   transform: translateZ(0);
   backface-visibility: hidden;
   will-change: transform, opacity;
+}
+
+/* Modern slow-motion entrance keyframes */
+@keyframes modernFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes modernFadeIn {
+  0% {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+.animate-fade-in-up {
+  animation: modernFadeInUp 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: modernFadeIn 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Reduced Motion Clinical Accessibility Rule */

@@ -237,16 +237,16 @@ export default function FirstTimeOnboardingModal({ user, isOpen, onComplete }: F
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs"
           />
 
           {/* Unified Minimal Modal Container Matching App UI */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 14 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 14 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 340 }}
+            initial={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(5px)' }}
+            animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
+            transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
             className="relative w-full max-w-2xl bg-surface-container-lowest border-0 sm:border sm:border-surface-container-high rounded-none sm:rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col h-full sm:h-auto sm:max-h-[90vh] my-auto"
           >
             {/* Modal Header */}

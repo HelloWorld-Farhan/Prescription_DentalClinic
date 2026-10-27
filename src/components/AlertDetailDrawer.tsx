@@ -95,8 +95,9 @@ export default function AlertDetailDrawer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-black/45 backdrop-blur-sm"
           />
 
           {/* Slide-Over Drawer Canvas */}
@@ -104,7 +105,7 @@ export default function AlertDetailDrawer({
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+            transition={{ type: 'spring', damping: 32, stiffness: 220, mass: 0.85 }}
             className="fixed inset-y-0 right-0 max-w-3xl w-full bg-surface-container-lowest shadow-2xl z-50 flex flex-col border-l border-surface-container-high overflow-hidden"
           >
             {/* Top Fixed Drawer Header */}

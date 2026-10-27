@@ -64,6 +64,17 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "sans-serif"],
+      },
+      transitionTimingFunction: {
+        'modern': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        'gentle': 'cubic-bezier(0.22, 1, 0.36, 1)',
+        'slow-in-out': 'cubic-bezier(0.65, 0, 0.35, 1)',
+      },
+      transitionDuration: {
+        '250': '250ms',
+        '350': '350ms',
+        '400': '400ms',
+        '450': '450ms',
       }
     }
   },

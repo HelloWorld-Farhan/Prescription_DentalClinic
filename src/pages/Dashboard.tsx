@@ -143,16 +143,17 @@ export default function Dashboard() {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: { staggerChildren: 0.05 }
+      transition: { staggerChildren: 0.08 }
     }
   };
 
   const cardVariants = {
-    hidden: { opacity: 0, y: 12 },
+    hidden: { opacity: 0, y: 16, filter: 'blur(4px)' },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { type: 'spring' as const, stiffness: 350, damping: 26 }
+      filter: 'blur(0px)',
+      transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as const }
     }
   };
 
@@ -230,7 +231,7 @@ export default function Dashboard() {
         <motion.div
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-primary/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/check')}
         >
@@ -286,7 +287,7 @@ export default function Dashboard() {
         <motion.div
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#975A16]/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/alerts')}
         >
@@ -331,7 +332,7 @@ export default function Dashboard() {
         <motion.div
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className={`group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between relative overflow-hidden cursor-pointer transition-colors duration-200 transform-gpu will-change-transform ${
             highSeverityCount > 0 ? 'hover:border-error/50' : 'hover:border-emerald-500/40'
           }`}
@@ -396,7 +397,7 @@ export default function Dashboard() {
         <motion.div
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#553C9A]/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
           onClick={() => navigate('/rules')}
         >

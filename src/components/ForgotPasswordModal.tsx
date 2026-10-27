@@ -275,10 +275,10 @@ export default function ForgotPasswordModal({
 
         {/* Modal Window Container */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 16 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 16 }}
-          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ opacity: 0, scale: 0.95, y: 18, filter: 'blur(5px)' }}
+          animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, scale: 0.96, y: 12, filter: 'blur(3px)' }}
+          transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
           className="relative w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden z-10 flex flex-col"
         >
           {/* Top Clinical Header Strip */}
