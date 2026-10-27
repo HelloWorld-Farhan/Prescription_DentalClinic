@@ -327,17 +327,22 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Card 3: High-Severity Open */}
+        {/* Card 3: Critical Safety Alerts */}
         <motion.div
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.01 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-error/50 relative overflow-hidden cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
-          onClick={() => navigate('/alerts?q=contraindicated')}
+          className={`group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between relative overflow-hidden cursor-pointer transition-colors duration-200 transform-gpu will-change-transform ${
+            highSeverityCount > 0 ? 'hover:border-error/50' : 'hover:border-emerald-500/40'
+          }`}
+          onClick={() => navigate(highSeverityCount > 0 ? '/alerts?q=contraindicated' : '/alerts')}
+          title="Critical Safety Alerts: Real-time contraindicated drug interactions & safety conflicts"
         >
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[11px] uppercase tracking-wider text-outline font-bold">High-Severity Open</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Critical Safety Alerts</span>
+              </div>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
                   highSeverityCount > 0 ? 'text-error' : 'text-on-surface'
@@ -348,30 +353,40 @@ export default function Dashboard() {
                   highSeverityCount > 0 ? 'bg-[#FFDAD6] text-[#BA1A1A]' : 'bg-emerald-100 text-emerald-800'
                 }`}>
                   <span className="material-symbols-outlined text-[14px]">
-                    {highSeverityCount > 0 ? 'error' : 'check'}
+                    {highSeverityCount > 0 ? 'error' : 'check_circle'}
                   </span>
-                  {highSeverityCount > 0 ? 'Urgent' : 'Safe'}
+                  {highSeverityCount > 0 ? 'Urgent' : 'All Clear'}
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-[#FFDAD6] flex items-center justify-center text-[#BA1A1A] group-hover:bg-[#BA1A1A] group-hover:text-white transition-colors duration-200 shadow-2xs">
-              <span className="material-symbols-outlined text-[22px]">warning</span>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-200 shadow-2xs ${
+              highSeverityCount > 0
+                ? 'bg-[#FFDAD6] text-[#BA1A1A] group-hover:bg-[#BA1A1A] group-hover:text-white'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 group-hover:bg-emerald-600 group-hover:text-white'
+            }`}>
+              <span className="material-symbols-outlined text-[22px]">
+                {highSeverityCount > 0 ? 'warning' : 'health_and_safety'}
+              </span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between gap-1 z-10">
             <p className="text-[11px] text-on-surface-variant truncate">
-              {highSeverityCount > 0 ? `${highSeverityCount} critical flagged` : 'No open contraindications'}
+              {highSeverityCount > 0 ? `${highSeverityCount} critical flagged` : 'No active contraindications'}
             </p>
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate('/alerts?q=contraindicated');
+                navigate(highSeverityCount > 0 ? '/alerts?q=contraindicated' : '/alerts');
               }}
-              className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#BA1A1A] bg-[#FFDAD6] hover:bg-[#BA1A1A] hover:text-white transition-colors duration-150 text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
-              title="Inspect Urgent Contraindicated Alerts"
+              className={`group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg transition-colors duration-150 text-[11px] font-bold shadow-2xs cursor-pointer shrink-0 ${
+                highSeverityCount > 0
+                  ? 'text-[#BA1A1A] bg-[#FFDAD6] hover:bg-[#BA1A1A] hover:text-white'
+                  : 'text-on-surface-variant bg-surface-container-high hover:bg-primary hover:text-white'
+              }`}
+              title={highSeverityCount > 0 ? 'Inspect Urgent Contraindicated Alerts' : 'View Safety Alerts Queue'}
             >
-              <span>Inspect Urgent</span>
+              <span>{highSeverityCount > 0 ? 'Inspect Urgent' : 'View Queue'}</span>
               <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
             </button>
           </div>

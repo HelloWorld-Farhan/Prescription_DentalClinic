@@ -177,9 +177,11 @@ export default function RulesAdmin() {
   const filteredRules = rules.filter((r) => {
     const matchesCategory =
       categoryFilter === 'ALL' ||
-      (categoryFilter === 'Interaction' && r.category === 'Drug-Drug') ||
-      (categoryFilter === 'Allergy' && r.category === 'Drug-Allergy') ||
-      (categoryFilter === 'Dose' && r.category === 'Renal Dose Adjustment') ||
+      (categoryFilter === 'Interaction' && (r.category === 'Drug-Drug' || r.category.toLowerCase().includes('interaction'))) ||
+      (categoryFilter === 'Allergy' && (r.category === 'Drug-Allergy' || r.category.toLowerCase().includes('allergy'))) ||
+      (categoryFilter === 'Dose' && (r.category === 'Renal Dose Adjustment' || r.category.toLowerCase().includes('dose'))) ||
+      (categoryFilter === 'Condition' && (r.category === 'Drug-Condition' || r.category.toLowerCase().includes('condition'))) ||
+      (categoryFilter === 'Duplicate' && r.category.toLowerCase().includes('duplicate')) ||
       r.category.toLowerCase().includes(categoryFilter.toLowerCase());
 
     const matchesStatus =
@@ -187,10 +189,15 @@ export default function RulesAdmin() {
       (statusFilter === 'ACTIVE' && r.active) ||
       (statusFilter === 'INACTIVE' && !r.active);
 
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      r.drugA.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.drugB.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.description.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      r.id.toLowerCase().includes(q) ||
+      r.drugA.toLowerCase().includes(q) ||
+      r.drugB.toLowerCase().includes(q) ||
+      r.description.toLowerCase().includes(q) ||
+      r.category.toLowerCase().includes(q) ||
+      r.severity.toLowerCase().includes(q);
 
     return matchesCategory && matchesStatus && matchesSearch;
   });
@@ -343,8 +350,18 @@ export default function RulesAdmin() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search Rule ID, clinical mechanism, drug or condition..."
-                className="w-full h-10 pl-10 pr-3 rounded-xl bg-surface-container-low text-on-surface text-xs outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                className="w-full h-10 pl-10 pr-9 rounded-xl bg-surface-container-low text-on-surface text-xs outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-outline"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-outline hover:text-on-surface cursor-pointer p-0.5 rounded-md"
+                  title="Clear search"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -358,6 +375,7 @@ export default function RulesAdmin() {
                   { value: 'Interaction', label: 'Drug-Drug Interaction', icon: 'sync_alt' },
                   { value: 'Allergy', label: 'Allergy Conflict', icon: 'crisis_alert' },
                   { value: 'Dose', label: 'Dose & Frequency', icon: 'medication' },
+                  { value: 'Condition', label: 'Drug-Condition Conflict', icon: 'stethoscope' },
                   { value: 'Duplicate', label: 'Duplicate Therapy', icon: 'content_copy' },
                 ]}
               />
@@ -382,6 +400,8 @@ export default function RulesAdmin() {
                   setSearchQuery('');
                   setCategoryFilter('ALL');
                   setStatusFilter('ALL');
+                  setToastMessage('Filters cleared: Showing all rules');
+                  setTimeout(() => setToastMessage(null), 2500);
                 }}
                 className={`p-2.5 h-10 rounded-xl transition-all flex items-center justify-center cursor-pointer border ${
                   searchQuery !== '' || categoryFilter !== 'ALL' || statusFilter !== 'ALL'

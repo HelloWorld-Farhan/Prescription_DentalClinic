@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
@@ -32,6 +32,19 @@ export default function Alerts() {
     });
   });
 
+  const availableTabs = [
+    { key: 'all' as const, label: 'All Alerts', count: allAlerts.length },
+    { key: 'contraindicated' as const, label: 'Contraindicated (Urgent)', count: allAlerts.filter(a => a.alert?.severity === 'contraindicated').length },
+    { key: 'major' as const, label: 'Major Interactions', count: allAlerts.filter(a => a.alert?.severity === 'major').length },
+    { key: 'overridden' as const, label: 'Overridden History', count: allAlerts.filter(a => a.alert?.overridden).length }
+  ].filter(tab => tab.key === 'all' || tab.count > 0);
+
+  useEffect(() => {
+    if (activeTab !== 'all' && !availableTabs.some(t => t.key === activeTab)) {
+      setActiveTab('all');
+    }
+  }, [availableTabs, activeTab]);
+
   const filtered = allAlerts.filter(item => {
     const matchesTab =
       activeTab === 'all'
@@ -46,6 +59,10 @@ export default function Alerts() {
       (item.patientName || '').toLowerCase().includes(query) ||
       (item.mrn || '').toLowerCase().includes(query) ||
       (item.alert?.title || '').toLowerCase().includes(query) ||
+      (item.alert?.description || '').toLowerCase().includes(query) ||
+      (item.alert?.recommendation || '').toLowerCase().includes(query) ||
+      (item.alert?.clinicalImpact || '').toLowerCase().includes(query) ||
+      (item.alert?.mechanism || '').toLowerCase().includes(query) ||
       drugs.some(d => (d || '').toLowerCase().includes(query));
 
     return matchesTab && matchesSearch;
@@ -78,32 +95,37 @@ export default function Alerts() {
 
         {/* Search */}
         <div className="max-w-xs w-full">
-          <div className="relative flex items-center bg-surface-container-lowest rounded-xl px-3 py-2 border border-surface-container-high shadow-xs">
+          <div className="relative flex items-center bg-surface-container-lowest rounded-xl px-3 py-2 border border-surface-container-high shadow-xs focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <span className="material-symbols-outlined text-outline text-[18px] mr-2">search</span>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search alert, drug, patient..."
-              className="w-full text-xs text-on-surface bg-transparent outline-none"
+              placeholder="Search alert, drug, patient, MRN..."
+              className="w-full text-xs text-on-surface bg-transparent outline-none placeholder:text-outline"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="text-outline hover:text-on-surface cursor-pointer p-0.5 ml-1"
+                title="Clear search"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Tabs Filter */}
       <div className="flex items-center gap-2 border-b border-surface-container-high pb-3 overflow-x-auto no-scrollbar">
-        {[
-          { key: 'all', label: 'All Alerts', count: allAlerts.length },
-          { key: 'contraindicated', label: 'Contraindicated (Urgent)', count: allAlerts.filter(a => a.alert.severity === 'contraindicated').length },
-          { key: 'major', label: 'Major Interactions', count: allAlerts.filter(a => a.alert.severity === 'major').length },
-          { key: 'overridden', label: 'Overridden History', count: allAlerts.filter(a => a.alert.overridden).length }
-        ].map((tab) => (
+        {availableTabs.map((tab) => (
           <motion.button
             type="button"
             key={tab.key}
             whileTap={{ scale: 0.97 }}
-            onClick={() => setActiveTab(tab.key as any)}
+            onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeTab === tab.key
                 ? 'bg-primary text-white shadow-xs'

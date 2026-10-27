@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
@@ -13,13 +13,30 @@ export default function AuditLog() {
   const logs = VirtualDb.getAuditLogs();
   const checks = VirtualDb.getChecks();
 
+  const availableFilterItems = [
+    { label: 'All', count: logs.length },
+    { label: 'Safety Screen', count: logs.filter(l => l.action.includes('Safety Screen')).length },
+    { label: 'Alert Overridden', count: logs.filter(l => l.action.includes('Alert Overridden')).length },
+    { label: 'Report Printed', count: logs.filter(l => l.action.includes('Report Printed')).length },
+    { label: 'Rule Updated', count: logs.filter(l => l.action.includes('Rule Updated')).length },
+  ].filter(item => item.label === 'All' || item.count > 0);
+
+  useEffect(() => {
+    if (filterAction !== 'All' && !availableFilterItems.some(i => i.label === filterAction)) {
+      setFilterAction('All');
+    }
+  }, [availableFilterItems, filterAction]);
+
   const filteredLogs = logs.filter((log) => {
     const matchesAction = filterAction === 'All' || log.action.includes(filterAction);
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      log.clinicianName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.patientMrn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchQuery.toLowerCase());
+      log.clinicianName.toLowerCase().includes(q) ||
+      log.patientMrn.toLowerCase().includes(q) ||
+      log.details.toLowerCase().includes(q) ||
+      log.action.toLowerCase().includes(q) ||
+      (log.severity && log.severity.toLowerCase().includes(q)) ||
+      (log.timestamp && log.timestamp.toLowerCase().includes(q));
 
     return matchesAction && matchesSearch;
   });
@@ -53,13 +70,7 @@ export default function AuditLog() {
       {/* Filter and Search Bar */}
       <div className="p-4 bg-surface-container-lowest rounded-2xl border border-surface-container-high shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto no-scrollbar pb-0.5">
-          {[
-            { label: 'All', count: logs.length },
-            { label: 'Safety Screen', count: logs.filter(l => l.action.includes('Safety Screen')).length },
-            { label: 'Alert Overridden', count: logs.filter(l => l.action.includes('Alert Overridden')).length },
-            { label: 'Report Printed', count: logs.filter(l => l.action.includes('Report Printed')).length },
-            { label: 'Rule Updated', count: logs.filter(l => l.action.includes('Rule Updated')).length },
-          ].map((item) => {
+          {availableFilterItems.map((item) => {
             const isSelected = filterAction === item.label;
             return (
               <motion.button
