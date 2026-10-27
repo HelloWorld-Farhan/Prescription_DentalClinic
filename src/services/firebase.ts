@@ -29,13 +29,25 @@ export interface GoogleAuthResult {
 
 /**
  * Triggers 1-Click Google Sign-In popup with Firebase
+ * Supports loginHintEmail to preselect or restrict OAuth to that exact account.
  */
-export async function signInWithGooglePopup(): Promise<GoogleAuthResult | null> {
+export async function signInWithGooglePopup(loginHintEmail?: string): Promise<GoogleAuthResult | null> {
   if (!auth) {
     throw new Error('Google Sign-In is not configured. Missing VITE_FIREBASE_API_KEY environment variable.');
   }
   try {
-    const cred = await signInWithPopup(auth, googleProvider);
+    const provider = new GoogleAuthProvider();
+    if (loginHintEmail && loginHintEmail.trim()) {
+      provider.setCustomParameters({
+        login_hint: loginHintEmail.trim().toLowerCase(),
+        prompt: 'select_account'
+      });
+    } else {
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+    }
+    const cred = await signInWithPopup(auth, provider);
     const user = cred.user;
     if (!user.email) {
       throw new Error('Google account did not provide an email address.');

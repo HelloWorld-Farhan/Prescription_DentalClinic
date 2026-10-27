@@ -10,7 +10,8 @@ import {
   saveActiveSessions,
   getLoginHistory,
   recordLoginEvent,
-  getDeviceId
+  getDeviceId,
+  formatSessionTimestamp
 } from '../services/sessionAudit';
 
 export interface ClinicalProfile {
@@ -244,7 +245,7 @@ export default function Settings() {
         if (data && data.history && data.history.length > 0) {
           const mappedHistory: LoginHistoryItem[] = data.history.map((h: any) => ({
             id: h.id,
-            timestamp: h.created_at ? `Today at ${new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}` : 'Recent',
+            timestamp: h.created_at ? formatSessionTimestamp(h.created_at) : 'Active Now',
             device: h.device_name,
             browserOs: h.browser_os,
             ip: h.ip_address || '10.240.42.18',
@@ -313,8 +314,13 @@ export default function Settings() {
   const handleLinkGoogle = async () => {
     setIsLinkingGoogle(true);
     try {
-      const gUser = await signInWithGooglePopup();
+      const gUser = await signInWithGooglePopup(profile.email);
       if (!gUser) return;
+      if (profile.email && gUser.email.trim().toLowerCase() !== profile.email.trim().toLowerCase()) {
+        throw new Error(
+          `Email mismatch: This account is registered as "${profile.email}". You cannot link a different Google account ("${gUser.email}"). Please choose "${profile.email}".`
+        );
+      }
       await authApi.linkGoogle(gUser.email, gUser.idToken, gUser.photoUrl);
       setProfile((prev) => ({ ...prev, isGoogleLinked: true }));
       localStorage.setItem(`google_linked_${profile.email.toLowerCase()}`, 'true');
@@ -1619,7 +1625,14 @@ export default function Settings() {
                   {paginatedHistory.map((row) => (
                     <tr key={row.id} className="hover:bg-surface-container-low/40 transition-colors">
                       <td className="py-3.5 px-6 font-medium">
-                        <div className="text-on-surface font-semibold">{row.timestamp}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-on-surface font-semibold">{row.timestamp}</span>
+                          {row.isCurrent && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                              Current
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-outline font-mono">{row.id}</div>
                       </td>
                       <td className="py-3.5 px-4 font-bold text-on-surface">

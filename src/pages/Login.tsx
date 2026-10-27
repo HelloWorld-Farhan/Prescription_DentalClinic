@@ -239,7 +239,8 @@ export default function Login() {
     try {
       setIsGoogleLoading(true);
       setErrorMessage(null);
-      const googleUser = await signInWithGooglePopup();
+      const hint = clinicalId.includes('@') ? clinicalId.trim() : undefined;
+      const googleUser = await signInWithGooglePopup(hint);
       if (!googleUser) {
         // User closed or dismissed the popup
         return;

@@ -289,9 +289,18 @@ export default function Signup() {
     try {
       setIsGoogleLoading(true);
       setSignupError(null);
-      const googleUser = await signInWithGooglePopup();
+      const hint = email?.trim() || undefined;
+      const googleUser = await signInWithGooglePopup(hint);
       if (!googleUser) {
         // User closed or dismissed the popup
+        return;
+      }
+
+      // If clinician already typed an email into the signup form, ensure Google account matches that exact email
+      if (email.trim() && googleUser.email.toLowerCase() !== email.trim().toLowerCase()) {
+        setSignupError(
+          `Email mismatch: You specified "${email.trim()}" in the form, but authenticated with Google account "${googleUser.email}". Please select "${email.trim()}" in Google or clear the email field.`
+        );
         return;
       }
 

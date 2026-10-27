@@ -19,6 +19,7 @@ export interface ActiveSessionItem {
 export interface LoginHistoryItem {
   id: string;
   timestamp: string;
+  isoTimestamp?: string;
   device: string;
   browserOs: string;
   ip: string;
@@ -27,6 +28,42 @@ export interface LoginHistoryItem {
   details?: string;
   deviceId?: string;
   isCurrent?: boolean;
+}
+
+/**
+ * Calculates a human-readable, precise session timestamp.
+ * Examples: "Today at 04:34 PM", "Yesterday at 08:15 AM", "Oct 25, 2026 at 02:10 PM".
+ */
+export function formatSessionTimestamp(dateInput?: string | Date): string {
+  if (!dateInput) return 'Active Now';
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) {
+    return String(dateInput);
+  }
+
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  if (isToday) {
+    return `Today at ${timeStr}`;
+  } else if (isYesterday) {
+    return `Yesterday at ${timeStr}`;
+  } else {
+    const monthStr = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${monthStr} at ${timeStr}`;
+  }
 }
 
 // Clean up deprecated legacy global mock keys once on bootstrap
@@ -294,9 +331,11 @@ export function getLoginHistory(email?: string, clinicianName?: string): LoginHi
 
   // If no history exists yet, guarantee the active workstation session login event
   const name = clinicianName || resolveClinicianName(email);
+  const now = new Date();
   const initialSessionEvent: LoginHistoryItem = {
     id: `AUTH-${Math.floor(1000 + Math.random() * 9000)}`,
-    timestamp: `Today at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`,
+    timestamp: formatSessionTimestamp(now),
+    isoTimestamp: now.toISOString(),
     device: env.device,
     browserOs: env.browserOs,
     ip: env.ip,
@@ -328,13 +367,14 @@ export function recordLoginEvent(
   const env = detectClientEnvironment();
   const id = `AUTH-${Math.floor(1000 + Math.random() * 9000)}`;
   const now = new Date();
-  const timestamp = `Today at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+  const timestamp = formatSessionTimestamp(now);
   const currentDevId = getDeviceId();
   const userEmail = resolveUserEmail(email);
 
   const newItem: LoginHistoryItem = {
     id,
     timestamp,
+    isoTimestamp: now.toISOString(),
     device: customDevice || env.device,
     browserOs: env.browserOs,
     ip: customIp || env.ip,
