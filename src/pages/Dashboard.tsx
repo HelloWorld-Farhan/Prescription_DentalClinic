@@ -636,41 +636,43 @@ export default function Dashboard() {
           </div>
 
           {/* Footer of Table */}
-          <div className="flex flex-col sm:flex-row items-center justify-between pt-3 border-t border-surface-container gap-2">
-            <span className="text-xs text-on-surface-variant font-medium">
+          <div className="flex flex-col sm:flex-row items-center justify-between pt-3 border-t border-surface-container gap-2.5 w-full">
+            <span className="text-xs text-on-surface-variant font-medium text-center sm:text-left">
               Showing <strong className="text-on-surface font-semibold">{filteredChecks.length === 0 ? 0 : (checksPage - 1) * checksPageSize + 1}</strong>–<strong className="text-on-surface font-semibold">{Math.min(checksPage * checksPageSize, filteredChecks.length)}</strong> of <strong className="text-on-surface font-semibold">{filteredChecks.length}</strong> screening checks
             </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={checksPage <= 1}
-                onClick={() => setChecksPage((p) => Math.max(1, p - 1))}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[15px]">arrow_back</span>
-                <span>Previous</span>
-              </button>
+            <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  disabled={checksPage <= 1}
+                  onClick={() => setChecksPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                  <span>Previous</span>
+                </button>
 
-              <span className="text-xs font-bold text-outline px-1">
-                {checksPage} / {totalChecksPages}
-              </span>
+                <span className="text-xs font-bold text-outline px-1.5 whitespace-nowrap font-mono">
+                  {checksPage} / {totalChecksPages}
+                </span>
 
-              <button
-                type="button"
-                disabled={checksPage >= totalChecksPages}
-                onClick={() => setChecksPage((p) => Math.min(totalChecksPages, p + 1))}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-              >
-                <span>Next</span>
-                <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
-              </button>
+                <button
+                  type="button"
+                  disabled={checksPage >= totalChecksPages}
+                  onClick={() => setChecksPage((p) => Math.min(totalChecksPages, p + 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                >
+                  <span>Next</span>
+                  <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+                </button>
+              </div>
 
-              <div className="h-4 w-px bg-surface-container-high mx-1" />
+              <div className="hidden sm:block h-4 w-px bg-surface-container-high mx-1" />
 
               <button
                 type="button"
                 onClick={() => navigate('/audit-log')}
-                className="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer transition-colors duration-150 ml-1"
+                className="text-xs text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer transition-colors duration-150 whitespace-nowrap"
               >
                 <span>View Full Audit Registry</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>

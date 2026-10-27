@@ -13,7 +13,7 @@ export default function CameraCaptureModal({
   onClose,
   onCapture,
 }: CameraCaptureModalProps) {
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -91,8 +91,12 @@ export default function CameraCaptureModal({
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    const w = video.videoWidth || video.clientWidth || 1280;
+    const h = video.videoHeight || video.clientHeight || 720;
+    if (w <= 0 || h <= 0) return;
+
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 

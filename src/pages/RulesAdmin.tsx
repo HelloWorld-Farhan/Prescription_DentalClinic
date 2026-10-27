@@ -485,12 +485,12 @@ export default function RulesAdmin() {
       </div>
 
       {/* Primary Interactive Tabs Navigation */}
-      <div className="w-full border-b border-surface-container-high">
-        <div className="flex items-center gap-4">
+      <div className="w-full border-b border-surface-container-high overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-max pb-0.5">
           <button
             type="button"
             onClick={() => setActiveTab('rules')}
-            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'rules'
                 ? 'border-primary-container text-primary font-bold'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -498,15 +498,16 @@ export default function RulesAdmin() {
           >
             <span className="material-symbols-outlined text-[18px]">rule_folder</span>
             <span>Clinical History</span>
-            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px]">
-              {rules.length} active rules
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold whitespace-nowrap">
+              <span className="font-mono">{rules.length}</span>
+              <span>active rules</span>
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'history'
                 ? 'border-primary-container text-primary font-bold'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -514,15 +515,16 @@ export default function RulesAdmin() {
           >
             <span className="material-symbols-outlined text-[18px]">history_edu</span>
             <span>Import &amp; Upload History</span>
-            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px]">
-              {documentHistory.length} records
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold whitespace-nowrap">
+              <span className="font-mono">{documentHistory.length}</span>
+              <span>records</span>
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('knowledge')}
-            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'knowledge'
                 ? 'border-primary-container text-primary font-bold'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -530,15 +532,16 @@ export default function RulesAdmin() {
           >
             <span className="material-symbols-outlined text-[18px]">account_tree</span>
             <span>Knowledge Sources</span>
-            <span className="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px]">
-              0 active engines
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px] font-bold whitespace-nowrap">
+              <span className="font-mono">0</span>
+              <span>engines</span>
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('regression')}
-            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 pb-3 border-b-2 text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'regression'
                 ? 'border-primary-container text-primary font-bold'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -546,8 +549,9 @@ export default function RulesAdmin() {
           >
             <span className="material-symbols-outlined text-[18px]">checklist_rtl</span>
             <span>Test Suite &amp; Regression</span>
-            <span className="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px]">
-              0 assertions
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px] font-bold whitespace-nowrap">
+              <span className="font-mono">0</span>
+              <span>assertions</span>
             </span>
           </button>
         </div>

@@ -1627,11 +1627,11 @@ export default function NewCheck() {
                   whileHover={{ scale: 1.015, y: -1 }}
                   whileTap={{ scale: 0.985 }}
                   onClick={handleStartSafetyCheck}
-                  className="w-full h-12 rounded-xl bg-primary-container hover:bg-primary text-on-primary font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                  className="w-full min-h-[48px] px-4 sm:px-6 py-2.5 rounded-xl bg-primary-container hover:bg-primary text-on-primary font-bold text-xs sm:text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 sm:gap-2.5 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[22px] animate-pulse">radar</span>
-                  <span>Run Automated Safety Screening &amp; Extraction</span>
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  <span className="material-symbols-outlined text-[20px] sm:text-[22px] animate-pulse shrink-0">radar</span>
+                  <span className="truncate sm:whitespace-normal">Run Automated Safety Screening &amp; Extraction</span>
+                  <span className="material-symbols-outlined text-[18px] shrink-0">arrow_forward</span>
                 </motion.button>
               </div>
             </section>
