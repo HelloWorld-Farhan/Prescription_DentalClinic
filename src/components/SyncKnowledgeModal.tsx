@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getDocumentHistory, UploadedDocumentRecord } from '../services/storageService';
+import { getDocumentHistory, UploadedDocumentRecord, isAvatarFile } from '../services/storageService';
 import { VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, SafetyCheckRecord } from '../types';
 
@@ -48,10 +48,12 @@ export default function SyncKnowledgeModal({
 
     const loadedItems: SyncableItem[] = [];
 
-    // 1. Vault Documents
+    // 1. Vault Documents (Strictly clinical files, never user avatar photos)
     try {
       const docs: UploadedDocumentRecord[] = getDocumentHistory();
-      docs.forEach((doc) => {
+      docs
+        .filter((doc) => !isAvatarFile(doc.filename) && !isAvatarFile(doc.storageUrl))
+        .forEach((doc) => {
         let icon = 'description';
         const ft = (doc.fileType || '').toLowerCase();
         const fn = (doc.filename || '').toLowerCase();

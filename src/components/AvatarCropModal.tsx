@@ -230,12 +230,13 @@ export default function AvatarCropModal({
         { type: 'image/jpeg' }
       );
 
-      // Upload directly to Cloudflare R2
+      // Upload directly to Cloudflare R2 without recording into clinical documents vault
       const r2Result = await uploadToR2(
         file,
         userEmail,
         userName,
-        `avatar_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`
+        `avatar_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.jpg`,
+        false
       );
       const savedUrl = r2Result.url;
 

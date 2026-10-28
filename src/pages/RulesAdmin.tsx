@@ -1454,7 +1454,7 @@ export default function RulesAdmin() {
                       />
 
                       {/* Dropzone & Live Camera Area */}
-                      <div>
+                      <div className={`transition-all duration-300 ${isExtracting ? 'opacity-10 blur-sm pointer-events-none select-none' : ''}`}>
                         <label className="block text-xs font-bold text-on-surface mb-1.5">
                           2. Choose or Capture Document
                         </label>

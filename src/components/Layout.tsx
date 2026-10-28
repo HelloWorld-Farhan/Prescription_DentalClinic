@@ -626,6 +626,40 @@ export default function Layout() {
       <div className="lg:pl-64 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
         {/* Fixed Header */}
         <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-xs z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-surface-container-high gap-2 sm:gap-4">
+          {/* Mobile Full Top-Bar Confirmation Overlay (Covers entire top bar on phones so full message fits and vanishes cleanly) */}
+          <AnimatePresence>
+            {topConfirmation && (
+              <motion.div
+                key={`mobile-full-bar-${topConfirmation.id}`}
+                initial={{ opacity: 0, y: -64 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -64 }}
+                transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+                className="md:hidden absolute inset-0 z-50 bg-gradient-to-r from-teal-900 via-teal-800 to-emerald-800 text-white flex items-center justify-between px-4 sm:px-6 shadow-md border-b border-emerald-400/40 select-none"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                  <span className="material-symbols-outlined text-[22px] text-emerald-300 shrink-0">
+                    {topConfirmation.type === 'error'
+                      ? 'error'
+                      : topConfirmation.type === 'warning'
+                      ? 'warning'
+                      : 'check_circle'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-semibold text-white leading-tight line-clamp-2">
+                    {topConfirmation.message}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTopConfirmation(null)}
+                  className="w-8 h-8 rounded-lg hover:bg-white/10 active:bg-white/20 text-white/90 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  title="Dismiss confirmation"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
           {/* Left: Mobile Menu + Active Module Context */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
             <motion.button
@@ -724,59 +758,16 @@ export default function Layout() {
             </AnimatePresence>
           </div>
 
-          {/* Center: Mobile Prescription AI Status / Animated Top Bar Confirmation (< md screens) */}
+          {/* Center: Mobile Prescription AI Status (< md screens) */}
           <div className="flex md:hidden items-center justify-center min-w-0 flex-1 mx-2 relative h-10">
-            <AnimatePresence mode="wait">
-              {topConfirmation ? (
-                <motion.div
-                  key={`mobile-confirm-${topConfirmation.id}`}
-                  initial={{ opacity: 0, y: -26, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-full max-w-xs h-9 px-3 rounded-xl bg-gradient-to-r from-teal-800 via-teal-700 to-emerald-700 text-white flex items-center justify-between shadow-md border border-emerald-400/40 z-30 select-none overflow-hidden"
-                >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="material-symbols-outlined text-[17px] text-emerald-300 shrink-0">
-                      {topConfirmation.type === 'error'
-                        ? 'error'
-                        : topConfirmation.type === 'warning'
-                        ? 'warning'
-                        : 'check_circle'}
-                    </span>
-                    <span className="text-[11px] font-semibold text-white truncate leading-tight">
-                      {topConfirmation.message}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setTopConfirmation(null)}
-                    className="ml-1.5 w-5 h-5 rounded-md hover:bg-white/10 text-white/80 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                    title="Dismiss confirmation"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">close</span>
-                  </button>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="mobile-ai-badge"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center justify-center"
-                >
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
-                    <span className="material-symbols-outlined text-[16px] text-primary">psychology</span>
-                    <span className="font-bold text-on-surface text-[11px]">AI</span>
-                    <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] font-bold">
-                      v1.0
-                    </span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface-variant shadow-2xs">
+              <span className="material-symbols-outlined text-[16px] text-primary">psychology</span>
+              <span className="font-bold text-on-surface text-[11px]">AI</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono text-[9px] font-bold">
+                v1.0
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Prescription AI Online"></span>
+            </div>
           </div>
 
           {/* Right Header Actions */}

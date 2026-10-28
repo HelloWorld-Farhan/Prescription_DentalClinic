@@ -20,27 +20,33 @@ export default function MinimalExtractionOverlay({
 
   useEffect(() => {
     let interval: any = null;
+    let failsafeTimeout: any = null;
 
     if (isExtracting) {
       setShow(true);
       setProgress(1);
       progressRef.current = 1;
 
-      // Smooth continuous real-time ticking
+      // Failsafe: After 4.2 seconds, automatically transition to completion sweep
+      failsafeTimeout = setTimeout(() => {
+        isExtractingRef.current = false;
+      }, 4200);
+
+      // Smooth continuous real-time ticking from 1% to 99% without ever freezing
       interval = setInterval(() => {
         if (isExtractingRef.current) {
-          // Continuous progress while async work is underway
-          if (progressRef.current < 92) {
-            const step = Math.max(0.5, (92 - progressRef.current) * 0.022);
-            progressRef.current = Math.min(92, progressRef.current + step);
-          } else if (progressRef.current < 97) {
-            progressRef.current += 0.15;
+          if (progressRef.current < 85) {
+            const step = Math.max(0.6, (85 - progressRef.current) * 0.035);
+            progressRef.current = Math.min(85, progressRef.current + step);
+          } else if (progressRef.current < 99) {
+            // Smoothly tick through 90s all the way to 99% without stalling
+            progressRef.current = Math.min(99, progressRef.current + 0.22);
           }
           setProgress(Math.round(progressRef.current));
         } else {
           // Accelerated sweep to 100% when backend work finishes
           if (progressRef.current < 100) {
-            progressRef.current = Math.min(100, progressRef.current + 3.5);
+            progressRef.current = Math.min(100, progressRef.current + 4.5);
             setProgress(Math.round(progressRef.current));
           } else {
             clearInterval(interval);
@@ -49,15 +55,15 @@ export default function MinimalExtractionOverlay({
               setProgress(1);
               progressRef.current = 1;
               if (onComplete) onComplete();
-            }, 380);
+            }, 300);
           }
         }
-      }, 35);
+      }, 30);
     } else if (show) {
       // Backend resolved; accelerate to 100%
       interval = setInterval(() => {
         if (progressRef.current < 100) {
-          progressRef.current = Math.min(100, progressRef.current + 4);
+          progressRef.current = Math.min(100, progressRef.current + 5);
           setProgress(Math.round(progressRef.current));
         } else {
           clearInterval(interval);
@@ -66,13 +72,14 @@ export default function MinimalExtractionOverlay({
             setProgress(1);
             progressRef.current = 1;
             if (onComplete) onComplete();
-          }, 380);
+          }, 300);
         }
-      }, 30);
+      }, 25);
     }
 
     return () => {
       if (interval) clearInterval(interval);
+      if (failsafeTimeout) clearTimeout(failsafeTimeout);
     };
   }, [isExtracting]);
 
@@ -86,58 +93,71 @@ export default function MinimalExtractionOverlay({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.25 }}
         onClick={(e) => e.stopPropagation()}
-        className={`absolute inset-0 z-30 flex items-center justify-center bg-white/45 backdrop-blur-[1px] rounded-2xl pointer-events-none select-none overflow-hidden ${className}`}
+        className={`absolute inset-0 z-30 flex items-center justify-center bg-white/85 backdrop-blur-md rounded-2xl pointer-events-none select-none overflow-hidden ${className}`}
       >
-        {/* Subtle Ambient Floating Blurred Orbs in Background */}
+        {/* Ambient Floating Blurred Black Dots & Soft Charcoal Orbs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* Dot 1: Deep Charcoal floating orb */}
           <motion.div
-            className="absolute w-28 h-28 rounded-full bg-slate-900/10 blur-xl"
+            className="absolute w-32 h-32 rounded-full bg-slate-900/15 blur-2xl"
             animate={{
-              x: ['-20%', '30%', '-10%'],
-              y: ['-10%', '20%', '-20%'],
-              scale: [1, 1.25, 0.95],
+              x: ['-25%', '35%', '-15%'],
+              y: ['-15%', '25%', '-20%'],
+              scale: [1, 1.3, 0.9],
             }}
             transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
-            style={{ top: '30%', left: '35%' }}
+            style={{ top: '20%', left: '25%' }}
           />
+          {/* Dot 2: Soft Black blur particle */}
           <motion.div
-            className="absolute w-36 h-36 rounded-full bg-teal-500/15 blur-2xl"
+            className="absolute w-24 h-24 rounded-full bg-black/12 blur-xl"
             animate={{
-              x: ['20%', '-25%', '15%'],
-              y: ['20%', '-15%', '10%'],
-              scale: [1.1, 0.9, 1.2],
+              x: ['25%', '-30%', '15%'],
+              y: ['20%', '-20%', '10%'],
+              scale: [1.1, 0.85, 1.2],
             }}
             transition={{ repeat: Infinity, duration: 7, ease: 'easeInOut' }}
-            style={{ top: '25%', right: '30%' }}
+            style={{ top: '35%', right: '25%' }}
           />
+          {/* Dot 3: Subtle Zinc dot */}
           <motion.div
-            className="absolute w-20 h-20 rounded-full bg-emerald-600/10 blur-lg"
+            className="absolute w-20 h-20 rounded-full bg-zinc-800/14 blur-lg"
             animate={{
-              x: ['-15%', '25%', '-15%'],
-              y: ['15%', '-25%', '15%'],
+              x: ['-20%', '20%', '-20%'],
+              y: ['10%', '-30%', '10%'],
             }}
             transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
-            style={{ bottom: '20%', left: '45%' }}
+            style={{ bottom: '15%', left: '40%' }}
+          />
+          {/* Dot 4: Accent soft slate dot */}
+          <motion.div
+            className="absolute w-16 h-16 rounded-full bg-slate-800/10 blur-md"
+            animate={{
+              x: ['15%', '-15%', '15%'],
+              y: ['-20%', '15%', '-20%'],
+            }}
+            transition={{ repeat: Infinity, duration: 5.5, ease: 'easeInOut' }}
+            style={{ top: '15%', right: '40%' }}
           />
         </div>
 
-        {/* Real-Time Modern Percentage Display with Sequentially Pulsing Triple Dots */}
+        {/* Real-Time Modern Percentage Display in Crisp Light Black / Charcoal */}
         <div className="relative z-10 flex items-baseline justify-center">
           <motion.span
             key="percentage-number"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-            className="text-7xl sm:text-8xl md:text-9xl font-black font-mono tracking-tighter bg-gradient-to-r from-teal-950 via-primary to-teal-600 bg-clip-text text-transparent drop-shadow-sm select-none"
+            className="text-7xl sm:text-8xl md:text-9xl font-black font-mono tracking-tighter bg-gradient-to-r from-slate-900 via-zinc-800 to-slate-700 bg-clip-text text-transparent drop-shadow-sm select-none"
           >
             {progress}%
           </motion.span>
 
-          {/* Sequentially Pulsing Animated Dots (Active while counting up to 100%) */}
+          {/* Sequentially Pulsing Animated Dots in Light Black */}
           {!isFinished && (
-            <span className="inline-flex items-center ml-1.5 text-4xl sm:text-5xl md:text-6xl font-black text-primary/70 tracking-widest select-none">
+            <span className="inline-flex items-center ml-1.5 text-4xl sm:text-5xl md:text-6xl font-black text-slate-700 tracking-widest select-none">
               <motion.span
                 animate={{ opacity: [0.15, 1, 0.15] }}
                 transition={{ repeat: Infinity, duration: 1.1, delay: 0, ease: 'easeInOut' }}

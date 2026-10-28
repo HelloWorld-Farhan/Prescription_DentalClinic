@@ -13,6 +13,18 @@ export interface UploadedDocumentRecord {
 
 const STORAGE_KEY_DOCS = 'smileclinic_uploaded_documents_v1';
 
+export function isAvatarFile(filenameOrUrl: string = ''): boolean {
+  const lower = (filenameOrUrl || '').toLowerCase();
+  return (
+    lower.startsWith('avatar_') ||
+    lower.includes('/avatar_') ||
+    lower.includes('_avatar_') ||
+    lower.includes('avatar-')
+  );
+}
+
+
+
 /**
  * Generates a non-colliding distinct filename if a file with the same name
  * already exists in the user's document history (e.g. file (1).pdf, file (2).pdf).
@@ -46,7 +58,8 @@ export async function uploadToR2(
   file: File,
   userId: string = 'user-current',
   authorName: string = 'Authorized Clinician',
-  customFilename?: string
+  customFilename?: string,
+  saveRecord: boolean = true
 ): Promise<{ url: string; key: string; filename: string; size: number }> {
   const env = (import.meta as any).env || {};
   const apiUrl = (env.VITE_API_URL || '').replace(/\/$/, '');
@@ -72,18 +85,21 @@ export async function uploadToR2(
       if (response.ok) {
         const data = await response.json();
         const finalUrl = data.url || (r2PublicBase ? `${r2PublicBase}/${fileKey}` : '');
-        saveDocumentRecord({
-          id: 'doc-' + timestamp,
-          filename: distinctFilename,
-          fileType: file.type || 'application/octet-stream',
-          fileSize: file.size,
-          uploadedAt: new Date().toLocaleString(),
-          storageUrl: finalUrl,
-          userId,
-          authorName,
-          extractedRulesCount: 0,
-          status: 'stored',
-        });
+        const shouldSaveRecord = saveRecord && !isAvatarFile(distinctFilename) && !isAvatarFile(file.name);
+        if (shouldSaveRecord) {
+          saveDocumentRecord({
+            id: 'doc-' + timestamp,
+            filename: distinctFilename,
+            fileType: file.type || 'application/octet-stream',
+            fileSize: file.size,
+            uploadedAt: new Date().toLocaleString(),
+            storageUrl: finalUrl,
+            userId,
+            authorName,
+            extractedRulesCount: 0,
+            status: 'stored',
+          });
+        }
 
         return {
           url: finalUrl,
@@ -102,18 +118,21 @@ export async function uploadToR2(
     ? `${r2PublicBase}/${fileKey}`
     : URL.createObjectURL(file);
 
-  saveDocumentRecord({
-    id: 'doc-' + timestamp,
-    filename: distinctFilename,
-    fileType: file.type || 'application/octet-stream',
-    fileSize: file.size,
-    uploadedAt: new Date().toLocaleString(),
-    storageUrl: fallbackUrl,
-    userId,
-    authorName,
-    extractedRulesCount: 0,
-    status: 'stored',
-  });
+  const shouldSaveFallback = saveRecord && !isAvatarFile(distinctFilename) && !isAvatarFile(file.name);
+  if (shouldSaveFallback) {
+    saveDocumentRecord({
+      id: 'doc-' + timestamp,
+      filename: distinctFilename,
+      fileType: file.type || 'application/octet-stream',
+      fileSize: file.size,
+      uploadedAt: new Date().toLocaleString(),
+      storageUrl: fallbackUrl,
+      userId,
+      authorName,
+      extractedRulesCount: 0,
+      status: 'stored',
+    });
+  }
 
   return {
     url: fallbackUrl,
@@ -127,8 +146,16 @@ export function getDocumentHistory(userId?: string): UploadedDocumentRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_DOCS);
     if (!raw) return [];
-    const list: UploadedDocumentRecord[] = JSON.parse(raw);
+    let list: UploadedDocumentRecord[] = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
+
+    // Auto-purge any avatar records mistakenly saved in document history
+    const sanitizedList = list.filter((d) => !isAvatarFile(d.filename) && !isAvatarFile(d.storageUrl));
+    if (sanitizedList.length !== list.length) {
+      localStorage.setItem(STORAGE_KEY_DOCS, JSON.stringify(sanitizedList));
+      list = sanitizedList;
+    }
+
     if (userId) {
       return list.filter((d) => d.userId === userId || d.userId === 'user-current');
     }
@@ -139,6 +166,9 @@ export function getDocumentHistory(userId?: string): UploadedDocumentRecord[] {
 }
 
 export function saveDocumentRecord(record: UploadedDocumentRecord): void {
+  if (isAvatarFile(record.filename) || isAvatarFile(record.storageUrl)) {
+    return; // Avatars are never clinical document records
+  }
   try {
     const existing = getDocumentHistory();
     existing.unshift(record);

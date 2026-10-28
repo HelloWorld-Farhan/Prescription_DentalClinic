@@ -1129,7 +1129,7 @@ export default function NewCheck() {
                   <div
                     className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 w-full ${
                       isProcessingDocument
-                        ? 'filter blur-[2px] opacity-75 pointer-events-none select-none scale-[0.99]'
+                        ? 'filter blur-sm opacity-10 pointer-events-none select-none scale-[0.98]'
                         : ''
                     }`}
                   >
