@@ -7,6 +7,7 @@ import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } fr
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
+import DocumentExtractionAnimation, { DocumentExtractionRef } from '../components/DocumentExtractionAnimation';
 import { uploadToR2, updateDocumentExtractedCount, deleteDocumentRecord } from '../services/storageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
@@ -146,6 +147,7 @@ export default function NewCheck() {
   const [uploadedFileSize, setUploadedFileSize] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const extractionAnimRef = useRef<DocumentExtractionRef | null>(null);
 
   // Camera Photo State
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -402,6 +404,7 @@ export default function NewCheck() {
   };
 
   // Main file processing handler: Uploads to Cloudflare R2 and extracts medicines
+  // Main file processing handler: Uploads to Cloudflare R2 and extracts medicines
   const handleProcessIncomingFile = async (file: File, source: 'upload' | 'camera') => {
     const isImage = file.type.startsWith('image/') || source === 'camera';
     let localPreviewUrl: string | null = null;
@@ -412,28 +415,35 @@ export default function NewCheck() {
     setUploadedFileName(file.name);
     setIsProcessingDocument(true);
     const currentUserId = storedUser?.id || 'clinician-user';
+
     try {
-      // 1. Upload to Cloudflare R2
-      const r2Result = await uploadToR2(file, currentUserId, prescriberDisplayName);
-      setUploadedFileName(r2Result.filename);
-      const sizeStr =
-        file.size > 1024 * 1024
-          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-          : `${(file.size / 1024).toFixed(0)} KB`;
-      setUploadedFileSize(sizeStr);
+      const extractionTask = async () => {
+        const r2Result = await uploadToR2(file, currentUserId, prescriberDisplayName);
+        const sizeStr =
+          file.size > 1024 * 1024
+            ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+            : `${(file.size / 1024).toFixed(0)} KB`;
+        const ext =
+          r2Result.filename.split('.').pop()?.toUpperCase() || (source === 'camera' ? 'CAMERA SCAN' : 'FILE');
 
-      const ext =
-        r2Result.filename.split('.').pop()?.toUpperCase() || (source === 'camera' ? 'CAMERA SCAN' : 'FILE');
+        const { medicines: extracted, patient: extractedPatient } = await extractPrescriptionsFromDocument(file, source);
+        updateDocumentExtractedCount(r2Result.url, extracted.length);
 
-      // Allow optical scanning HUD animation to scan document
-      if (isImage) {
-        await new Promise((resolve) => setTimeout(resolve, 1400));
+        const previewUrl = localPreviewUrl || (file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+        return { r2Result, sizeStr, ext, extracted, extractedPatient, previewUrl };
+      };
+
+      const taskPromise = extractionTask();
+
+      // Trigger document extraction animation if uploaded via file/dropzone
+      if (source === 'upload' && extractionAnimRef.current) {
+        await extractionAnimRef.current.playExtraction(taskPromise);
       }
 
-      const { medicines: extracted, patient: extractedPatient } = await extractPrescriptionsFromDocument(file, source);
-      updateDocumentExtractedCount(r2Result.url, extracted.length);
+      const { r2Result, sizeStr, ext, extracted, extractedPatient, previewUrl } = await taskPromise;
 
-      const previewUrl = localPreviewUrl || (file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+      setUploadedFileName(r2Result.filename);
+      setUploadedFileSize(sizeStr);
       if (source === 'camera' || previewUrl) {
         setCapturedPhoto(previewUrl || 'camera_captured_rx_slip.jpg');
       }
@@ -465,18 +475,13 @@ export default function NewCheck() {
         return Array.from(map.values());
       });
 
-      showConfirmation(
-        `Extracted ${extracted.length} medications from ${r2Result.filename} and saved to secure vault.`,
-        'success'
-      );
+      showConfirmation(`Extracted ${extracted.length} medications from ${r2Result.filename} and saved to secure vault.`, 'success');
     } catch (err: any) {
       console.error('File processing error:', err);
       showConfirmation('Document parsed locally; please verify extracted items.', 'info');
     } finally {
-      setIsProcessingDocument(false);
     }
   };
-
   // Camera Snap Handler - Called when user confirms photo in CameraCaptureModal
   const handleCameraCapture = (file: File) => {
     setIsCameraModalOpen(false);
@@ -1034,113 +1039,86 @@ export default function NewCheck() {
             {/* TAB 1: UPLOAD FILE */}
             {inputMethod === 'upload' && (
               <div className="space-y-4">
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (isProcessingDocument) return;
-                    setIsDragOver(true);
-                  }}
-                  onDragLeave={() => setIsDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (isProcessingDocument) return;
-                    handleFileDrop(e);
-                  }}
-                  onClick={() => {
-                    if (isProcessingDocument) return;
-                    fileInputRef.current?.click();
-                  }}
-                  className={`relative rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-200 overflow-hidden ${
-                    isProcessingDocument
-                      ? 'border border-primary/25 bg-white shadow-sm min-h-[340px] cursor-default p-0'
-                      : isDragOver
-                      ? 'p-8 sm:p-11 border-2 border-dashed border-primary bg-primary/10 shadow-lg scale-[1.005] cursor-pointer group'
-                      : 'p-8 sm:p-11 border-2 border-dashed border-primary/30 bg-gradient-to-b from-surface-container-lowest via-surface-container-lowest to-surface-container-low/40 hover:border-primary hover:bg-surface-container-low/60 hover:shadow-sm cursor-pointer group'
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xlsx,.xls,.csv,application/pdf,image/*,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
-                    onChange={handleFileInputChange}
-                    className="hidden"
-                    disabled={isProcessingDocument}
-                  />
+                <DocumentExtractionAnimation ref={extractionAnimRef} className="rounded-2xl w-full">
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (isProcessingDocument) return;
+                      setIsDragOver(true);
+                    }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (isProcessingDocument) return;
+                      handleFileDrop(e);
+                    }}
+                    onClick={() => {
+                      if (isProcessingDocument) return;
+                      fileInputRef.current?.click();
+                    }}
+                    className={`relative rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-200 overflow-hidden ${
+                      isProcessingDocument
+                        ? 'p-8 sm:p-11 border-2 border-dashed border-[#cbd5d1] bg-white cursor-default'
+                        : isDragOver
+                        ? 'p-8 sm:p-11 border-2 border-dashed border-primary bg-primary/10 shadow-lg scale-[1.005] cursor-pointer group'
+                        : 'p-8 sm:p-11 border-2 border-dashed border-primary/30 bg-gradient-to-b from-surface-container-lowest via-surface-container-lowest to-surface-container-low/40 hover:border-primary hover:bg-surface-container-low/60 hover:shadow-sm cursor-pointer group'
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xlsx,.xls,.csv,application/pdf,image/*,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                      onChange={handleFileInputChange}
+                      className="hidden"
+                      disabled={isProcessingDocument}
+                    />
 
-                  {/* Processing / Extracting Scanner Overlay: Fills 100% of the container edge-to-edge */}
-                  {isProcessingDocument ? (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full h-full min-h-[340px] flex flex-col"
-                    >
-                      <OpticalScanOverlay
-                        imageUrl={capturedPhoto}
-                        fileName={uploadedFileName || 'Prescription Document'}
-                        fileType={
-                          uploadedFileName?.toLowerCase().endsWith('.pdf')
-                            ? 'pdf'
-                            : uploadedFileName?.toLowerCase().endsWith('.docx') ||
-                              uploadedFileName?.toLowerCase().endsWith('.doc')
-                            ? 'word'
-                            : uploadedFileName?.toLowerCase().endsWith('.csv') ||
-                              uploadedFileName?.toLowerCase().endsWith('.xlsx')
-                            ? 'csv'
-                            : 'image'
-                        }
-                        isScanning={true}
-                        title="PropNexAI Agent Model 3 · Clinical Vision OCR"
-                        className="w-full h-full border-0 rounded-2xl shadow-none"
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      {/* Ambient Background Radial Glow */}
-                      <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity" />
+                    {/* Ambient Background Radial Glow */}
+                    <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity" />
 
-                      <div className="relative z-10 flex flex-col items-center gap-3">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/15 via-teal-500/15 to-primary/5 text-primary flex items-center justify-center shadow-xs border border-primary/20 group-hover:scale-105 transition-transform duration-200">
-                          <span className="material-symbols-outlined text-[32px] group-hover:-translate-y-0.5 transition-transform">
-                            upload_file
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="text-base font-bold text-on-surface flex items-center justify-center gap-1.5 flex-wrap">
-                            <span>Drop prescription scan, PDF, Word, or Excel file here or</span>
-                            <span className="text-primary underline decoration-primary/40 underline-offset-4 font-extrabold">browse files</span>
-                          </div>
-                          <p className="text-xs text-outline max-w-md mx-auto">
-                            Supports PDF digital slips, Word (.docx), Excel (.xlsx/.csv), and High-Res Images up to 25MB
-                          </p>
-                        </div>
-
-                        {/* Supported Format Pills */}
-                        <div className="flex items-center gap-2 flex-wrap justify-center pt-1">
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-rose-600">picture_as_pdf</span>
-                            <span>PDF (Multi-Page)</span>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-blue-600">image</span>
-                            <span>PNG / JPG / WEBP</span>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-indigo-600">description</span>
-                            <span>Word (.docx / .doc)</span>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-emerald-600">table_chart</span>
-                            <span>Excel / CSV (.xlsx)</span>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-emerald-600">cloud_done</span>
-                            <span>Securely Stored in Vault</span>
-                          </span>
-                        </div>
+                    <div className="relative z-10 flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/15 via-teal-500/15 to-primary/5 text-primary flex items-center justify-center shadow-xs border border-primary/20 group-hover:scale-105 transition-transform duration-200">
+                        <span className="material-symbols-outlined text-[32px] group-hover:-translate-y-0.5 transition-transform">
+                          upload_file
+                        </span>
                       </div>
-                    </>
-                  )}
-                </div>
+
+                      <div className="space-y-1">
+                        <div className="text-base font-bold text-on-surface flex items-center justify-center gap-1.5 flex-wrap">
+                          <span>Drop prescription scan, PDF, Word, or Excel file here or</span>
+                          <span className="text-primary underline decoration-primary/40 underline-offset-4 font-extrabold">browse files</span>
+                        </div>
+                        <p className="text-xs text-outline max-w-md mx-auto">
+                          Supports PDF digital slips, Word (.docx), Excel (.xlsx/.csv), and High-Res Images up to 25MB
+                        </p>
+                      </div>
+
+                      {/* Supported Format Pills */}
+                      <div className="flex items-center gap-2 flex-wrap justify-center pt-1">
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px] text-rose-600">picture_as_pdf</span>
+                          <span>PDF (Multi-Page)</span>
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px] text-blue-600">image</span>
+                          <span>PNG / JPG / WEBP</span>
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px] text-indigo-600">description</span>
+                          <span>Word (.docx / .doc)</span>
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px] text-emerald-600">table_chart</span>
+                          <span>Excel / CSV (.xlsx)</span>
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px] text-emerald-600">cloud_done</span>
+                          <span>Securely Stored in Vault</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </DocumentExtractionAnimation>
                 {/* Attached Document Card with Real-time OCR Readiness */}
                 {uploadedFileName && (
                   <motion.div
