@@ -61,6 +61,15 @@ export default function Dashboard() {
   const [isBatchSyncing, setIsBatchSyncing] = useState(false);
 
   const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
+  const [selectedCheckId, setSelectedCheckId] = useState<string | null>(() => {
+    const init = VirtualDb.getChecks();
+    return init[0]?.id || null;
+  });
+
+  const selectedCheck = useMemo(() => {
+    if (!checks || checks.length === 0) return null;
+    return checks.find(c => c.id === selectedCheckId) || checks[0];
+  }, [checks, selectedCheckId]);
 
   // Live ticking Indian Standard Time (IST) clock
   const [currentTimeIST, setCurrentTimeIST] = useState(() => formatISTTime(Date.now()));
@@ -525,15 +534,15 @@ export default function Dashboard() {
 
           {/* Table Wrapper */}
           <div className="overflow-x-auto w-full max-w-full">
-            <table className="w-full text-left border-collapse min-w-[700px]">
+            <table className="w-full text-left border-collapse min-w-[720px]">
               <thead>
                 <tr className="text-outline text-xs uppercase tracking-wider border-b border-surface-container font-semibold">
-                  <th className="py-2.5 px-2">Check ID</th>
-                  <th className="py-2.5 px-2">Patient Key</th>
-                  <th className="py-2.5 px-2">Prescribed Regimen</th>
-                  <th className="py-2.5 px-2">Highest Severity</th>
-                  <th className="py-2.5 px-2">Reviewer / Status</th>
-                  <th className="py-2.5 px-2 text-right">Action</th>
+                  <th className="py-3 px-3 w-[150px] whitespace-nowrap">Check ID</th>
+                  <th className="py-3 px-3 w-[160px] whitespace-nowrap">Patient Key</th>
+                  <th className="py-3 px-3 min-w-[200px]">Prescribed Regimen</th>
+                  <th className="py-3 px-3 w-[140px] whitespace-nowrap">Highest Severity</th>
+                  <th className="py-3 px-3 w-[160px] whitespace-nowrap">Reviewer / Status</th>
+                  <th className="py-3 px-3 w-[150px] text-right whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-container text-xs text-on-surface">
@@ -564,98 +573,115 @@ export default function Dashboard() {
                   paginatedChecks.map((check) => {
                     const hasContra = check.alerts.some(a => a.severity === 'contraindicated');
                     const hasMajor = check.alerts.some(a => a.severity === 'major');
+                    const isSelected = selectedCheck?.id === check.id;
 
                     return (
-                      <tr key={check.id} className="hover:bg-surface-container-low/60 transition-colors duration-150">
-                        <td className="py-3 px-2">
-                          <div className="flex items-center gap-1 font-mono font-bold text-xs text-primary">
+                      <tr
+                        key={check.id}
+                        onClick={() => setSelectedCheckId(check.id)}
+                        className={`cursor-pointer transition-colors duration-150 border-l-[3px] ${
+                          isSelected
+                            ? 'bg-teal-50/80 dark:bg-teal-950/40 border-l-primary shadow-2xs'
+                            : 'hover:bg-surface-container-low/60 border-l-transparent'
+                        }`}
+                      >
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 font-mono font-bold text-xs text-primary">
                             <span>{check.checkNumber}</span>
                             <button
                               type="button"
-                              onClick={() => navigator.clipboard.writeText(check.checkNumber)}
-                              className="text-outline hover:text-primary transition-colors duration-150 cursor-pointer"
-                              title="Copy ID"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(check.checkNumber);
+                                showConfirmation(`Copied ${check.checkNumber}`, 'info', 1000);
+                              }}
+                              className="text-outline hover:text-primary transition-colors duration-150 cursor-pointer p-0.5 rounded hover:bg-primary/10"
+                              title="Copy Check Number"
                             >
                               <span className="material-symbols-outlined text-[13px]">content_copy</span>
                             </button>
+                            {isSelected && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" title="Currently Selected" />
+                            )}
                           </div>
-                          <span className="text-[11px] text-outline">{check.timestamp}</span>
+                          <span className="text-[11px] text-outline block">{check.timestamp}</span>
                         </td>
 
-                        <td className="py-3 px-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[16px] text-secondary">shield</span>
-                            <span className="font-semibold">{check.patientKey || check.mrn}</span>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 font-bold text-on-surface">
+                            <span className="material-symbols-outlined text-[15px] text-primary">shield</span>
+                            <span>{check.patientKey || check.mrn}</span>
                           </div>
-                          <span className="text-[11px] text-outline">{check.unit}</span>
+                          <span className="text-[11px] text-outline block">{check.unit}</span>
                         </td>
 
-                        <td className="py-3 px-2 max-w-xs">
+                        <td className="py-3 px-3">
                           {check.prescriptions && check.prescriptions.length > 0 ? (
-                            <>
-                              <div className="font-medium text-on-surface truncate">
+                            <div className="flex flex-col gap-0.5 max-w-[220px]">
+                              <div className="font-semibold text-on-surface text-xs truncate">
                                 {check.prescriptions[0].drugName}
+                                {check.prescriptions[0].dosage ? ` · ${check.prescriptions[0].dosage}` : ''}
                               </div>
                               {check.prescriptions.length > 1 && (
-                                <div className="text-[11px] text-on-surface-variant flex items-center gap-1 truncate">
-                                  <span className="material-symbols-outlined text-[13px] text-error">add</span>
+                                <div className="text-[11px] text-on-surface-variant flex items-center gap-1 truncate font-medium">
+                                  <span className="material-symbols-outlined text-[12px] text-primary">add</span>
                                   <span>{check.prescriptions.slice(1).map(p => p.drugName).join(', ')}</span>
                                 </div>
                               )}
-                            </>
+                            </div>
                           ) : (
-                            <div className="font-medium text-on-surface truncate">
+                            <div className="font-semibold text-on-surface text-xs truncate max-w-[220px]">
                               {check.prescribedDrugs?.[0] || 'Unspecified'}
                             </div>
                           )}
                         </td>
 
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-3 whitespace-nowrap">
                           {hasContra ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs bg-[#FFDAD6] text-[#BA1A1A] font-bold">
-                              <span className="material-symbols-outlined text-[14px]">error</span>
-                              High Severity
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] bg-[#FFDAD6] text-[#BA1A1A] font-bold shadow-2xs whitespace-nowrap">
+                              <span className="material-symbols-outlined text-[13px]">error</span>
+                              Contraindicated
                             </span>
                           ) : hasMajor ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs bg-[#FEF3C7] text-[#975A16] font-bold">
-                              <span className="material-symbols-outlined text-[14px]">warning</span>
-                              Moderate
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] bg-[#FEF3C7] text-[#975A16] font-bold shadow-2xs whitespace-nowrap">
+                              <span className="material-symbols-outlined text-[13px]">warning</span>
+                              Major Alert
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800 font-bold">
-                              <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                              Clear / Clean
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] bg-emerald-100 text-emerald-800 font-bold shadow-2xs whitespace-nowrap">
+                              <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                              Clear · Safe
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3 px-2">
-                          <div className="inline-flex items-center gap-1.5 font-medium text-primary">
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-                            <span>{check.reviewerName || check.prescriberName}</span>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5 font-semibold text-primary text-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>
+                            <span className="truncate max-w-[120px]">{check.reviewerName || check.prescriberName}</span>
                           </div>
-                          <div className="text-[11px] text-outline font-semibold">{check.overallStatus}</div>
+                          <div className="text-[11px] text-outline font-medium">{check.overallStatus}</div>
                         </td>
 
-                        <td className="py-3 px-2 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
+                        <td className="py-3 px-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <motion.button
                               type="button"
                               whileTap={{ scale: 0.98 }}
                               onClick={() => navigate(`/report?id=${check.id}`)}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors duration-150 text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
-                              title="Open Clinical Decision Report"
+                              title="Open Clinical Decision Report PDF"
                             >
-                              <span className="material-symbols-outlined text-[15px] text-primary">description</span>
-                              <span>Report</span>
+                              <span className="material-symbols-outlined text-[14px] text-primary">description</span>
+                              <span>PDF</span>
                             </motion.button>
                             <motion.button
                               type="button"
                               whileTap={{ scale: 0.98 }}
                               onClick={() => handleInspect(check)}
-                              className="px-3 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors duration-150 text-xs font-bold cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors duration-150 text-xs font-bold cursor-pointer"
                             >
-                              Inspect
+                              Review
                             </motion.button>
                           </div>
                         </td>
@@ -714,9 +740,9 @@ export default function Dashboard() {
         </div>
 
         {/* RIGHT COLUMN: Action CTA & Critical Review Queue */}
-        <div className="lg:col-span-4 flex flex-col gap-5 min-w-0 max-w-full">
-          {/* CTAs Card */}
-          <div className="flex flex-col gap-2.5">
+        <div className="lg:col-span-4 flex flex-col gap-4 min-w-0 max-w-full">
+          {/* Quick CTAs */}
+          <div className="flex flex-col gap-2">
             <motion.button
               type="button"
               whileTap={{ scale: 0.98 }}
@@ -753,16 +779,129 @@ export default function Dashboard() {
                 <span>Scan Rx Barcode</span>
               </motion.button>
             </div>
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/report')}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-surface-container-low text-secondary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors duration-150 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px] text-primary">description</span>
-              <span>Open Printable CDS Verification Report</span>
-            </motion.button>
           </div>
+
+          {/* User Requested: Selected Check Details Card (Dynamic sync with clicked table row) */}
+          {selectedCheck && (
+            <motion.div
+              key={selectedCheck.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-surface-container-lowest rounded-2xl p-4.5 shadow-xs border border-primary/25 flex flex-col gap-3 relative overflow-hidden"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-surface-container">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">verified</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-outline">Selected Check</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    </div>
+                    <h2 className="text-sm font-bold text-on-surface truncate">
+                      {selectedCheck.patientKey || selectedCheck.mrn}
+                    </h2>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end shrink-0">
+                  <span className="font-mono text-xs font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md border border-primary/15">
+                    {selectedCheck.checkNumber}
+                  </span>
+                  <span className="text-[10px] text-outline mt-0.5">{selectedCheck.timestamp}</span>
+                </div>
+              </div>
+
+              {/* Status Banner */}
+              {selectedCheck.alerts && selectedCheck.alerts.some(a => a.severity === 'contraindicated' && !a.overridden) ? (
+                <div className="p-2.5 rounded-xl bg-[#FFDAD6] border border-[#BA1A1A]/20 flex items-center gap-2 text-[#BA1A1A]">
+                  <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                  <div className="text-xs">
+                    <div className="font-bold">Contraindicated Safety Hazard</div>
+                    <div className="text-[10px] opacity-90">Requires clinician override before dispensing</div>
+                  </div>
+                </div>
+              ) : selectedCheck.alerts && selectedCheck.alerts.some(a => a.severity === 'major' && !a.overridden) ? (
+                <div className="p-2.5 rounded-xl bg-[#FEF3C7] border border-[#975A16]/20 flex items-center gap-2 text-[#975A16]">
+                  <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
+                  <div className="text-xs">
+                    <div className="font-bold">Major Clinical Warning</div>
+                    <div className="text-[10px] opacity-90">Review recommended dose adjustments</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center gap-2 text-emerald-800">
+                  <span className="material-symbols-outlined text-[18px] text-emerald-600 shrink-0">check_circle</span>
+                  <div className="text-xs">
+                    <div className="font-bold">Safe to Dispense — All Clear</div>
+                    <div className="text-[10px] text-emerald-700">Zero contraindicated drug interactions</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Prescribed Regimen Chips */}
+              <div className="bg-surface-container-low rounded-xl p-2.5 flex flex-col gap-1.5 border border-surface-container-high/40">
+                <div className="flex items-center justify-between text-[10px] font-bold text-outline uppercase tracking-wider">
+                  <span>Prescribed Regimen ({selectedCheck.prescriptions?.length || selectedCheck.prescribedDrugs?.length || 1})</span>
+                  <span className="text-primary font-medium">{selectedCheck.unit}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {selectedCheck.prescriptions && selectedCheck.prescriptions.length > 0 ? (
+                    selectedCheck.prescriptions.map((rx, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-container-lowest text-on-surface text-[11px] font-semibold border border-surface-container-high/60 shadow-2xs">
+                        <span className="material-symbols-outlined text-[12px] text-primary">medication</span>
+                        <span>{rx.drugName}</span>
+                        {rx.dosage && <span className="text-[10px] text-outline font-normal">({rx.dosage})</span>}
+                      </span>
+                    ))
+                  ) : (
+                    (selectedCheck.prescribedDrugs || ['Unspecified']).map((drug, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-container-lowest text-on-surface text-[11px] font-semibold border border-surface-container-high/60 shadow-2xs">
+                        <span className="material-symbols-outlined text-[12px] text-primary">medication</span>
+                        <span>{drug}</span>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Meta */}
+              <div className="flex items-center justify-between text-[11px] px-0.5 text-on-surface-variant">
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px] text-secondary">person_check</span>
+                  <span>{selectedCheck.reviewerName || selectedCheck.prescriberName || 'Active Clinician'}</span>
+                </span>
+                <span className="text-outline font-medium">
+                  {selectedCheck.overallStatus || 'Attested'}
+                </span>
+              </div>
+
+              {/* Primary Dual Actions: PDF Report & Review CDS */}
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-surface-container">
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate(`/report?id=${selectedCheck.id}`)}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-primary text-white hover:bg-primary-hover shadow-xs text-xs font-bold transition-colors cursor-pointer"
+                  title={`Open Printable PDF Report for ${selectedCheck.checkNumber}`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">description</span>
+                  <span>Open PDF Report</span>
+                </motion.button>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleInspect(selectedCheck)}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-surface-container-low text-primary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors cursor-pointer"
+                  title="Review CDS decision, warnings, and attestation"
+                >
+                  <span className="material-symbols-outlined text-[16px]">rate_review</span>
+                  <span>Review Check</span>
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
 
           {/* High Priority Queue Card */}
           <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col gap-3">
