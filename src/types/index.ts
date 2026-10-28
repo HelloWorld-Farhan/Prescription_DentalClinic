@@ -49,6 +49,8 @@ export interface SafetyCheckRecord {
   id: string;
   checkNumber: string;
   timestamp: string;
+  timestampMs?: number;
+  createdAt?: string;
   patientId: string;
   patientName: string;
   patientKey?: string;
@@ -71,11 +73,20 @@ export interface SafetyCheckRecord {
 export interface AuditLogEntry {
   id: string;
   timestamp: string;
+  timestampMs?: number;
+  createdAt?: string;
   clinicianName: string;
-  action: 'Safety Screen Initiated' | 'Alert Overridden' | 'Prescription Modified' | 'Report Printed' | 'Rule Updated' | 'FHIR Synced';
+  action: 'Safety Screen Initiated' | 'Alert Overridden' | 'Prescription Modified' | 'Report Printed' | 'Rule Updated' | 'FHIR Synced' | string;
   patientMrn: string;
+  patientName?: string;
+  checkId?: string;
+  prescriptions?: PrescriptionItem[];
+  alerts?: DrugInteractionAlert[];
+  overrideReason?: string;
+  overrideAuthor?: string;
   details: string;
   severity: AlertSeverity;
+  hash?: string;
 }
 
 export interface InteractionRule {

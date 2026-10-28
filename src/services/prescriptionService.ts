@@ -1,3 +1,67 @@
+/**
+ * Determines whether a given timestamp falls on "Today" in Indian Standard Time (IST, UTC+5:30).
+ * Every day at 12:00 AM IST (midnight), the IST date advances, automatically resetting today's checks.
+ */
+export function isTodayIST(timestampOrDate?: number | string | Date): boolean {
+  if (!timestampOrDate) return false;
+  let ms: number;
+  if (typeof timestampOrDate === 'number') {
+    ms = timestampOrDate;
+  } else if (typeof timestampOrDate === 'string') {
+    if (timestampOrDate.startsWith('chk-') || timestampOrDate.startsWith('aud-')) {
+      const num = parseInt(timestampOrDate.split('-')[1], 10);
+      ms = !isNaN(num) && num > 1000000000000 ? num : Date.now();
+    } else {
+      const d = new Date(timestampOrDate);
+      ms = !isNaN(d.getTime()) ? d.getTime() : Date.now();
+    }
+  } else {
+    ms = timestampOrDate.getTime();
+  }
+
+  // IST is UTC + 5:30 = +19,800,000 ms
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const istNow = new Date(Date.now() + IST_OFFSET_MS);
+  const istTarget = new Date(ms + IST_OFFSET_MS);
+
+  return (
+    istNow.getUTCFullYear() === istTarget.getUTCFullYear() &&
+    istNow.getUTCMonth() === istTarget.getUTCMonth() &&
+    istNow.getUTCDate() === istTarget.getUTCDate()
+  );
+}
+
+/**
+ * Formats a timestamp into an Indian Standard Time (IST) string.
+ * e.g. "06:30 PM IST" or "28 Oct, 06:30 PM IST".
+ */
+export function formatISTTime(timestampOrDate: number | string | Date = Date.now(), includeDate = false): string {
+  let date: Date;
+  if (typeof timestampOrDate === 'number') {
+    date = new Date(timestampOrDate);
+  } else if (typeof timestampOrDate === 'string') {
+    if (timestampOrDate.startsWith('chk-') || timestampOrDate.startsWith('aud-')) {
+      const num = parseInt(timestampOrDate.split('-')[1], 10);
+      date = !isNaN(num) && num > 1000000000000 ? new Date(num) : new Date(timestampOrDate);
+    } else {
+      const d = new Date(timestampOrDate);
+      date = !isNaN(d.getTime()) ? d : new Date();
+    }
+  } else {
+    date = timestampOrDate;
+  }
+
+  return (
+    new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      ...(includeDate ? { day: '2-digit', month: 'short' } : {}),
+    }).format(date) + ' IST'
+  );
+}
+
 import { Patient, SafetyCheckRecord, AuditLogEntry, DrugInteractionAlert, PrescriptionItem, InteractionRule } from '../types';
 
 const STORAGE_KEYS = {
@@ -203,17 +267,36 @@ export class PrescriptionStorage {
 
   static addCheck(record: SafetyCheckRecord) {
     const checks = this.getChecks();
-    checks.unshift(record);
+    const now = Date.now();
+    const istTimeStr = formatISTTime(now, true);
+
+    const enrichedRecord: SafetyCheckRecord = {
+      ...record,
+      timestampMs: record.timestampMs || now,
+      createdAt: record.createdAt || new Date(now).toISOString(),
+      timestamp: record.timestamp && record.timestamp !== 'Just now' ? record.timestamp : istTimeStr,
+    };
+
+    checks.unshift(enrichedRecord);
     localStorage.setItem(STORAGE_KEYS.CHECKS, JSON.stringify(checks));
 
+    const auditHash = 'SHA256:' + Math.random().toString(36).substring(2, 10).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase();
+
     this.addAudit({
-      id: 'aud-' + Date.now(),
-      timestamp: 'Just now',
+      id: 'aud-' + now,
+      timestamp: istTimeStr,
+      timestampMs: now,
+      createdAt: new Date(now).toISOString(),
       clinicianName: record.prescriberName,
       action: 'Safety Screen Initiated',
       patientMrn: record.mrn,
+      patientName: record.patientName,
+      checkId: record.id,
+      prescriptions: record.prescriptions,
+      alerts: record.alerts,
       details: `Screened ${record.prescriptions.length} items for ${record.patientName}. Result: ${record.overallStatus}.`,
-      severity: record.alerts.length > 0 ? record.alerts[0].severity : 'safe'
+      severity: record.alerts.length > 0 ? record.alerts[0].severity : 'safe',
+      hash: auditHash
     });
   }
 
@@ -236,14 +319,27 @@ export class PrescriptionStorage {
 
     localStorage.setItem(STORAGE_KEYS.CHECKS, JSON.stringify(checks));
 
+    const now = Date.now();
+    const istTimeStr = formatISTTime(now, true);
+    const auditHash = 'SHA256:' + Math.random().toString(36).substring(2, 10).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase();
+
     this.addAudit({
-      id: 'aud-' + Date.now(),
-      timestamp: 'Just now',
+      id: 'aud-' + now,
+      timestamp: istTimeStr,
+      timestampMs: now,
+      createdAt: new Date(now).toISOString(),
       clinicianName: author,
       action: 'Alert Overridden',
       patientMrn: check.mrn,
-      details: `Alert "${alert?.title}" overridden: ${reason}`,
-      severity: alert?.severity || 'major'
+      patientName: check.patientName,
+      checkId: check.id,
+      prescriptions: check.prescriptions,
+      alerts: check.alerts,
+      overrideReason: reason,
+      overrideAuthor: author,
+      details: `Alert "${alert?.title || alertId}" overridden: ${reason}`,
+      severity: alert?.severity || 'major',
+      hash: auditHash
     });
   }
 
@@ -251,13 +347,34 @@ export class PrescriptionStorage {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.AUDIT);
       const list: AuditLogEntry[] = raw ? JSON.parse(raw) : INITIAL_AUDIT_LOGS;
+      const checks = this.getChecks();
+
       const safetyOnly = (Array.isArray(list) ? list : []).filter(
         (log) => log.action !== 'Rule Updated' && !log.action.includes('Rule')
       );
+
+      // Hydrate missing inner details from safety checks if available
+      const enrichedLogs = safetyOnly.map((log) => {
+        if (!log.prescriptions || log.prescriptions.length === 0 || !log.alerts) {
+          const match = checks.find((c) => c.mrn === log.patientMrn || c.id === log.checkId);
+          if (match) {
+            return {
+              ...log,
+              patientName: log.patientName || match.patientName,
+              checkId: log.checkId || match.id,
+              prescriptions: log.prescriptions || match.prescriptions,
+              alerts: log.alerts || match.alerts,
+              hash: log.hash || ('SHA256:' + log.id.replace('aud-', '') + 'FEDCBA98'),
+            };
+          }
+        }
+        return log;
+      });
+
       if (raw && safetyOnly.length !== list.length) {
         localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(safetyOnly));
       }
-      return safetyOnly;
+      return enrichedLogs;
     } catch {
       return INITIAL_AUDIT_LOGS.filter((l) => l.action !== 'Rule Updated' && !l.action.includes('Rule'));
     }

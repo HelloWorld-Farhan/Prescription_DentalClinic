@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
+import { PrescriptionStorage as VirtualDb, getActiveClinicianName, isTodayIST, formatISTTime } from '../services/prescriptionService';
 import { SafetyCheckRecord, DrugInteractionAlert } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CustomDropdown from '../components/CustomDropdown';
@@ -62,17 +62,41 @@ export default function Dashboard() {
 
   const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
 
-  // Memoized metrics to prevent recalculation churn
-  const highSeverityCount = useMemo(() => 
-    checks.filter(c => c.alerts.some(a => a.severity === 'contraindicated' && !a.overridden)).length,
-    [checks]
-  );
+  // Live ticking Indian Standard Time (IST) clock
+  const [currentTimeIST, setCurrentTimeIST] = useState(() => formatISTTime(Date.now()));
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTimeIST(formatISTTime(Date.now()));
+    }, 15000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const inQueueCount = useMemo(() => 
-    checks.filter(c => c.overallStatus === 'Requires Review' || c.overallStatus === 'Contraindicated').length,
-    [checks]
-  );
+  // 1. Checks performed TODAY in Indian Standard Time (IST, UTC+5:30)
+  // Automatically resets to 0 every day at 12:00 AM IST (midnight)
+  const todayChecks = useMemo(() => {
+    return checks.filter(c => isTodayIST(c.timestampMs || c.createdAt || c.id || c.timestamp));
+  }, [checks]);
 
+  // Latest check time today in Indian Standard Time
+  const latestTodayCheckTime = useMemo(() => {
+    if (todayChecks.length === 0) return null;
+    const first = todayChecks[0];
+    return formatISTTime(first.timestampMs || first.createdAt || first.id || first.timestamp);
+  }, [todayChecks]);
+
+  // 2. All active (unresolved / un-overridden) alerts in queue
+  const activeAlerts = useMemo(() => {
+    return checks.flatMap(c => (c.alerts || []).filter(a => !a.overridden));
+  }, [checks]);
+  const inQueueCount = activeAlerts.length;
+
+  // 3. All active contraindicated (critical hazard) alerts
+  const criticalAlerts = useMemo(() => {
+    return checks.flatMap(c => (c.alerts || []).filter(a => a.severity === 'contraindicated' && !a.overridden));
+  }, [checks]);
+  const highSeverityCount = criticalAlerts.length;
+
+  // 4. Active clinical rules
   const rulesCount = useMemo(() => VirtualDb.getRules().length, []);
 
   const priorityAlerts = useMemo(() => 
@@ -253,16 +277,21 @@ export default function Dashboard() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Checks Today</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Checks Today</span>
+                <span className="text-[10px] font-mono text-primary font-bold px-1.5 py-0.5 rounded-md bg-primary/10">
+                  IST {currentTimeIST}
+                </span>
+              </div>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">
-                  <AnimatedCounter value={checks.length} />
+                  <AnimatedCounter value={todayChecks.length} />
                 </span>
                 <span className="inline-flex items-center text-xs text-primary font-bold">
                   <span className="material-symbols-outlined text-[14px]">
-                    {checks.length > 0 ? 'trending_up' : 'check_circle'}
+                    {todayChecks.length > 0 ? 'trending_up' : 'schedule'}
                   </span>
-                  {checks.length > 0 ? '+100%' : 'Active'}
+                  {todayChecks.length > 0 ? '+100%' : 'Resets 12 AM'}
                 </span>
               </div>
             </div>
@@ -281,7 +310,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center justify-between gap-1">
               <p className="text-[11px] text-on-surface-variant truncate">
-                {checks.filter(c => c.fhirSynced).length} auto, {checks.length} checked
+                {latestTodayCheckTime ? `Latest: ${latestTodayCheckTime}` : 'Resets daily at 12:00 AM IST'}
               </p>
               <button
                 type="button"
@@ -327,7 +356,7 @@ export default function Dashboard() {
           </div>
           <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between gap-1">
             <span className="text-[11px] text-on-surface-variant truncate">
-              {inQueueCount > 0 ? 'Wait: 2.1 mins' : 'Zero backlog'}
+              {inQueueCount > 0 ? `${inQueueCount} alerts awaiting review` : 'Zero backlog'}
             </span>
             <button
               type="button"
@@ -388,7 +417,7 @@ export default function Dashboard() {
           </div>
           <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between gap-1 z-10">
             <p className="text-[11px] text-on-surface-variant truncate">
-              {highSeverityCount > 0 ? `${highSeverityCount} critical flagged` : 'No active contraindications'}
+              {highSeverityCount > 0 ? `${highSeverityCount} contraindicated hazard flags` : 'No active contraindications'}
             </p>
             <button
               type="button"

@@ -606,10 +606,13 @@ export default function NewCheck() {
       const hasMajor = evaluatedAlerts.some(a => a.severity === 'major');
       const overallStatus = hasContra ? 'Contraindicated' : hasMajor ? 'Requires Review' : 'Safe to Dispense';
 
+      const nowMs = Date.now();
       const newRecord: SafetyCheckRecord = {
-        id: 'chk-' + Date.now(),
+        id: 'chk-' + nowMs,
         checkNumber: 'CHK-2026-' + Math.floor(1000 + Math.random() * 9000),
         timestamp: 'Just now',
+        timestampMs: nowMs,
+        createdAt: new Date(nowMs).toISOString(),
         patientId: updatedPatient.id,
         patientName: patientDisplayName,
         mrn: updatedPatient.mrn,
