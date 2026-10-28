@@ -41,7 +41,6 @@ export default function MinimalExtractionOverlay({
             const step = Math.max(0.65, (85 - progressRef.current) * 0.04);
             progressRef.current = Math.min(85, progressRef.current + step);
           } else if (progressRef.current < 99) {
-            // Smoothly tick through 90s all the way to 99% without stalling
             progressRef.current = Math.min(99, progressRef.current + 0.25);
           }
           setProgress(Math.round(progressRef.current));
@@ -96,51 +95,30 @@ export default function MinimalExtractionOverlay({
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.28, ease: 'easeOut' }}
-        onClick={(e) => e.stopPropagation()}
-        className={`absolute inset-0 z-30 flex items-center justify-center bg-white/80 backdrop-blur-md rounded-2xl pointer-events-none select-none overflow-hidden ${className}`}
-      >
-        {/* Soft Ambient Floating Orbs */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <motion.div
-            className="absolute w-36 h-36 rounded-full bg-teal-500/10 blur-2xl"
-            animate={{
-              x: ['-20%', '25%', '-15%'],
-              y: ['-10%', '20%', '-15%'],
-              scale: [1, 1.25, 0.95],
-            }}
-            transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
-            style={{ top: '20%', left: '25%' }}
-          />
-          <motion.div
-            className="absolute w-28 h-28 rounded-full bg-slate-900/8 blur-xl"
-            animate={{
-              x: ['20%', '-25%', '15%'],
-              y: ['15%', '-15%', '10%'],
-              scale: [1.1, 0.9, 1.15],
-            }}
-            transition={{ repeat: Infinity, duration: 7, ease: 'easeInOut' }}
-            style={{ bottom: '25%', right: '25%' }}
-          />
-        </div>
-
-        {/* Central Glassmorphic Card Container */}
+      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+        {/* Dark blurred clinical backdrop */}
         <motion.div
-          initial={{ scale: 0.92, opacity: 0, y: 8 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+        />
+
+        {/* Central Glassmorphic Modal Popup Card */}
+        <motion.div
+          initial={{ scale: 0.92, opacity: 0, y: 14 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.92, opacity: 0, y: 8 }}
-          transition={{ type: 'spring', damping: 22, stiffness: 320 }}
-          className="relative z-10 flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl bg-white/85 shadow-2xl border border-white/80 backdrop-blur-xl max-w-xs w-full mx-4"
+          exit={{ scale: 0.92, opacity: 0, y: 14 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+          onClick={(e) => e.stopPropagation()}
+          className={`relative z-10 flex flex-col items-center justify-center p-7 sm:p-8 rounded-3xl bg-white shadow-2xl border border-slate-100 max-w-xs w-full mx-auto select-none ${className}`}
         >
           {/* Circular SVG Ring & Central Percentage Display */}
           <div className="relative w-36 h-36 flex items-center justify-center">
             <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 136 136">
               <defs>
-                <linearGradient id="tealPercentageGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="tealPercentageGradModal" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#005c65" />
                   <stop offset="50%" stopColor="#007782" />
                   <stop offset="100%" stopColor="#0d9488" />
@@ -162,7 +140,7 @@ export default function MinimalExtractionOverlay({
                 cx="68"
                 cy="68"
                 r={radius}
-                stroke="url(#tealPercentageGrad)"
+                stroke="url(#tealPercentageGradModal)"
                 strokeWidth="7"
                 strokeLinecap="round"
                 fill="none"
@@ -202,7 +180,7 @@ export default function MinimalExtractionOverlay({
           </div>
 
           {/* Elegant Status Pill Underneath */}
-          <div className="mt-4 flex flex-col items-center gap-1">
+          <div className="mt-4 flex flex-col items-center gap-1 text-center">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-[#005c65] border border-teal-200/80 shadow-2xs">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
@@ -216,7 +194,7 @@ export default function MinimalExtractionOverlay({
             </span>
           </div>
         </motion.div>
-      </motion.div>
+      </div>
     </AnimatePresence>
   );
 }

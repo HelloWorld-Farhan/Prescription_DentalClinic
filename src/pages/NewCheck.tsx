@@ -7,9 +7,7 @@ import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } fr
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import ClinicalInquiriesModal from '../components/ClinicalInquiriesModal';
-import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
-import ImageLaserScanOverlay from '../components/ImageLaserScanOverlay';
 import { uploadToR2, deleteDocumentRecord } from '../services/storageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
@@ -1194,10 +1192,7 @@ export default function NewCheck() {
                     </div>
                   </div>
 
-                  {/* Minimal Real-Time Percentage Overlay Floating Over Blurred Dropzone */}
-                  <MinimalExtractionOverlay
-                    isExtracting={isProcessingDocument}
-                  />
+
                 </div>
 
                 {/* Attached Document Card with Real-time OCR Readiness */}
@@ -1277,16 +1272,7 @@ export default function NewCheck() {
             {/* TAB 2: CAMERA PHOTO SCAN */}
             {inputMethod === 'camera' && (
               <div className="space-y-4">
-                {/* Active Laser Scanning State when extracting captured photo */}
-                {isProcessingDocument && capturedPhoto ? (
-                  <div className="space-y-3">
-                    <ImageLaserScanOverlay
-                      imageUrl={capturedPhoto}
-                      isScanning={true}
-                    />
-                  </div>
-                ) : (
-                  <>
+                <>
                     {/* Camera Viewfinder: White background matching UI theme with dashed teal border */}
                     <div
                       onClick={() => setIsCameraModalOpen(true)}
@@ -1388,7 +1374,6 @@ export default function NewCheck() {
                       </div>
                     )}
                   </>
-                )}
               </div>
             )}
 
@@ -2522,6 +2507,11 @@ export default function NewCheck() {
         isOpen={isCameraModalOpen}
         onClose={() => setIsCameraModalOpen(false)}
         onCapture={handleCameraCapture}
+      />
+
+      {/* AI Multimodal Extraction Progress Modal Popup */}
+      <MinimalExtractionOverlay
+        isExtracting={isProcessingDocument}
       />
 
       {/* Patient & Clinical Inquiries Pre-Screening Popup Modal */}

@@ -9,7 +9,6 @@ import CustomDropdown from '../components/CustomDropdown';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
-import ImageLaserScanOverlay from '../components/ImageLaserScanOverlay';
 import {
   uploadToR2,
   getDocumentHistory,
@@ -1552,11 +1551,9 @@ export default function RulesAdmin() {
                         ) : (
                           <div className="space-y-3">
                             {imagePreviewUrl && (
-                              <ImageLaserScanOverlay
-                                imageUrl={imagePreviewUrl}
-                                isScanning={isExtracting}
-                                className="max-h-[240px]"
-                              />
+                              <div className="relative rounded-2xl overflow-hidden border border-surface-container-high bg-surface-container-lowest flex items-center justify-center max-h-[240px]">
+                                <img src={imagePreviewUrl} alt="Document Preview" className="w-full max-h-[240px] object-contain" />
+                              </div>
                             )}
 
                             <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3">
