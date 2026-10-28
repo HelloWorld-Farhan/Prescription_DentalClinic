@@ -27,94 +27,106 @@ export default function MinimalExtractionOverlay({
   const [progress, setProgress] = useState(1);
   const [show, setShow] = useState(false);
   
-  // Use stable refs for callbacks to prevent re-render cancellations
+  // Stable refs to prevent re-render cancellations
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  const isExtractingRef = useRef(isExtracting);
-  isExtractingRef.current = isExtracting;
+  const currentProgressRef = useRef(1);
+  const isClosingRef = useRef(false);
 
-  const completionTriggeredRef = useRef(false);
-
+  // 1. When extraction starts
   useEffect(() => {
-    let animFrame: any = null;
-    let startTime: number | null = null;
-    const targetDurationMs = 3200; // Complete smoothly within 3.2s
-
     if (isExtracting) {
       setShow(true);
+      isClosingRef.current = false;
+      currentProgressRef.current = 1;
       setProgress(1);
-      completionTriggeredRef.current = false;
 
-      const triggerFinish = () => {
-        if (completionTriggeredRef.current) return;
-        completionTriggeredRef.current = true;
-        setProgress(100);
+      let animFrame: number;
+      const startTime = performance.now();
 
-        // Guaranteed dismissal after brief visual confirmation of completion
-        setTimeout(() => {
-          setShow(false);
-          setProgress(1);
-          if (onCompleteRef.current) {
-            onCompleteRef.current();
-          }
-        }, 400);
+      const animateHoldingCurve = (now: number) => {
+        if (isClosingRef.current) return;
+
+        const elapsed = now - startTime;
+        // Natural asymptotic progression that caps at 94% while waiting for backend
+        const ratio = 1 - Math.exp(-elapsed / 2200);
+        const p = Math.min(94, Math.max(1, Math.round(ratio * 94)));
+
+        currentProgressRef.current = p;
+        setProgress(p);
+
+        animFrame = requestAnimationFrame(animateHoldingCurve);
       };
 
-      const animate = (timestamp: number) => {
-        if (!startTime) startTime = timestamp;
-        const elapsed = timestamp - startTime;
+      animFrame = requestAnimationFrame(animateHoldingCurve);
 
-        if (!isExtractingRef.current) {
-          // Parent extraction finished early: accelerate immediately to 100%
-          triggerFinish();
-          return;
-        }
-
-        const rawRatio = Math.min(1, elapsed / targetDurationMs);
-        const easeOut = 1 - Math.pow(1 - rawRatio, 2.5);
-        const currentP = Math.min(100, Math.max(1, Math.round(easeOut * 100)));
-        setProgress(currentP);
-
-        if (currentP >= 100) {
-          triggerFinish();
-          return;
-        }
-
-        animFrame = requestAnimationFrame(animate);
+      return () => {
+        if (animFrame) cancelAnimationFrame(animFrame);
       };
-
-      animFrame = requestAnimationFrame(animate);
-    } else if (show && !completionTriggeredRef.current) {
-      // Backend resolved while overlay is visible: trigger immediate smooth finish
-      completionTriggeredRef.current = true;
-      setProgress(100);
-      setTimeout(() => {
-        setShow(false);
-        setProgress(1);
-        if (onCompleteRef.current) {
-          onCompleteRef.current();
-        }
-      }, 400);
     }
-
-    return () => {
-      if (animFrame) cancelAnimationFrame(animFrame);
-    };
   }, [isExtracting]);
 
+  // 2. When extraction completes (isExtracting flips from true to false while modal is open)
+  useEffect(() => {
+    if (!isExtracting && show && !isClosingRef.current) {
+      isClosingRef.current = true;
+
+      // Swiftly sweep from currentProgressRef (e.g. 70-94%) to 100%
+      const startP = currentProgressRef.current;
+      const sweepDuration = 280; // ms
+      const sweepStart = performance.now();
+      let sweepFrame: number;
+
+      const sweepTo100 = (now: number) => {
+        const elapsed = now - sweepStart;
+        const progressFrac = Math.min(1, elapsed / sweepDuration);
+        const currentSweepP = Math.round(startP + (100 - startP) * progressFrac);
+
+        currentProgressRef.current = currentSweepP;
+        setProgress(currentSweepP);
+
+        if (progressFrac < 1) {
+          sweepFrame = requestAnimationFrame(sweepTo100);
+        } else {
+          // Reached exactly 100% with checkmark
+          setProgress(100);
+          currentProgressRef.current = 100;
+
+          // Give clinician 450ms visual confirmation of completion, then smoothly close
+          setTimeout(() => {
+            setShow(false);
+            setProgress(1);
+            currentProgressRef.current = 1;
+            isClosingRef.current = false;
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+            }
+          }, 450);
+        }
+      };
+
+      sweepFrame = requestAnimationFrame(sweepTo100);
+
+      return () => {
+        if (sweepFrame) cancelAnimationFrame(sweepFrame);
+      };
+    }
+  }, [isExtracting, show]);
+
   const handleDismiss = () => {
+    isClosingRef.current = true;
     setShow(false);
     setProgress(1);
-    completionTriggeredRef.current = true;
+    currentProgressRef.current = 1;
     if (onCloseRef.current) {
       onCloseRef.current();
     }
   };
 
-  if (!show && !isExtracting) return null;
+  if (!show) return null;
   if (typeof document === 'undefined') return null;
 
   const isFinished = progress >= 100;
@@ -224,7 +236,7 @@ export default function MinimalExtractionOverlay({
                   style={{
                     strokeDasharray: circumference,
                     strokeDashoffset,
-                    transition: 'stroke-dashoffset 0.06s linear',
+                    transition: 'stroke-dashoffset 0.05s linear',
                   }}
                 />
 
