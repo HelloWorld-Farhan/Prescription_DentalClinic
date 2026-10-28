@@ -7,7 +7,7 @@
  * Zero browser localStorage usage.
  * ==============================================================================
  */
-import { syncDocumentToCloud, deleteDocumentFromCloud } from './cloudSyncService';
+import { syncDocumentToCloud, deleteDocumentFromCloud, getClinicianEmail } from './cloudSyncService';
 import { API_BASE_URL, R2_PUBLIC_URL } from '../config/api';
 
 
@@ -172,7 +172,9 @@ export async function uploadToR2(
 
   customFilename?: string,
 
-  saveRecord: boolean = true
+  saveRecord: boolean = true,
+
+  category?: 'prescription' | 'history' | 'report' | 'profile'
 
 ): Promise<{ url: string; key: string; filename: string; size: number }> {
 
@@ -188,7 +190,30 @@ export async function uploadToR2(
 
   const timestamp = Date.now();
 
-  const fileKey = `uploads/${userId}/${timestamp}_${sanitizedFilename}`;
+  const activeEmail = (getClinicianEmail() || (userId.includes('@') ? userId : '') || 'user-current').trim().toLowerCase();
+
+  // Determine subfolder based on file type
+  const ext = sanitizedFilename.split('.').pop()?.toLowerCase() || '';
+  let subfolder = 'documents';
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext)) {
+    subfolder = 'images';
+  } else if (ext === 'pdf') {
+    subfolder = 'pdf';
+  } else if (['docx', 'doc'].includes(ext)) {
+    subfolder = 'word';
+  } else if (['csv', 'xlsx', 'xls'].includes(ext)) {
+    subfolder = 'csv';
+  }
+
+  const determinedCat = isAvatarFile(sanitizedFilename)
+    ? 'profile/avatar'
+    : (category || (saveRecord ? 'history' : 'prescription'));
+
+  const fileKey = determinedCat === 'report'
+    ? `users/${activeEmail}/report/${timestamp}_${sanitizedFilename}`
+    : determinedCat === 'profile/avatar'
+    ? `users/${activeEmail}/profile/avatar/${timestamp}_${sanitizedFilename}`
+    : `users/${activeEmail}/${determinedCat}/${subfolder}/${timestamp}_${sanitizedFilename}`;
 
 
 
@@ -205,6 +230,10 @@ export async function uploadToR2(
       formData.append('key', fileKey);
 
       formData.append('userId', userId);
+
+      formData.append('userEmail', activeEmail);
+
+      formData.append('category', determinedCat);
 
 
 
