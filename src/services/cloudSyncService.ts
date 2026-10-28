@@ -9,10 +9,7 @@
 import { SafetyCheckRecord, AuditLogEntry, InteractionRule, Patient } from '../types';
 import { UploadedDocumentRecord } from './storageService';
 
-const API_BASE_URL = (
-  (import.meta as any).env?.VITE_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8000' : '')
-).replace(/\/$/, '');
+import { API_BASE_URL } from '../config/api';
 
 const STORAGE_KEYS = {
   CHECKS: 'smileclinic_checks',
@@ -24,6 +21,13 @@ const STORAGE_KEYS = {
 
 export function getClinicianEmail(): string {
   try {
+    const rawUser = localStorage.getItem('smileclinic_auth_user') || sessionStorage.getItem('smileclinic_auth_user');
+    if (rawUser) {
+      try {
+        const u = JSON.parse(rawUser);
+        if (u?.email) return u.email.trim().toLowerCase();
+      } catch {}
+    }
     return (
       sessionStorage.getItem('rxguard_prescriber_email') ||
       localStorage.getItem('rxguard_prescriber_email') ||

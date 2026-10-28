@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import { PrescriptionItem, InteractionRule, AlertSeverity } from '../types';
 
 export interface ExtractedPatientMetadata {
@@ -505,7 +506,7 @@ export async function extractPrescriptionData(
 
   // 2. Call the Real PropNexAI Agent Model 3 Backend API
   const env = (import.meta as any).env || {};
-  const apiUrl = (env.VITE_API_URL || '').replace(/\/$/, '') || 'https://dentalclinic-backend-eiav.onrender.com';
+  const apiUrl = API_BASE_URL;
 
   try {
     const formData = new FormData();
@@ -623,7 +624,7 @@ export interface DocumentRulesExtractionResult {
  */
 export async function extractDocumentRules(file: File): Promise<DocumentRulesExtractionResult> {
   const env = (import.meta as any).env || {};
-  const apiUrl = (env.VITE_API_URL || '').replace(/\/$/, '') || 'https://dentalclinic-backend-eiav.onrender.com';
+  const apiUrl = API_BASE_URL;
   const now = Date.now();
 
   try {

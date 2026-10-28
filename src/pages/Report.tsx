@@ -6,10 +6,7 @@ import { SafetyCheckRecord } from '../types';
 import { getClinicianEmail } from '../services/cloudSyncService';
 import { showConfirmation } from '../services/confirmation';
 
-const API_BASE_URL = (
-  (import.meta as any).env?.VITE_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8000' : '')
-).replace(/\/$/, '');
+import { API_BASE_URL } from '../config/api';
 
 interface GeminiClinicalAnalysis {
   clinicalSummary?: string;

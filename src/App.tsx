@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { MotionConfig, AnimatePresence, motion } from 'framer-motion';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from './components/Layout';
-import { initAutoSync } from './services/cloudSyncService';
+import { initAutoSync, pullFromCloud } from './services/cloudSyncService';
 
 // Lazy-load clinical route pages
 const Login = lazy(() => import('./pages/Login'));
@@ -117,8 +117,23 @@ function AppRoutes() {
 
 export default function App() {
   useEffect(() => {
+    pullFromCloud().catch(() => {});
+
+    const handleRecheck = () => {
+      pullFromCloud().catch(() => {});
+    };
+    window.addEventListener('focus', handleRecheck);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') handleRecheck();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     const cleanup = initAutoSync();
-    return () => cleanup?.();
+    return () => {
+      cleanup?.();
+      window.removeEventListener('focus', handleRecheck);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   return (

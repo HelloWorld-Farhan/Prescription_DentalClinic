@@ -1,3 +1,4 @@
+import { pullFromCloud } from '../services/cloudSyncService';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -140,6 +141,7 @@ export default function Login() {
           localStorage.removeItem('rxguard_authenticated');
           localStorage.removeItem('smileclinic_remembered_email');
         }
+        pullFromCloud().catch(() => {});
         navigate('/dashboard');
         return;
       }
@@ -200,7 +202,8 @@ export default function Login() {
         }
         setTimeout(() => {
           setShowLoginOtpModal(false);
-          navigate('/dashboard');
+          pullFromCloud().catch(() => {});
+        navigate('/dashboard');
         }, 1200);
       }
     } catch (err: any) {
@@ -272,6 +275,7 @@ export default function Login() {
           localStorage.setItem(`google_linked_${googleUser.email.toLowerCase()}`, 'true');
         }
         recordLoginEvent('Success', `Authenticated via 1-Click Google OAuth (${googleUser.email})`, googleUser.email);
+        pullFromCloud().catch(() => {});
         navigate('/dashboard');
       }
     } catch (err: any) {
