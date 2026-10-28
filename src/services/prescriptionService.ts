@@ -778,6 +778,9 @@ export class ClinicalDecisionSupport {
       checkId: record.id,
       prescriptions: record.prescriptions,
       alerts: record.alerts,
+      sourceDocumentUrl: record.sourceDocumentUrl,
+      sourceDocumentName: record.sourceDocumentName,
+      sourceType: record.sourceType,
       details: `Screened ${record.prescriptions.length} items for ${record.patientName}. Result: ${record.overallStatus}.`,
       severity: record.alerts.length > 0 ? record.alerts[0].severity : 'safe',
       hash: auditHash
@@ -844,8 +847,11 @@ export class ClinicalDecisionSupport {
             ...log,
             patientName: log.patientName || match.patientName,
             checkId: log.checkId || match.id,
-            prescriptions: log.prescriptions || match.prescriptions,
-            alerts: log.alerts || match.alerts,
+            prescriptions: (log.prescriptions && log.prescriptions.length > 0) ? log.prescriptions : match.prescriptions,
+            alerts: (log.alerts && log.alerts.length > 0) ? log.alerts : match.alerts,
+            sourceDocumentUrl: log.sourceDocumentUrl || match.sourceDocumentUrl,
+            sourceDocumentName: log.sourceDocumentName || match.sourceDocumentName,
+            sourceType: log.sourceType || match.sourceType,
             hash: log.hash || ('SHA256:' + log.id.replace('aud-', '') + 'FEDCBA98'),
           };
         }

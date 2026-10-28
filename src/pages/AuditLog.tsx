@@ -32,6 +32,8 @@ export default function AuditLog() {
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const [selectedLogForRx, setSelectedLogForRx] = useState<AuditLogEntry | null>(null);
+  const [emailModalLog, setEmailModalLog] = useState<AuditLogEntry | null>(null);
+  const [emailModalMode, setEmailModalMode] = useState<'send' | 'preview'>('send');
 
 
 
@@ -825,6 +827,71 @@ export default function AuditLog() {
 
                               </div>
 
+                              {/* Per-Audit Clinical Action Bar: Email Send / Preview, Download PDF, View Uploaded Rx Slip */}
+                              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-surface-container-high/60 bg-surface-container-low/40 p-3 rounded-xl mt-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-on-surface">Screening Audit Actions:</span>
+                                  <span className="font-mono text-[11px] text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                                    {log.checkId || log.id}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {/* Send via Email */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEmailModalLog(log);
+                                      setEmailModalMode('send');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-800 text-white hover:bg-teal-900 transition-colors text-xs font-bold shadow-2xs cursor-pointer"
+                                    title="Send certified 2-page PDF report via email"
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">mail</span>
+                                    <span>Send via Email</span>
+                                  </button>
+
+                                  {/* Preview of Email */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEmailModalLog(log);
+                                      setEmailModalMode('preview');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container text-primary hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
+                                    title="Preview rendered HTML email and PDF attachment"
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">drafts</span>
+                                    <span>Preview of Email</span>
+                                  </button>
+
+                                  {/* Direct PDF Download */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const checkId = log.checkId || log.id;
+                                      navigate(`/report?id=${checkId}`);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
+                                    title="Open and download 2-page printable CDS PDF report"
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">download</span>
+                                    <span>Download PDF</span>
+                                  </button>
+
+                                  {/* View Uploaded Prescription Copy */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedLogForRx(log)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-800 hover:bg-teal-600 hover:text-white transition-colors text-xs font-bold border border-teal-200/80 shadow-2xs cursor-pointer"
+                                    title="View original uploaded prescription copy archived in R2"
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">receipt_long</span>
+                                    <span>Prescription Copy</span>
+                                  </button>
+                                </div>
+                              </div>
+
                             </motion.div>
 
                           </td>
@@ -931,410 +998,27 @@ export default function AuditLog() {
 
             {/* Dedicated Prescription Inspection Modal */}
 
-      {selectedLogForRx && typeof document !== 'undefined' && createPortal(
-
-        <AnimatePresence>
-
-          <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
-
-            <motion.div
-
-              initial={{ opacity: 0 }}
-
-              animate={{ opacity: 1 }}
-
-              exit={{ opacity: 0 }}
-
-              onClick={() => setSelectedLogForRx(null)}
-
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
-
-            />
-
-            <motion.div
-
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-
-              exit={{ opacity: 0, scale: 0.95, y: 12 }}
-
-              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-
-              onClick={(e) => e.stopPropagation()}
-
-              className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-2xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 z-10 max-h-[90vh] overflow-y-auto"
-
-            >
-
-              {(() => {
-
-                const matchedCheck = checks.find(
-
-                  (c) => c.id === selectedLogForRx.checkId || c.mrn === selectedLogForRx.patientMrn || c.patientKey === selectedLogForRx.patientMrn
-
-                );
-
-                const rxItems = selectedLogForRx.prescriptions || matchedCheck?.prescriptions || [];
-
-                const rxAlerts = selectedLogForRx.alerts || matchedCheck?.alerts || [];
-
-                const dateTimeObj = formatISTDateTime(selectedLogForRx.timestampMs || selectedLogForRx.timestamp);
-
-                const pdfReportIdentifier = matchedCheck?.checkNumber || matchedCheck?.id || selectedLogForRx.checkId || selectedLogForRx.id;
-
-                const pdfCleanName = `SmileClinic_CDS_Report_${pdfReportIdentifier.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-
-
-
-                return (
-
-                  <>
-
-                    {/* Header */}
-
-                    <div className="flex items-start justify-between gap-3 pb-3 border-b border-surface-container">
-
-                      <div className="flex items-center gap-3">
-
-                        <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center shrink-0">
-
-                          <span className="material-symbols-outlined text-[22px]">prescriptions</span>
-
-                        </div>
-
-                        <div>
-
-                          <div className="flex items-center gap-2">
-
-                            <h3 className="text-base font-bold text-on-surface">
-
-                              Prescription Inspection &amp; Clinical Verification
-
-                            </h3>
-
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-
-                              Attested
-
-                            </span>
-
-                          </div>
-
-                          <p className="text-xs text-outline mt-0.5">
-
-                            Patient MRN: <strong className="text-on-surface font-mono">{selectedLogForRx.patientMrn}</strong> • Clinician: <strong className="text-on-surface">{selectedLogForRx.clinicianName}</strong>
-
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                      <button
-
-                        type="button"
-
-                        onClick={() => setSelectedLogForRx(null)}
-
-                        className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-
-                      >
-
-                        <span className="material-symbols-outlined text-[18px]">close</span>
-
-                      </button>
-
-                    </div>
-
-
-
-                    {/* PDF Report Reference Bar */}
-
-                    <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-
-                      <div className="flex items-center gap-2.5 min-w-0">
-
-                        <span className="material-symbols-outlined text-primary text-[22px] shrink-0">picture_as_pdf</span>
-
-                        <div className="min-w-0">
-
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-outline block">Clinical Decision Support PDF Report</span>
-
-                          <span className="text-xs font-mono font-bold text-primary truncate block" title={pdfCleanName}>
-
-                            {pdfCleanName}
-
-                          </span>
-
-                        </div>
-
-                      </div>
-
-                      <button
-
-                        type="button"
-
-                        onClick={() => {
-
-                          if (matchedCheck) navigate(`/report?id=${matchedCheck.id}`);
-
-                          else navigate('/report');
-
-                        }}
-
-                        className="px-3.5 py-1.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
-
-                      >
-
-                        <span className="material-symbols-outlined text-[15px]">description</span>
-
-                        <span>Open PDF Report</span>
-
-                      </button>
-
-                    </div>
-
-
-
-                    {/* Meta Grid */}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-surface-container-low/50 border border-surface-container text-xs">
-
-                      <div>
-
-                        <span className="text-[10px] uppercase font-bold text-outline block">Date &amp; Time (IST)</span>
-
-                        <span className="font-semibold text-on-surface font-mono text-[11px]">{dateTimeObj.full}</span>
-
-                      </div>
-
-                      <div>
-
-                        <span className="text-[10px] uppercase font-bold text-outline block">Clinical Severity Status</span>
-
-                        <span className={`inline-flex items-center gap-1 font-bold text-[11px] uppercase ${
-
-                          selectedLogForRx.severity === 'contraindicated'
-
-                            ? 'text-rose-700'
-
-                            : selectedLogForRx.severity === 'major'
-
-                            ? 'text-orange-700'
-
-                            : 'text-emerald-700'
-
-                        }`}>
-
-                          {selectedLogForRx.severity || 'SAFE'}
-
-                        </span>
-
-                      </div>
-
-                      <div>
-
-                        <span className="text-[10px] uppercase font-bold text-outline block">SHA-256 Legal Seal</span>
-
-                        <span className="font-mono text-[10px] text-outline truncate block" title={selectedLogForRx.hash}>
-
-                          {selectedLogForRx.hash || 'SHA256:7B8F3C92D01E4A56'}
-
-                        </span>
-
-                      </div>
-
-                    </div>
-
-
-
-                    {/* Prescribed Medications */}
-
-                    <div className="flex flex-col gap-2">
-
-                      <div className="flex items-center justify-between text-xs font-bold text-on-surface">
-
-                        <span className="flex items-center gap-1.5">
-
-                          <span className="material-symbols-outlined text-[16px] text-primary">medication</span>
-
-                          Prescribed Medication Items ({rxItems.length})
-
-                        </span>
-
-                        <span className="text-[10px] text-outline font-normal">RxNorm Formulations</span>
-
-                      </div>
-
-
-
-                      {rxItems.length === 0 ? (
-
-                        <div className="p-4 rounded-xl bg-surface-container-low text-center text-xs text-on-surface-variant italic">
-
-                          {selectedLogForRx.details || 'No detailed prescription items logged for this event.'}
-
-                        </div>
-
-                      ) : (
-
-                        <div className="flex flex-col gap-2">
-
-                          {rxItems.map((rx, idx) => (
-
-                            <div key={idx} className="p-3 rounded-xl bg-surface-container-lowest border border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-
-                              <div>
-
-                                <div className="flex items-center gap-2 flex-wrap">
-
-                                  <span className="text-xs font-bold text-on-surface">{rx.drugName}</span>
-
-                                  {rx.dosage && (
-
-                                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-bold text-[10px]">
-
-                                      {rx.dosage}
-
-                                    </span>
-
-                                  )}
-
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-container text-on-surface-variant font-medium">
-
-                                    {rx.route || 'Oral'}
-
-                                  </span>
-
-                                </div>
-
-                                <span className="text-[11px] text-outline mt-0.5 block">
-
-                                  {rx.genericName && `${rx.genericName} • `}Frequency: {rx.frequency || 'Standard'} • Duration: {rx.duration || '7 days'}
-
-                                </span>
-
-                              </div>
-
-                            </div>
-
-                          ))}
-
-                        </div>
-
-                      )}
-
-                    </div>
-
-
-
-                    {/* Warnings / Alerts summary */}
-
-                    {rxAlerts.length > 0 && (
-
-                      <div className="flex flex-col gap-2 pt-2 border-t border-surface-container">
-
-                        <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-
-                          <span className="material-symbols-outlined text-[16px] text-amber-600">health_and_safety</span>
-
-                          Screened Safety Alerts ({rxAlerts.length})
-
-                        </span>
-
-                        <div className="flex flex-col gap-1.5">
-
-                          {rxAlerts.map((alt) => (
-
-                            <div key={alt.id} className="p-2.5 rounded-lg bg-surface-container-low border border-surface-container flex items-start justify-between gap-2 text-xs">
-
-                              <div>
-
-                                <span className="font-bold text-on-surface block">{alt.title}</span>
-
-                                <span className="text-[11px] text-on-surface-variant leading-relaxed block mt-0.5">{alt.recommendation || alt.mechanism}</span>
-
-                              </div>
-
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-
-                                alt.severity === 'contraindicated' ? 'bg-rose-100 text-rose-800' : 'bg-orange-100 text-orange-800'
-
-                              }`}>
-
-                                {alt.severity}
-
-                              </span>
-
-                            </div>
-
-                          ))}
-
-                        </div>
-
-                      </div>
-
-                    )}
-
-
-
-                    {/* Modal Footer */}
-
-                    <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-surface-container">
-
-                      <button
-
-                        type="button"
-
-                        onClick={() => setSelectedLogForRx(null)}
-
-                        className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
-
-                      >
-
-                        Close
-
-                      </button>
-
-                      <button
-
-                        type="button"
-
-                        onClick={() => {
-
-                          if (matchedCheck) navigate(`/report?id=${matchedCheck.id}`);
-
-                          else navigate('/report');
-
-                        }}
-
-                        className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
-
-                      >
-
-                        <span className="material-symbols-outlined text-[15px]">print</span>
-
-                        <span>Open Attestation Report</span>
-
-                      </button>
-
-                    </div>
-
-                  </>
-
-                );
-
-              })()}
-
-            </motion.div>
-
-          </div>
-
-        </AnimatePresence>,
-
-        document.body
-
+      {/* Real Uploaded Prescription Slip Modal */}
+      <PrescriptionCopyModal
+        isOpen={!!selectedLogForRx}
+        onClose={() => setSelectedLogForRx(null)}
+        auditLog={selectedLogForRx}
+        check={checks.find((c) => c.id === selectedLogForRx?.checkId || c.mrn === selectedLogForRx?.patientMrn)}
+      />
+
+      {/* Individual Email Send / Preview Modal */}
+      {emailModalLog && (
+        <EmailReportModal
+          isOpen={!!emailModalLog}
+          onClose={() => setEmailModalLog(null)}
+          mode={emailModalMode}
+          checkId={emailModalLog.checkId || emailModalLog.id}
+          patientName={emailModalLog.patientName || emailModalLog.patientMrn}
+          patientMrn={emailModalLog.patientMrn}
+          prescriptions={emailModalLog.prescriptions || []}
+          alerts={emailModalLog.alerts || []}
+          overallStatus={emailModalLog.severity === 'safe' ? 'Safe to Dispense' : 'Requires Review'}
+        />
       )}
 
 

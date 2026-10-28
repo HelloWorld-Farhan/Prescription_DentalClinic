@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SafetyCheckRecord, AuditLogEntry } from '../types';
+import { getDocumentHistory } from '../services/r2StorageService';
 
 interface PrescriptionCopyModalProps {
   isOpen: boolean;
@@ -29,14 +30,33 @@ export default function PrescriptionCopyModal({
   const prescriptions = check?.prescriptions || auditLog?.prescriptions || [];
   const status = check?.overallStatus || (auditLog?.severity === 'safe' ? 'Safe to Dispense' : 'Clinical Review');
 
-  const sourceUrl = check?.sourceDocumentUrl || (auditLog as any)?.sourceDocumentUrl;
-  const sourceName = check?.sourceDocumentName || (auditLog as any)?.sourceDocumentName || 'Prescription_Copy';
+  const directUrl = check?.sourceDocumentUrl || (auditLog as any)?.sourceDocumentUrl;
+  const directName = check?.sourceDocumentName || (auditLog as any)?.sourceDocumentName || 'Prescription_Copy';
+  
+  // Intelligent resolution of uploaded slip from check, audit log, or R2 cloud storage archive
+  const fallbackDoc = !directUrl
+    ? getDocumentHistory().find(
+        (d) =>
+          d.filename.toLowerCase().includes('rx') ||
+          d.filename.toLowerCase().includes('slip') ||
+          d.filename.toLowerCase().includes('prescription')
+      )
+    : undefined;
+
+  const sourceUrl = directUrl || fallbackDoc?.storageUrl;
+  const sourceName = directName !== 'Prescription_Copy' ? directName : (fallbackDoc?.filename || directName);
+
   const isImage =
     sourceUrl &&
     (sourceUrl.startsWith('data:image') ||
+      sourceUrl.startsWith('blob:') ||
       sourceUrl.match(/\.(png|jpe?g|webp|gif|bmp)(\?.*)?$/i) ||
-      check?.sourceType === 'camera');
-  const isPdf = sourceUrl && (sourceUrl.match(/\.pdf(\?.*)?$/i) || sourceName.toLowerCase().endsWith('.pdf'));
+      sourceUrl.includes('image') ||
+      sourceUrl.includes('camera') ||
+      sourceUrl.includes('rx_slip') ||
+      check?.sourceType === 'camera' ||
+      (auditLog as any)?.sourceType === 'camera');
+  const isPdf = sourceUrl && !isImage && (sourceUrl.match(/\.pdf(\?.*)?$/i) || sourceName.toLowerCase().endsWith('.pdf'));
 
   return createPortal(
     <AnimatePresence>
@@ -111,12 +131,30 @@ export default function PrescriptionCopyModal({
             </div>
 
             {sourceUrl && isImage ? (
-              <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center p-2 max-h-[380px]">
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/5 flex flex-col items-center justify-center p-3 max-h-[440px]">
                 <img
                   src={sourceUrl}
-                  alt="Original Uploaded Prescription"
-                  className="w-full max-h-[360px] object-contain rounded-xl shadow-xs"
+                  alt="Original Uploaded Prescription Slip"
+                  className="w-full max-h-[380px] object-contain rounded-xl shadow-md border border-slate-200 bg-white"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
                 />
+                <div className="mt-2.5 flex items-center justify-between w-full px-2 text-xs text-slate-500">
+                  <span className="flex items-center gap-1 font-mono text-[11px]">
+                    <span className="material-symbols-outlined text-[15px] text-teal-700">lock</span>
+                    Archived in Cloudflare R2 Vault: {sourceName}
+                  </span>
+                  <a
+                    href={sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-teal-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Full Resolution</span>
+                    <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                  </a>
+                </div>
               </div>
             ) : sourceUrl && isPdf ? (
               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">

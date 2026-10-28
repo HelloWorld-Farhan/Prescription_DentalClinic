@@ -164,6 +164,9 @@ export interface SafetyCheckRecord {
 
 
 export interface AuditLogEntry {
+  sourceDocumentUrl?: string;
+  sourceDocumentName?: string;
+  sourceType?: 'upload' | 'camera' | 'manual';
 
   id: string;
 

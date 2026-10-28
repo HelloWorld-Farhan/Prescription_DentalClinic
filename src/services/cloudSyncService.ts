@@ -132,6 +132,9 @@ export async function pullFromCloud(): Promise<boolean> {
           pdfFilename: c.pdfFilename,
           pdfUrl: c.pdfUrl,
           notes: c.notes,
+          sourceDocumentUrl: c.sourceDocumentUrl || c.source_document_url,
+          sourceDocumentName: c.sourceDocumentName || c.source_document_name,
+          sourceType: c.sourceType || c.source_type,
           digitalSeal: c.digitalSeal,
           fhirSynced: !!c.fhirSynced,
           questions: c.questions || [],
@@ -163,6 +166,9 @@ export async function pullFromCloud(): Promise<boolean> {
           hash: a.hash || 'SHA256:AUTHENTICATED',
           pdfFilename: a.pdfFilename,
           pdfUrl: a.pdfUrl,
+          sourceDocumentUrl: a.sourceDocumentUrl || a.innerData?.sourceDocumentUrl,
+          sourceDocumentName: a.sourceDocumentName || a.innerData?.sourceDocumentName,
+          sourceType: a.sourceType || a.innerData?.sourceType,
         };
       });
       PrescriptionStorage.setAuditLogs(mappedAuditLogs);
