@@ -343,3 +343,4 @@ export function initAutoSync(): () => void {
     if (autoSyncTimer) clearInterval(autoSyncTimer);
   };
 }
+
