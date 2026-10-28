@@ -95,7 +95,6 @@ export default function RulesAdmin() {
   const [uploadSource, setUploadSource] = useState<'file' | 'camera'>('file');
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [extractionProgress, setExtractionProgress] = useState(0);
   const [draftRules, setDraftRules] = useState<DraftRuleItem[]>([emptyDraftRule()]);
   const [manualFormError, setManualFormError] = useState<string | null>(null);
   const [extractedPreviewRules, setExtractedPreviewRules] = useState<InteractionRule[]>([]);
@@ -244,7 +243,6 @@ export default function RulesAdmin() {
   const handleExtractFromDocument = async () => {
     if (!uploadedFile) return;
     setIsExtracting(true);
-    setExtractionProgress(20);
 
     try {
       const isImage =
@@ -256,17 +254,10 @@ export default function RulesAdmin() {
         setImagePreviewUrl(URL.createObjectURL(uploadedFile));
       }
 
-      setExtractionProgress(40);
-      if (isImage) {
-        await new Promise((r) => setTimeout(r, 600));
-      }
-
-      setExtractionProgress(65);
       // 1. Extract rules and medications using PropNexAI Engine directly in-memory (DO NOT upload to R2 yet)
       const docResult = await extractDocumentRules(uploadedFile);
       let rulesToStage = docResult.rules;
 
-      setExtractionProgress(85);
       // If no explicit rules but medicines found, generate clinical pairing/clearance rules
       if (rulesToStage.length === 0 && docResult.medicines.length > 0) {
         rulesToStage = docResult.medicines.map((m, idx) => ({
@@ -299,16 +290,11 @@ export default function RulesAdmin() {
         storageUrl: '', // Staged in memory - not committed to vault yet
         format: uploadFormat.toUpperCase(),
       });
-
-      setExtractionProgress(100);
-      await new Promise((r) => setTimeout(r, 380));
-      setAddModalMode('preview');
     } catch (err: any) {
       console.error('Extraction error:', err);
       showConfirmation('Failed to extract document. Please check file format.', 'error');
     } finally {
       setIsExtracting(false);
-      setExtractionProgress(0);
     }
   };
 
@@ -1545,7 +1531,6 @@ export default function RulesAdmin() {
                               <ImageLaserScanOverlay
                                 imageUrl={imagePreviewUrl}
                                 isScanning={isExtracting}
-                                progress={extractionProgress}
                                 className="max-h-[240px]"
                               />
                             )}
@@ -1591,7 +1576,7 @@ export default function RulesAdmin() {
                     {/* Minimal Real-Time Percentage Overlay Floating Over Blurred Upload Area */}
                     <MinimalExtractionOverlay
                       isExtracting={isExtracting}
-                      progress={extractionProgress}
+                      onComplete={() => setAddModalMode('preview')}
                     />
                   </div>
                 )}

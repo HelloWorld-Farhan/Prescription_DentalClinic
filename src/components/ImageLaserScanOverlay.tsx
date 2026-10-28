@@ -1,19 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 interface ImageLaserScanOverlayProps {
   imageUrl: string;
   isScanning: boolean;
-  progress?: number;
   className?: string;
 }
 
 export default function ImageLaserScanOverlay({
   imageUrl,
   isScanning,
-  progress = 0,
   className = '',
 }: ImageLaserScanOverlayProps) {
+  const [progress, setProgress] = useState(1);
+  const progressRef = useRef(1);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (isScanning) {
+      setProgress(1);
+      progressRef.current = 1;
+      interval = setInterval(() => {
+        if (progressRef.current < 94) {
+          const step = Math.max(0.6, (94 - progressRef.current) * 0.025);
+          progressRef.current = Math.min(94, progressRef.current + step);
+          setProgress(Math.round(progressRef.current));
+        } else if (progressRef.current < 99) {
+          progressRef.current += 0.15;
+          setProgress(Math.round(progressRef.current));
+        }
+      }, 35);
+    } else {
+      setProgress(100);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isScanning]);
+
+  const isFinished = progress >= 100;
+
   return (
     <div className={`relative rounded-2xl overflow-hidden border border-primary/25 bg-surface-container-lowest flex items-center justify-center max-h-[380px] ${className}`}>
       {/* Image Preview */}
@@ -43,13 +69,35 @@ export default function ImageLaserScanOverlay({
           </motion.div>
 
           {/* Large Centered Percentage during Image Scan */}
-          {progress > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px]">
-              <span className="text-6xl sm:text-7xl font-black text-primary font-mono tracking-tight drop-shadow-md select-none">
-                {Math.round(progress)}%
+          <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px]">
+            <div className="flex items-baseline justify-center">
+              <span className="text-6xl sm:text-7xl font-black font-mono tracking-tighter bg-gradient-to-r from-teal-950 via-primary to-teal-600 bg-clip-text text-transparent drop-shadow-md select-none">
+                {progress}%
               </span>
+              {!isFinished && (
+                <span className="inline-flex items-center ml-1 text-4xl sm:text-5xl font-black text-primary/70 tracking-widest select-none">
+                  <motion.span
+                    animate={{ opacity: [0.15, 1, 0.15] }}
+                    transition={{ repeat: Infinity, duration: 1.1, delay: 0, ease: 'easeInOut' }}
+                  >
+                    .
+                  </motion.span>
+                  <motion.span
+                    animate={{ opacity: [0.15, 1, 0.15] }}
+                    transition={{ repeat: Infinity, duration: 1.1, delay: 0.22, ease: 'easeInOut' }}
+                  >
+                    .
+                  </motion.span>
+                  <motion.span
+                    animate={{ opacity: [0.15, 1, 0.15] }}
+                    transition={{ repeat: Infinity, duration: 1.1, delay: 0.44, ease: 'easeInOut' }}
+                  >
+                    .
+                  </motion.span>
+                </span>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
