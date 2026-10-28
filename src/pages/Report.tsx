@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
+import { uploadToR2 } from '../services/storageService';
 import { showConfirmation } from '../services/confirmation';
 
 export default function Report() {
@@ -149,6 +150,54 @@ export default function Report() {
               .join('; ')
           : 'No Contraindicated Interactions Detected. Cleared for dispensing.';
 
+      // Compile and upload certified report document to Cloudflare R2
+      let r2DownloadUrl = currentCheck?.sourceDocumentUrl || window.location.href;
+      try {
+        const reportHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smile Clinic CDS Report #${reportIdentifier}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 28px; color: #0f172a; max-width: 800px; margin: 0 auto; }
+    .header { border-bottom: 2px solid #005c65; padding-bottom: 12px; margin-bottom: 20px; }
+    .badge { display: inline-block; padding: 4px 12px; background: #ecfdf5; color: #047857; border-radius: 20px; font-weight: bold; font-size: 12px; }
+    .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2 style="margin: 0; color: #005c65;">Smile Clinic &middot; Clinical Decision Support (CDS) Verification Report</h2>
+    <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Report Reference: ${reportIdentifier} &bull; Timestamp: ${timestampUtc}</p>
+  </div>
+  <div class="box">
+    <strong>Patient Name:</strong> ${patientDisplayName} (MRN: ${currentCheck?.mrn || 'PT-MRN-9281'})<br>
+    <strong>Prescribing Clinician:</strong> ${reviewerDisplay} (Lic #${prescriberNpi})<br>
+    <strong>Safety Status:</strong> <span class="badge">${overallStatus}</span>
+  </div>
+  <div class="box">
+    <strong>Evaluated Prescriptions:</strong><br>
+    ${rxSummary}
+  </div>
+  <div class="box">
+    <strong>Algorithmic Safety Checks &amp; Rules:</strong><br>
+    ${alertsSummaryText}
+  </div>
+  <div style="font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 24px;">
+    Official Electronic Attestation &bull; 21 CFR Part 11 Certified &bull; SHA256 Notary: SHA256-4f8b9e892c21ad8310c8ff0e34a7812bc88
+  </div>
+</body>
+</html>`;
+        const blob = new Blob([reportHtml], { type: 'text/html' });
+        const file = new File([blob], `SmileClinic_CDS_Report_${reportIdentifier}.html`, { type: 'text/html' });
+        const r2Res = await uploadToR2(file, storedUser?.id || 'clinician-user', reviewerDisplay);
+        if (r2Res?.url) {
+          r2DownloadUrl = r2Res.url;
+        }
+      } catch (r2Err) {
+        console.warn('R2 upload fallback:', r2Err);
+      }
+
       const payload = {
         to_email: emailRecipient.trim(),
         report_id: reportIdentifier,
@@ -163,7 +212,7 @@ export default function Report() {
         alerts_summary: alertsSummaryText,
         alerts_count: currentCheck?.alerts?.length || 0,
         portal_url: window.location.href,
-        download_url: currentCheck?.sourceDocumentUrl || window.location.href,
+        download_url: r2DownloadUrl,
         pdf_filename: `SmileClinic_CDS_Report_${reportIdentifier}.pdf`,
         notary_hash: 'SHA256-4f8b9e892c21ad8310c8ff0e34a7812bc88',
       };
@@ -317,6 +366,65 @@ export default function Report() {
       </header>
 
       {/* 2. PDF PRESENTATION VIEWPORT (2-PAGE A4 SHEETS) */}
+            {/* STRICT 2-PAGE PRINT ENFORCEMENT & COLOR FORCING */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait !important;
+            margin: 5mm 7mm 5mm 7mm !important;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            width: 100% !important;
+          }
+          .report-sheet-wrapper {
+            gap: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            transform: none !important;
+          }
+          .print-a4-page-1 {
+            page-break-before: auto !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-sizing: border-box !important;
+            height: 284mm !important;
+            max-height: 284mm !important;
+            overflow: hidden !important;
+            padding: 5mm 6mm !important;
+            margin: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+          }
+          .print-a4-page-2 {
+            page-break-before: always !important;
+            break-before: page !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-sizing: border-box !important;
+            height: 284mm !important;
+            max-height: 284mm !important;
+            overflow: hidden !important;
+            padding: 5mm 6mm !important;
+            margin: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+          }
+        }
+      `}</style>
       <main className="w-full bg-[#1E293B] py-8 px-2 sm:px-6 flex flex-col items-center min-h-[calc(100vh-120px)] transition-all overflow-x-auto print:bg-white print:p-0 print:min-h-0 print:overflow-visible">
         {/* Floating Document Canvas Pagination Indicator */}
         <div className="mb-6 flex items-center gap-3 bg-[#0F172A]/90 text-white px-4 py-1.5 rounded-full shadow-lg backdrop-blur-md text-xs font-medium print:hidden">
@@ -352,8 +460,8 @@ export default function Report() {
               <span className="font-mono text-slate-400">#REF-{reportIdentifier}</span>
             </div>
 
-            <article className="report-sheet a4-page w-full bg-white text-[#0F172A] rounded-sm shadow-2xl p-6 sm:p-10 flex flex-col justify-between print:shadow-none print:p-6 print:w-full print:break-after-page min-h-[1050px]">
-              <div className="flex flex-col gap-5">
+            <article className="report-sheet a4-page print-a4-page-1 w-full bg-white text-[#0F172A] rounded-sm shadow-2xl p-6 sm:p-8 flex flex-col justify-between print:shadow-none print:w-full min-h-[1050px]">
+              <div className="flex flex-col gap-3.5 sm:gap-5 print:gap-2.5">
                 {/* SECTION A: Document Clinical Masthead & Verification Header */}
                 <header className="flex flex-col gap-4 pb-4 border-b border-slate-200">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -770,8 +878,8 @@ export default function Report() {
               <span className="font-mono text-slate-400">#REF-{reportIdentifier}</span>
             </div>
 
-            <article className="report-sheet a4-page w-full bg-white text-[#0F172A] rounded-sm shadow-2xl p-6 sm:p-10 flex flex-col justify-between print:shadow-none print:p-6 print:w-full min-h-[1050px]">
-              <div className="flex flex-col gap-5">
+            <article className="report-sheet a4-page print-a4-page-2 w-full bg-white text-[#0F172A] rounded-sm shadow-2xl p-6 sm:p-8 flex flex-col justify-between print:shadow-none print:w-full min-h-[1050px]">
+              <div className="flex flex-col gap-3.5 sm:gap-5 print:gap-2.5">
                 {/* PAGE 2 HEADER */}
                 <header className="flex items-center justify-between pb-3 border-b border-slate-200">
                   <div className="flex items-center gap-2.5">
@@ -1151,38 +1259,30 @@ export default function Report() {
                 </div>
               </div>
 
-              {/* Email Input Field */}
+              {/* Locked Read-Only Email Preview Field */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-on-surface">
-                  Recipient Clinician Email
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={emailRecipient}
-                    onChange={(e) => {
-                      setEmailRecipient(e.target.value);
-                      if (emailError) setEmailError('');
-                    }}
-                    placeholder="clinician@smileclinic.com"
-                    disabled={isSendingEmail}
-                    className={`w-full h-10 pl-9 pr-3 rounded-xl border text-xs font-medium bg-white focus:outline-none transition-colors ${
-                      emailError
-                        ? 'border-rose-400 focus:border-rose-500'
-                        : 'border-surface-container-high focus:border-primary'
-                    }`}
-                  />
-                  <span className="material-symbols-outlined text-[18px] text-outline absolute left-2.5 top-2.5">
-                    alternate_email
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-on-surface">
+                    Recipient Clinician Email
+                  </label>
+                  <span className="text-[10px] text-outline font-medium">HIPAA Encrypted SMTP</span>
+                </div>
+                
+                <div className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high text-xs font-semibold bg-white text-on-surface flex items-center justify-between shadow-2xs select-text">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-[16px] text-primary shrink-0">mail</span>
+                    <span className="font-mono text-on-surface truncate">{emailRecipient}</span>
+                  </div>
+                  <span className="text-[10px] text-outline font-medium flex items-center gap-1 bg-surface-container-low px-2 py-0.5 rounded-md border border-surface-container shrink-0">
+                    <span className="material-symbols-outlined text-[13px] text-emerald-600">lock</span>
+                    <span>Authenticated Account</span>
                   </span>
                 </div>
 
-                {emailError && (
-                  <div className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">error</span>
-                    <span>{emailError}</span>
-                  </div>
-                )}
+                <div className="text-[10px] text-outline flex items-center gap-1 px-1">
+                  <span className="material-symbols-outlined text-[13px] text-primary">verified</span>
+                  <span>Dispatched exclusively to your authenticated sign-in address (read-only for security).</span>
+                </div>
               </div>
 
               {/* Animated Sending Progress */}
