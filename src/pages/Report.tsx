@@ -370,8 +370,8 @@ export default function Report() {
       <style>{`
         @media print {
           @page {
-            size: A4 portrait !important;
-            margin: 5mm 7mm 5mm 7mm !important;
+            size: 210mm 297mm !important;
+            margin: 0 !important;
           }
           * {
             -webkit-print-color-adjust: exact !important;
@@ -382,7 +382,14 @@ export default function Report() {
             margin: 0 !important;
             padding: 0 !important;
             background: #ffffff !important;
-            width: 100% !important;
+            width: 210mm !important;
+            height: auto !important;
+          }
+          main {
+            padding: 0 !important;
+            margin: 0 !important;
+            background: #ffffff !important;
+            min-height: 0 !important;
           }
           .report-sheet-wrapper {
             gap: 0 !important;
@@ -390,21 +397,30 @@ export default function Report() {
             padding: 0 !important;
             transform: none !important;
           }
+          .report-sheet-wrapper > div {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 210mm !important;
+            max-width: 210mm !important;
+          }
           .print-a4-page-1 {
             page-break-before: auto !important;
+            break-before: auto !important;
             page-break-after: always !important;
             break-after: page !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             box-sizing: border-box !important;
-            height: 284mm !important;
-            max-height: 284mm !important;
+            width: 210mm !important;
+            height: 296mm !important;
+            max-height: 296mm !important;
             overflow: hidden !important;
-            padding: 5mm 6mm !important;
-            margin: 0 !important;
+            padding: 8mm 10mm !important;
+            margin: 0 auto !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
+            box-shadow: none !important;
           }
           .print-a4-page-2 {
             page-break-before: always !important;
@@ -414,14 +430,16 @@ export default function Report() {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             box-sizing: border-box !important;
-            height: 284mm !important;
-            max-height: 284mm !important;
+            width: 210mm !important;
+            height: 296mm !important;
+            max-height: 296mm !important;
             overflow: hidden !important;
-            padding: 5mm 6mm !important;
-            margin: 0 !important;
+            padding: 8mm 10mm !important;
+            margin: 0 auto !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
+            box-shadow: none !important;
           }
         }
       `}</style>
@@ -868,7 +886,7 @@ export default function Report() {
           {/* ========================================================================= */}
           {/* PAGE 2 OF 2: MONOGRAPH DOSSIER, CDS RULES TABLE & DIGITAL ATTESTATION      */}
           {/* ========================================================================= */}
-          <div className="w-full max-w-[820px] print:max-w-none print:w-full print:break-before-page">
+          <div className="w-full max-w-[820px] print:max-w-none print:w-full ">
             {/* Visual Page 2 Tag (Screen only) */}
             <div className="mb-2 flex items-center justify-between text-xs text-slate-300 font-semibold px-2 print:hidden">
               <span className="flex items-center gap-1">
