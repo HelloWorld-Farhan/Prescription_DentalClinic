@@ -156,6 +156,7 @@ export default function NewCheck() {
 
   // Document Processing, Cloudflare R2 Storage & Extraction State
   const [isProcessingDocument, setIsProcessingDocument] = useState(false);
+  const [documentProgress, setDocumentProgress] = useState(0);
   const [extractedMeta, setExtractedMeta] = useState<{
     filename: string;
     fileSize: string;
@@ -460,9 +461,11 @@ export default function NewCheck() {
       setCapturedPhoto(localPreviewUrl);
     }
     setUploadedFileName(file.name);
+    setDocumentProgress(15);
     setIsProcessingDocument(true);
     const currentUserId = storedUser?.id || 'clinician-user';
     try {
+      setDocumentProgress(30);
       // 1. Upload to Cloudflare R2
       const r2Result = await uploadToR2(file, currentUserId, prescriberDisplayName);
       setUploadedFileName(r2Result.filename);
@@ -475,14 +478,16 @@ export default function NewCheck() {
       const ext =
         r2Result.filename.split('.').pop()?.toUpperCase() || (source === 'camera' ? 'CAMERA SCAN' : 'FILE');
 
-      // Allow optical scanning HUD animation to scan document
+      setDocumentProgress(60);
       if (isImage) {
-        await new Promise((resolve) => setTimeout(resolve, 1400));
+        await new Promise((resolve) => setTimeout(resolve, 800));
       }
 
+      setDocumentProgress(75);
       const { medicines: extracted, patient: extractedPatient } = await extractPrescriptionsFromDocument(file, source);
       updateDocumentExtractedCount(r2Result.url, extracted.length);
 
+      setDocumentProgress(90);
       const previewUrl = localPreviewUrl || (file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
       if (source === 'camera' || previewUrl) {
         setCapturedPhoto(previewUrl || 'camera_captured_rx_slip.jpg');
@@ -515,6 +520,9 @@ export default function NewCheck() {
         return Array.from(map.values());
       });
 
+      setDocumentProgress(100);
+      await new Promise((resolve) => setTimeout(resolve, 380));
+
       showConfirmation(
         `Extracted ${extracted.length} medications from ${r2Result.filename} and saved to secure vault.`,
         'success'
@@ -524,6 +532,7 @@ export default function NewCheck() {
       showConfirmation('Document parsed locally; please verify extracted items.', 'info');
     } finally {
       setIsProcessingDocument(false);
+      setDocumentProgress(0);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -1184,12 +1193,12 @@ export default function NewCheck() {
                   {/* Minimal Real-Time Percentage Overlay Floating Over Blurred Dropzone */}
                   <MinimalExtractionOverlay
                     isExtracting={isProcessingDocument}
-                    fileName={uploadedFileName}
+                    progress={documentProgress}
                   />
                 </div>
 
                 {/* Attached Document Card with Real-time OCR Readiness */}
-                {uploadedFileName && (
+                {!isProcessingDocument && uploadedFileName && (
                   <motion.div
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
