@@ -209,4 +209,17 @@ textarea,
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
+
+  /* Strict 2-Page Partitioning Rules */
+  .print\:break-after-page,
+  .break-after-page {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  .print\:break-before-page,
+  .break-before-page {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
 }

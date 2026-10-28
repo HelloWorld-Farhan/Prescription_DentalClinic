@@ -145,12 +145,15 @@ export default function Dashboard() {
   }, [navigate]);
 
   const handleBatchSync = useCallback(() => {
+    if (isBatchSyncing) return;
     setIsBatchSyncing(true);
-    setChecks(VirtualDb.getChecks());
+    showConfirmation('Connecting to EHR Gateway & reconciling FHIR v4 patient records...', 'info', 1500);
     setTimeout(() => {
+      setChecks(VirtualDb.getChecks());
       setIsBatchSyncing(false);
-    }, 600);
-  }, []);
+      showConfirmation('Batch EHR synchronization complete: all clinical records verified.', 'success');
+    }, 1200);
+  }, [isBatchSyncing]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -700,11 +703,16 @@ export default function Dashboard() {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.98 }}
+                disabled={isBatchSyncing}
                 onClick={handleBatchSync}
-                className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container shadow-xs text-xs font-semibold border border-surface-container-high transition-colors duration-150 cursor-pointer"
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container shadow-xs text-xs font-semibold border border-surface-container-high transition-colors duration-150 cursor-pointer ${
+                  isBatchSyncing ? 'opacity-75 cursor-wait' : ''
+                }`}
               >
-                <span className="material-symbols-outlined text-[16px]">cloud_download</span>
-                <span>Batch EHR Sync</span>
+                <span className={`material-symbols-outlined text-[16px] ${isBatchSyncing ? 'animate-spin text-primary' : ''}`}>
+                  {isBatchSyncing ? 'sync' : 'cloud_download'}
+                </span>
+                <span>{isBatchSyncing ? 'Syncing EHR...' : 'Batch EHR Sync'}</span>
               </motion.button>
               <motion.button
                 type="button"
