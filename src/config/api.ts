@@ -17,3 +17,4 @@ export const R2_PUBLIC_URL: string = (
   (import.meta as any).env?.VITE_R2_PUBLIC_URL ||
   'https://pub-e6b50314f766405596ea974a88ed73cd.r2.dev'
 ).replace(/\/$/, '') || 'https://pub-e6b50314f766405596ea974a88ed73cd.r2.dev';
+

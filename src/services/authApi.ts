@@ -1039,7 +1039,7 @@ export const authApi = {
 
     // Asynchronously pull user cloud records to hydrate device
     try {
-      import('./cloudSyncService').then((m) => m.pullFromCloud());
+      pullFromCloud().catch(() => {});
     } catch {
       // ignore
     }

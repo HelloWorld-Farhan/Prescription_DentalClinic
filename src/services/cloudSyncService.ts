@@ -3,21 +3,65 @@
  * 
  * Synchronizes checks, audit logs, uploaded documents, clinical rules, and patients
  * in real-time with the Supabase PostgreSQL database via the FastAPI backend.
- * Ensures data created on one device (e.g. desktop) appears instantly on another (e.g. mobile phone).
+ * 
+ * ARCHITECTURAL RULE: Zero clinical data is saved in browser localStorage.
+ * LocalStorage is strictly reserved for session credentials & user avatar.
+ * Clinical data lives in reactive memory caches synchronized directly with the database.
  */
 
 import { SafetyCheckRecord, AuditLogEntry, InteractionRule, Patient } from '../types';
-import { UploadedDocumentRecord } from './storageService';
-
+import { UploadedDocumentRecord, setDocumentHistory } from './storageService';
+import { PrescriptionStorage, formatISTTime } from './prescriptionService';
 import { API_BASE_URL } from '../config/api';
 
-const STORAGE_KEYS = {
-  CHECKS: 'smileclinic_checks',
-  AUDIT: 'smileclinic_audit',
-  RULES: 'smileclinic_rules_v6',
-  DOCUMENTS: 'smileclinic_uploaded_documents_v1',
-  PATIENTS: 'smileclinic_patients_v3',
-};
+/**
+ * Strict LocalStorage Purge: Wipes all clinical data and retains ONLY
+ * login session tokens, user profile picture / avatar, and profile flags.
+ */
+export function purgeAllClinicalLocalStorage(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const ALLOWED_EXACT = new Set([
+      'smileclinic_auth_user',
+      'smileclinic_jwt_token',
+      'rxguard_authenticated',
+      'rxguard_jwt_token',
+      'rxguard_prescriber_email',
+      'rxguard_prescriber_name',
+      'rxguard_prescriber_id',
+      'rxguard_prescriber_phone',
+      'rxguard_prescriber_role',
+      'rxguard_prescriber_npi',
+      'rxguard_auth_provider',
+      'rxguard_device_token',
+      'rxguard_two_factor_enabled',
+      'rxguard_google_linked',
+      'rxguard_has_password',
+      'smileclinic_remembered_email',
+      'dental_clinic_logo',
+    ]);
+
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (ALLOWED_EXACT.has(key)) continue;
+      if (key.startsWith('firebase:')) continue;
+      if (key.startsWith('smileclinic_avatar_') || key.startsWith('user_avatar_')) continue;
+      if (key.startsWith('profile_completed_') || key.startsWith('google_linked_')) continue;
+      keysToRemove.push(key);
+    }
+
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+    console.warn('[Storage] Purge error:', e);
+  }
+}
+
+// Execute purge immediately on module load
+if (typeof window !== 'undefined') {
+  purgeAllClinicalLocalStorage();
+}
 
 export function getClinicianEmail(): string {
   try {
@@ -44,8 +88,8 @@ let isSyncing = false;
 let autoSyncTimer: any = null;
 
 /**
- * Pulls all persistent data from Supabase PostgreSQL for the current clinician.
- * Merges new items into local state without overwriting newer local edits.
+ * Pulls all persistent data from Supabase PostgreSQL for the authenticated clinician.
+ * Directly populates reactive memory stores. Never touches localStorage for clinical items.
  */
 export async function pullFromCloud(): Promise<boolean> {
   const email = getClinicianEmail();
@@ -59,124 +103,120 @@ export async function pullFromCloud(): Promise<boolean> {
     const data = await res.json();
     if (data.status !== 'success') return false;
 
-    let hasChecksChanged = false;
-    let hasAuditChanged = false;
-    let hasDocsChanged = false;
-    let hasRulesChanged = false;
-    let hasPatientsChanged = false;
-
     // 1. Reconcile Checks
     if (Array.isArray(data.checks)) {
-      const localChecksRaw = localStorage.getItem(STORAGE_KEYS.CHECKS);
-      const localChecks: SafetyCheckRecord[] = localChecksRaw ? JSON.parse(localChecksRaw) : [];
-      const localMap = new Map(localChecks.map(c => [c.id || c.checkNumber, c]));
-
-      data.checks.forEach((cloudCheck: any) => {
-        const id = cloudCheck.id || cloudCheck.checkNumber;
-        if (!id) return;
-        if (!localMap.has(id)) {
-          localMap.set(id, cloudCheck);
-          hasChecksChanged = true;
-        }
+      const mappedChecks: SafetyCheckRecord[] = data.checks.map((c: any) => {
+        const tsMs = c.timestampMs || (c.createdAt ? new Date(c.createdAt).getTime() : Date.now());
+        const timeFormatted = formatISTTime(tsMs, true);
+        return {
+          id: c.id || c.checkNumber,
+          checkNumber: c.checkNumber || c.id,
+          timestamp: c.timestamp || timeFormatted,
+          timestampMs: tsMs,
+          createdAt: c.createdAt || new Date(tsMs).toISOString(),
+          patientId: c.patientId || c.patientMrn || 'PT-UNKNOWN',
+          patientName: c.patientName || c.patientMrn || 'Patient',
+          mrn: c.patientMrn || c.patientId || 'PT-UNKNOWN',
+          unit: c.unit || 'Dental Operatory',
+          prescriptions: c.prescriptions || [],
+          alerts: c.alerts || [],
+          overallStatus:
+            c.status === 'safe' || c.highestSeverity === 'clear' || c.highestSeverity === 'safe'
+              ? 'Safe to Dispense'
+              : (c.status || 'Requires Review'),
+          prescriberName: c.reviewerName || 'Authorized Clinician',
+          prescriberNpi: c.prescriberNpi || 'DENT-CLINIC',
+          reviewerName: c.reviewerName,
+          status: c.status,
+          highestSeverity: c.highestSeverity,
+          pdfFilename: c.pdfFilename,
+          pdfUrl: c.pdfUrl,
+          notes: c.notes,
+          digitalSeal: c.digitalSeal,
+          fhirSynced: !!c.fhirSynced,
+          questions: c.questions || [],
+          questionAnswers: c.questionAnswers || [],
+        };
       });
-
-      if (hasChecksChanged) {
-        const mergedChecks = Array.from(localMap.values()).sort(
-          (a, b) => (b.timestampMs || 0) - (a.timestampMs || 0)
-        );
-        localStorage.setItem(STORAGE_KEYS.CHECKS, JSON.stringify(mergedChecks));
-        window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
-      }
+      PrescriptionStorage.setChecks(mappedChecks);
     }
 
     // 2. Reconcile Audit Logs
     if (Array.isArray(data.auditLogs)) {
-      const localAuditRaw = localStorage.getItem(STORAGE_KEYS.AUDIT);
-      const localAudit: AuditLogEntry[] = localAuditRaw ? JSON.parse(localAuditRaw) : [];
-      const auditMap = new Map(localAudit.map(a => [a.id, a]));
-
-      data.auditLogs.forEach((cloudLog: any) => {
-        if (!cloudLog.id) return;
-        if (!auditMap.has(cloudLog.id)) {
-          auditMap.set(cloudLog.id, cloudLog);
-          hasAuditChanged = true;
-        }
+      const mappedAuditLogs: AuditLogEntry[] = data.auditLogs.map((a: any) => {
+        const tsMs = a.timestampMs || (a.createdAt ? new Date(a.createdAt).getTime() : Date.now());
+        const timeFormatted = formatISTTime(tsMs, true);
+        return {
+          id: a.id,
+          timestamp: a.timestamp || timeFormatted,
+          timestampMs: tsMs,
+          createdAt: a.createdAt || new Date(tsMs).toISOString(),
+          clinicianName: a.clinicianName || 'Authorized Clinician',
+          action: a.action || 'Safety Screen Initiated',
+          patientMrn: a.patientMrn || 'PT-GENERAL',
+          patientName: a.patientName || a.innerData?.patientName || a.patientMrn,
+          checkId: a.checkId || a.innerData?.checkId,
+          prescriptions: a.prescriptions || a.innerData?.prescriptions || [],
+          alerts: a.alerts || a.innerData?.alerts || [],
+          details: a.eventDetails || a.details || '',
+          severity: (a.severity || 'safe').toLowerCase(),
+          hash: a.hash || 'SHA256:AUTHENTICATED',
+          pdfFilename: a.pdfFilename,
+          pdfUrl: a.pdfUrl,
+        };
       });
-
-      if (hasAuditChanged) {
-        const mergedAudit = Array.from(auditMap.values()).sort(
-          (a, b) => (b.timestampMs || 0) - (a.timestampMs || 0)
-        );
-        localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(mergedAudit));
-        window.dispatchEvent(new CustomEvent('smileclinic_audit_updated'));
-      }
+      PrescriptionStorage.setAuditLogs(mappedAuditLogs);
     }
 
     // 3. Reconcile Uploaded Documents
     if (Array.isArray(data.documents)) {
-      const localDocsRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTS);
-      const localDocs: UploadedDocumentRecord[] = localDocsRaw ? JSON.parse(localDocsRaw) : [];
-      const docMap = new Map(localDocs.map(d => [d.id, d]));
-
-      data.documents.forEach((cloudDoc: any) => {
-        if (!cloudDoc.id) return;
-        if (!docMap.has(cloudDoc.id)) {
-          docMap.set(cloudDoc.id, cloudDoc);
-          hasDocsChanged = true;
-        }
-      });
-
-      if (hasDocsChanged) {
-        const mergedDocs = Array.from(docMap.values());
-        localStorage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify(mergedDocs));
-        window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
-      }
+      const mappedDocs: UploadedDocumentRecord[] = data.documents.map((d: any) => ({
+        id: d.id,
+        userId: email,
+        filename: d.filename,
+        fileType: d.fileType || 'pdf',
+        fileSize: d.fileSize || 0,
+        storageUrl: d.storageUrl,
+        authorName: d.authorName || 'Authorized Clinician',
+        extractedRulesCount: d.extractedRulesCount || 0,
+        status: d.status || 'stored',
+        uploadedAt: d.uploadedAt || new Date().toISOString(),
+      }));
+      setDocumentHistory(mappedDocs);
     }
 
     // 4. Reconcile Clinical Rules
     if (Array.isArray(data.rules)) {
-      const localRulesRaw = localStorage.getItem(STORAGE_KEYS.RULES);
-      const localRules: InteractionRule[] = localRulesRaw ? JSON.parse(localRulesRaw) : [];
-      const ruleMap = new Map(localRules.map(r => [r.id, r]));
-
-      data.rules.forEach((cloudRule: any) => {
-        if (!cloudRule.id) return;
-        const local = ruleMap.get(cloudRule.id);
-        if (!local) {
-          ruleMap.set(cloudRule.id, cloudRule);
-          hasRulesChanged = true;
-        } else if (local.active !== cloudRule.active) {
-          local.active = cloudRule.active;
-          hasRulesChanged = true;
-        }
-      });
-
-      if (hasRulesChanged) {
-        const mergedRules = Array.from(ruleMap.values());
-        localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(mergedRules));
-        window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
-      }
+      const mappedRules: InteractionRule[] = data.rules.map((r: any) => ({
+        id: r.id,
+        drugA: r.drugA,
+        drugB: r.drugB,
+        category: r.category || 'Clinical Alert',
+        severity: r.severity || 'moderate',
+        mechanism: r.mechanism || '',
+        evidence: r.evidence || 'Established',
+        sourceFile: r.sourceFile,
+        active: r.active !== false,
+      }));
+      PrescriptionStorage.setRules(mappedRules);
     }
 
     // 5. Reconcile Patients
     if (Array.isArray(data.patients)) {
-      const localPatientsRaw = localStorage.getItem(STORAGE_KEYS.PATIENTS);
-      const localPatients: Patient[] = localPatientsRaw ? JSON.parse(localPatientsRaw) : [];
-      const patientMap = new Map(localPatients.map(p => [p.id, p]));
-
-      data.patients.forEach((cloudPatient: any) => {
-        if (!cloudPatient.id) return;
-        if (!patientMap.has(cloudPatient.id)) {
-          patientMap.set(cloudPatient.id, cloudPatient);
-          hasPatientsChanged = true;
-        }
-      });
-
-      if (hasPatientsChanged) {
-        const mergedPatients = Array.from(patientMap.values());
-        localStorage.setItem(STORAGE_KEYS.PATIENTS, JSON.stringify(mergedPatients));
-        window.dispatchEvent(new CustomEvent('smileclinic_patients_updated'));
-      }
+      const mappedPatients: Patient[] = data.patients.map((p: any) => ({
+        id: p.id,
+        mrn: p.mrn || p.id,
+        name: p.name || 'Patient',
+        age: p.age || 30,
+        gender: p.gender || 'Male',
+        weightKg: p.weightKg || 70,
+        egfr: p.egfr || 90,
+        pregnancyStatus: p.pregnancyStatus || 'No',
+        conditions: p.conditions || [],
+        allergies: p.allergies || [],
+        activeMedications: p.activeMedications || p.currentMedications || [],
+      }));
+      PrescriptionStorage.setPatients(mappedPatients);
     }
 
     return true;
@@ -189,38 +229,11 @@ export async function pullFromCloud(): Promise<boolean> {
 }
 
 /**
- * Pushes all local records to the Supabase database.
- * Used on login or when syncing a device with previously stored local records.
+ * Legacy batch push stub — kept for signature compatibility.
+ * All mutations now sync in real-time via granular endpoints.
  */
 export async function pushAllLocalToCloud(): Promise<boolean> {
-  const email = getClinicianEmail();
-  if (!email || !API_BASE_URL) return false;
-
-  try {
-    const checks: SafetyCheckRecord[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CHECKS) || '[]');
-    const auditLogs: AuditLogEntry[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.AUDIT) || '[]');
-    const documents: UploadedDocumentRecord[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCUMENTS) || '[]');
-    const rules: InteractionRule[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RULES) || '[]');
-    const patients: Patient[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PATIENTS) || '[]');
-
-    const res = await fetch(`${API_BASE_URL}/api/v1/sync/push`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        checks,
-        auditLogs,
-        documents,
-        rules,
-        patients,
-      }),
-    });
-
-    return res.ok;
-  } catch (err) {
-    console.warn('[CloudSync] Batch push error:', err);
-    return false;
-  }
+  return true;
 }
 
 // -------------------------------------------------------------
@@ -311,15 +324,15 @@ export function deleteRulesBySourceFromCloud(source: string) {
  * Initializes the background real-time synchronization loop.
  * - Instantly syncs upon load
  * - Listens for window focus / screen unlocking on mobile devices
- * - Polls every 15 seconds silently
+ * - Polls every 8 seconds silently for multi-device parity
  */
 export function initAutoSync(): () => void {
   if (typeof window === 'undefined') return () => {};
 
-  // Initial pull and reconcile
-  pullFromCloud().then(() => {
-    pushAllLocalToCloud();
-  });
+  purgeAllClinicalLocalStorage();
+
+  // Initial pull from Supabase PostgreSQL
+  pullFromCloud();
 
   // Pull immediately whenever user focuses window or unlocks phone screen
   const handleFocus = () => {
@@ -335,11 +348,11 @@ export function initAutoSync(): () => void {
   window.addEventListener('focus', handleFocus);
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  // Periodic polling every 15 seconds
+  // Periodic polling every 8 seconds
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   autoSyncTimer = setInterval(() => {
     pullFromCloud();
-  }, 15000);
+  }, 8000);
 
   return () => {
     window.removeEventListener('focus', handleFocus);
@@ -347,4 +360,3 @@ export function initAutoSync(): () => void {
     if (autoSyncTimer) clearInterval(autoSyncTimer);
   };
 }
-

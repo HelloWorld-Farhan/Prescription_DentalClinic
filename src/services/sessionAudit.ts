@@ -246,7 +246,7 @@ export function getActiveSessions(email?: string): ActiveSessionItem[] {
   const { sessions: key } = getStorageKeys(email);
 
   try {
-    const raw = localStorage.getItem(key);
+    const raw = sessionStorage.getItem(key);
     if (raw) {
       const parsed: ActiveSessionItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -275,7 +275,7 @@ export function getActiveSessions(email?: string): ActiveSessionItem[] {
   ];
 
   try {
-    localStorage.setItem(key, JSON.stringify(realCurrentSession));
+    sessionStorage.setItem(key, JSON.stringify(realCurrentSession));
   } catch {}
 
   return realCurrentSession;
@@ -288,7 +288,7 @@ export function saveActiveSessions(sessions: ActiveSessionItem[], email?: string
   if (typeof window === 'undefined') return;
   const { sessions: key } = getStorageKeys(email);
   try {
-    localStorage.setItem(key, JSON.stringify(sessions));
+    sessionStorage.setItem(key, JSON.stringify(sessions));
   } catch {}
 }
 
@@ -317,7 +317,7 @@ export function getLoginHistory(email?: string, clinicianName?: string): LoginHi
   const env = detectClientEnvironment();
 
   try {
-    const raw = localStorage.getItem(key);
+    const raw = sessionStorage.getItem(key);
     if (raw) {
       const parsed: LoginHistoryItem[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -348,7 +348,7 @@ export function getLoginHistory(email?: string, clinicianName?: string): LoginHi
 
   const initialList = [initialSessionEvent];
   try {
-    localStorage.setItem(key, JSON.stringify(initialList));
+    sessionStorage.setItem(key, JSON.stringify(initialList));
   } catch {}
 
   return initialList;
@@ -389,7 +389,7 @@ export function recordLoginEvent(
     try {
       const { history: key } = getStorageKeys(email);
       let existing: LoginHistoryItem[] = [];
-      const raw = localStorage.getItem(key);
+      const raw = sessionStorage.getItem(key);
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
@@ -401,7 +401,7 @@ export function recordLoginEvent(
         } catch {}
       }
       const updated = [newItem, ...existing.filter((item) => item.id !== newItem.id)].slice(0, 50);
-      localStorage.setItem(key, JSON.stringify(updated));
+      sessionStorage.setItem(key, JSON.stringify(updated));
 
       // Dispatch event for real-time reactivity in UI components
       window.dispatchEvent(new CustomEvent('smileclinic_session_history_updated', { detail: updated }));

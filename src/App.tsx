@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { MotionConfig, AnimatePresence, motion } from 'framer-motion';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from './components/Layout';
-import { initAutoSync, pullFromCloud } from './services/cloudSyncService';
+import { initAutoSync, pullFromCloud, purgeAllClinicalLocalStorage } from './services/cloudSyncService';
 
 // Lazy-load clinical route pages
 const Login = lazy(() => import('./pages/Login'));
@@ -117,6 +117,7 @@ function AppRoutes() {
 
 export default function App() {
   useEffect(() => {
+    purgeAllClinicalLocalStorage();
     pullFromCloud().catch(() => {});
 
     const handleRecheck = () => {

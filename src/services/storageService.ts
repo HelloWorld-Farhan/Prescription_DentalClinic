@@ -29,7 +29,19 @@ export interface UploadedDocumentRecord {
 
 
 
-const STORAGE_KEY_DOCS = 'smileclinic_uploaded_documents_v1';
+let _cachedDocs: UploadedDocumentRecord[] = [];
+
+export function setDocumentHistory(docs: UploadedDocumentRecord[]): void {
+  _cachedDocs = (docs || []).filter((d) => 
+    !isAvatarFile(d.filename) && 
+    !isAvatarFile(d.storageUrl) &&
+    !isPrescriptionCheckFile(d.filename) &&
+    !isPrescriptionCheckFile(d.storageUrl)
+  );
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
+  }
+}
 
 
 
@@ -318,219 +330,82 @@ export async function uploadToR2(
 
 
 export function getDocumentHistory(userId?: string): UploadedDocumentRecord[] {
-
   try {
-
-    const raw = localStorage.getItem(STORAGE_KEY_DOCS);
-
-    if (!raw) return [];
-
-    let list: UploadedDocumentRecord[] = JSON.parse(raw);
-
-    if (!Array.isArray(list)) return [];
-
-
-
-    // Auto-purge any avatar records or prescription checks mistakenly saved in knowledge document history
-
-    const sanitizedList = list.filter((d) => 
-
+    const list = _cachedDocs.filter((d) => 
       !isAvatarFile(d.filename) && 
-
       !isAvatarFile(d.storageUrl) &&
-
       !isPrescriptionCheckFile(d.filename) &&
-
       !isPrescriptionCheckFile(d.storageUrl)
-
     );
-
-    if (sanitizedList.length !== list.length) {
-
-      localStorage.setItem(STORAGE_KEY_DOCS, JSON.stringify(sanitizedList));
-
-      list = sanitizedList;
-
-    }
-
-
-
     if (userId) {
-
       return list.filter((d) => d.userId === userId || d.userId === 'user-current');
-
     }
-
     return list;
-
   } catch {
-
     return [];
-
   }
-
 }
-
-
 
 export function saveDocumentRecord(record: UploadedDocumentRecord): void {
-
   if (
-
     isAvatarFile(record.filename) ||
-
     isAvatarFile(record.storageUrl) ||
-
     isPrescriptionCheckFile(record.filename) ||
-
     isPrescriptionCheckFile(record.storageUrl)
-
   ) {
-
-    return; // Avatars and patient prescription checks are never clinical rule documents
-
+    return;
   }
-
   try {
-
     const existing = getDocumentHistory();
-
     existing.unshift(record);
-
-    localStorage.setItem(STORAGE_KEY_DOCS, JSON.stringify(existing.slice(0, 50)));
-
+    _cachedDocs = existing.slice(0, 50);
     syncDocumentToCloud(record);
-
     if (typeof window !== 'undefined') {
-
       window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
-
     }
-
   } catch {
-
     // ignore
-
   }
-
 }
-
-
 
 export function updateDocumentExtractedCount(docUrl: string, count: number): void {
-
   try {
-
-    const existing = getDocumentHistory();
-
-    const target = existing.find((d) => d.storageUrl === docUrl);
-
+    const target = _cachedDocs.find((d) => d.storageUrl === docUrl);
     if (target) {
-
       target.extractedRulesCount = count;
-
       target.status = 'analyzed';
-
-      localStorage.setItem(STORAGE_KEY_DOCS, JSON.stringify(existing));
-
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
+      }
     }
-
   } catch {
-
     // ignore
-
   }
-
 }
 
-
-
 export async function deleteDocumentRecord(
-
   docId: string,
-
   storageUrl?: string
-
 ): Promise<{ success: boolean; deletedDoc?: UploadedDocumentRecord }> {
-
   let deletedDoc: UploadedDocumentRecord | undefined;
-
   try {
-
-    const existing = getDocumentHistory();
-
-    const index = existing.findIndex(
-
+    const index = _cachedDocs.findIndex(
       (d) => (docId ? d.id === docId : false) || (storageUrl ? d.storageUrl === storageUrl : false)
-
     );
-
     if (index !== -1) {
-
-      deletedDoc = existing[index];
-
-      existing.splice(index, 1);
-
-      localStorage.setItem(STORAGE_KEY_DOCS, JSON.stringify(existing));
-
+      deletedDoc = _cachedDocs[index];
+      _cachedDocs.splice(index, 1);
       if (deletedDoc?.id) {
-
         deleteDocumentFromCloud(deletedDoc.id);
-
       }
-
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
+      }
     }
-
+    return { success: true, deletedDoc };
   } catch {
-
-    // ignore
-
+    return { success: false };
   }
-
-
-
-  // Purge object from Cloudflare R2 storage bucket
-
-  const urlToDelete = storageUrl || deletedDoc?.storageUrl;
-
-  if (urlToDelete) {
-
-    const env = (import.meta as any).env || {};
-
-    const apiUrl = API_BASE_URL;
-
-    if (apiUrl) {
-
-      try {
-
-        const formData = new FormData();
-
-        formData.append('url', urlToDelete);
-
-        await fetch(`${apiUrl}/api/storage/delete`, {
-
-          method: 'POST',
-
-          body: formData,
-
-        });
-
-      } catch {
-
-        // silent fallback
-
-      }
-
-    }
-
-  }
-
-
-
-  window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
-
-  return { success: true, deletedDoc };
-
 }
 
 
