@@ -1597,6 +1597,7 @@ export default function RulesAdmin() {
                     {/* Minimal Real-Time Percentage Overlay Floating Over Blurred Upload Area */}
                     <MinimalExtractionOverlay
                       isExtracting={isExtracting}
+                      onClose={() => setIsExtracting(false)}
                       onComplete={() => setAddModalMode('preview')}
                     />
                   </div>

@@ -2515,6 +2515,7 @@ export default function NewCheck() {
       {/* AI Multimodal Extraction Progress Modal Popup */}
       <MinimalExtractionOverlay
         isExtracting={isProcessingDocument}
+        onClose={() => setIsProcessingDocument(false)}
         onComplete={() => {
           setTimeout(() => {
             const queueEl = document.getElementById('prescribed-medication-queue');

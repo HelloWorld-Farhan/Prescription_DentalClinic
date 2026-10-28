@@ -1,243 +1,328 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface MinimalExtractionOverlayProps {
+export interface MinimalExtractionOverlayProps {
   isExtracting: boolean;
   onComplete?: () => void;
+  onClose?: () => void;
   className?: string;
   label?: string;
 }
 
 const EXTRACTION_STAGES = [
-  { min: 0, max: 25, title: 'Vault Ingest', detail: 'Encrypting & syncing slip to secure HIPAA cloud vault' },
-  { min: 25, max: 55, title: 'Multimodal Vision AI', detail: 'Scanning handwritten medications, dosages & instructions' },
-  { min: 55, max: 85, title: 'Monograph Normalization', detail: 'Standardizing clinical entities & active ingredients' },
-  { min: 85, max: 100, title: 'Regimen Staging', detail: 'Cross-referencing contraindications & staging queue' },
+  { id: 1, min: 0, max: 25, title: 'Vault Ingest', detail: 'Encrypting & uploading slip to secure HIPAA cloud storage' },
+  { id: 2, min: 25, max: 55, title: 'Multimodal Vision OCR', detail: 'Scanning handwritten medications, dosages & instructions' },
+  { id: 3, min: 55, max: 85, title: 'Monograph Normalization', detail: 'Standardizing active ingredients against RxNorm pharmacopeia' },
+  { id: 4, min: 85, max: 100, title: 'Regimen Staging', detail: 'Cross-referencing contraindications & staging queue' },
 ];
 
 export default function MinimalExtractionOverlay({
   isExtracting,
   onComplete,
+  onClose,
   className = '',
   label = 'AI Multimodal Extraction Active',
 }: MinimalExtractionOverlayProps) {
   const [progress, setProgress] = useState(1);
   const [show, setShow] = useState(false);
   const progressRef = useRef(1);
-  const isExtractingRef = useRef(isExtracting);
-  isExtractingRef.current = isExtracting;
+  const isDoneRef = useRef(false);
 
   useEffect(() => {
-    let interval: any = null;
-    let failsafeTimeout: any = null;
+    let animFrame: any = null;
+    let startTime: number | null = null;
+    const targetDurationMs = 3600; // Complete within 3.6s for responsive feedback
 
     if (isExtracting) {
       setShow(true);
       setProgress(1);
       progressRef.current = 1;
+      isDoneRef.current = false;
 
-      // Failsafe timeout to prevent any infinite stall
-      failsafeTimeout = setTimeout(() => {
-        isExtractingRef.current = false;
-      }, 4500);
+      const animate = (timestamp: number) => {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
 
-      // Smooth continuous real-time ticking from 1% to 99% without stalling
-      interval = setInterval(() => {
-        if (isExtractingRef.current) {
-          if (progressRef.current < 85) {
-            const step = Math.max(0.65, (85 - progressRef.current) * 0.045);
-            progressRef.current = Math.min(85, progressRef.current + step);
-          } else if (progressRef.current < 99) {
-            progressRef.current = Math.min(99, progressRef.current + 0.35);
-          }
-          setProgress(Math.round(progressRef.current));
-        } else {
-          // Accelerated sweep to 100% when backend work finishes
-          if (progressRef.current < 100) {
-            progressRef.current = Math.min(100, progressRef.current + 6.0);
-            setProgress(Math.round(progressRef.current));
-          } else {
-            clearInterval(interval);
-            setTimeout(() => {
-              setShow(false);
-              setProgress(1);
-              progressRef.current = 1;
-              if (onComplete) onComplete();
-            }, 400);
-          }
-        }
-      }, 25);
-    } else if (show) {
-      // Backend resolved; accelerate swiftly to 100%
-      interval = setInterval(() => {
-        if (progressRef.current < 100) {
-          progressRef.current = Math.min(100, progressRef.current + 7.0);
-          setProgress(Math.round(progressRef.current));
-        } else {
-          clearInterval(interval);
+        if (isDoneRef.current) {
+          // Accelerated finish
+          progressRef.current = 100;
+          setProgress(100);
           setTimeout(() => {
             setShow(false);
             setProgress(1);
-            progressRef.current = 1;
             if (onComplete) onComplete();
-          }, 400);
+          }, 450);
+          return;
         }
-      }, 20);
+
+        // Smooth cubic-out easing curve
+        const rawProgress = Math.min(1, elapsed / targetDurationMs);
+        // Easing: fast initial pickup, steady middle, smooth landing to 100%
+        const easeOut = 1 - Math.pow(1 - rawProgress, 2.5);
+        const currentP = Math.min(100, Math.max(1, Math.round(easeOut * 100)));
+
+        progressRef.current = currentP;
+        setProgress(currentP);
+
+        if (currentP >= 100) {
+          isDoneRef.current = true;
+          setTimeout(() => {
+            setShow(false);
+            setProgress(1);
+            if (onComplete) onComplete();
+          }, 450);
+          return;
+        }
+
+        animFrame = requestAnimationFrame(animate);
+      };
+
+      animFrame = requestAnimationFrame(animate);
+    } else if (show) {
+      // Backend resolved early: sweep quickly to 100%
+      isDoneRef.current = true;
+      setProgress(100);
+      progressRef.current = 100;
+      const t = setTimeout(() => {
+        setShow(false);
+        setProgress(1);
+        if (onComplete) onComplete();
+      }, 450);
+      return () => clearTimeout(t);
     }
 
     return () => {
-      if (interval) clearInterval(interval);
-      if (failsafeTimeout) clearTimeout(failsafeTimeout);
+      if (animFrame) cancelAnimationFrame(animFrame);
     };
   }, [isExtracting]);
 
-  if (!show) return null;
+  const handleDismiss = () => {
+    setShow(false);
+    setProgress(1);
+    if (onClose) onClose();
+  };
+
+  if (!show && !isExtracting) return null;
+  if (typeof document === 'undefined') return null;
 
   const isFinished = progress >= 100;
 
   // Accurate SVG circular geometry
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius; // ~339.29
+  const radius = 56;
+  const circumference = 2 * Math.PI * radius; // ~351.86
   const strokeDashoffset = circumference - (circumference * Math.min(progress, 100)) / 100;
 
   // Polar coordinates for traveling head dot on perimeter
   const angle = (Math.min(progress, 100) / 100) * 360 - 90;
-  const headX = 68 + radius * Math.cos((angle * Math.PI) / 180);
-  const headY = 68 + radius * Math.sin((angle * Math.PI) / 180);
+  const headX = 70 + radius * Math.cos((angle * Math.PI) / 180);
+  const headY = 70 + radius * Math.sin((angle * Math.PI) / 180);
 
   const currentStage =
     EXTRACTION_STAGES.find((s) => progress >= s.min && progress <= s.max) ||
     EXTRACTION_STAGES[EXTRACTION_STAGES.length - 1];
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-        {/* Dark blurred clinical backdrop */}
+      <div className="fixed inset-0 z-[120] overflow-y-auto flex items-center justify-center p-3 sm:p-5 print:hidden">
+        {/* Backdrop matching all system modals */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.22, ease: 'easeOut' }}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+          transition={{ duration: 0.22 }}
+          onClick={handleDismiss}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm cursor-pointer"
         />
 
-        {/* Central Standard Modal Popup Card */}
+        {/* Modal Window Container - Matching ClinicalInquiriesModal & PrescriptionCopyModal */}
         <motion.div
-          initial={{ scale: 0.93, opacity: 0, y: 14 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.93, opacity: 0, y: 14 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+          initial={{ opacity: 0, scale: 0.95, y: 14 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
           onClick={(e) => e.stopPropagation()}
-          className={`relative z-10 flex flex-col items-center bg-white border border-slate-200 rounded-3xl shadow-2xl p-6 sm:p-7 max-w-sm w-full mx-auto select-none ${className}`}
+          className={`relative z-10 w-full max-w-lg bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-2xl flex flex-col gap-5 max-h-[92vh] overflow-hidden ${className}`}
         >
-          {/* Header Bar */}
-          <div className="flex items-center justify-between w-full pb-4 border-b border-slate-100 mb-5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center shrink-0 shadow-2xs">
-                <span className="material-symbols-outlined text-[20px]">document_scanner</span>
+          {/* Top Modal Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center shrink-0 shadow-2xs">
+                <span className="material-symbols-outlined text-[22px]">document_scanner</span>
               </div>
-              <div className="text-left">
-                <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
-                  Multimodal AI Extraction
-                </h3>
-                <span className="text-[10px] text-slate-500 font-medium">Gemini Vision Pipeline</span>
-              </div>
-            </div>
-
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
-              Active
-            </span>
-          </div>
-
-          {/* Circular SVG Ring & Central Percentage Display */}
-          <div className="relative w-40 h-40 flex items-center justify-center my-1">
-            <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 136 136">
-              <defs>
-                <linearGradient id="tealPercentageGradModal" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#005c65" />
-                  <stop offset="50%" stopColor="#007782" />
-                  <stop offset="100%" stopColor="#0d9488" />
-                </linearGradient>
-              </defs>
-
-              {/* Background Track */}
-              <circle
-                cx="68"
-                cy="68"
-                r={radius}
-                className="stroke-slate-100"
-                strokeWidth="7"
-                fill="none"
-              />
-
-              {/* Dynamic Animated Foreground Stroke */}
-              <circle
-                cx="68"
-                cy="68"
-                r={radius}
-                stroke="url(#tealPercentageGradModal)"
-                strokeWidth="7"
-                strokeLinecap="round"
-                fill="none"
-                style={{
-                  strokeDasharray: circumference,
-                  strokeDashoffset,
-                  transition: 'stroke-dashoffset 0.08s linear',
-                }}
-              />
-
-              {/* Dynamic Traveling Head Dot on Circumference */}
-              {!isFinished && progress > 2 && (
-                <circle
-                  cx={headX}
-                  cy={headY}
-                  r="5.5"
-                  fill="#005c65"
-                  className="filter drop-shadow-[0_0_4px_rgba(0,119,130,0.6)]"
-                />
-              )}
-            </svg>
-
-            {/* In-Ring Digital Readout */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              {!isFinished ? (
-                <div className="flex items-baseline justify-center">
-                  <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-slate-900 tabular-nums leading-none select-none">
-                    {progress}
-                  </span>
-                  <span className="text-xl sm:text-2xl font-black text-[#007782] ml-0.5 select-none leading-none">
-                    %
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                    Multimodal AI Prescription Extraction
+                  </h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    isFinished 
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                      : 'bg-teal-50 text-[#005c65] border border-teal-200'
+                  }`}>
+                    {isFinished ? 'Extraction Complete' : 'Active Pipeline'}
                   </span>
                 </div>
-              ) : (
-                <motion.div
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', damping: 15, stiffness: 350 }}
-                  className="w-13 h-13 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30"
-                >
-                  <span className="material-symbols-outlined text-[30px] font-bold">check</span>
-                </motion.div>
-              )}
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Gemini Vision OCR &amp; Clinical CDS Monograph Pipeline
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors shrink-0"
+              title="Close popup"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+
+          {/* Central Circular Progress Ring */}
+          <div className="flex flex-col items-center justify-center py-2">
+            <div className="relative w-44 h-44 flex items-center justify-center">
+              <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 140 140">
+                <defs>
+                  <linearGradient id="tealPercentageGradModal" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#005c65" />
+                    <stop offset="50%" stopColor="#007782" />
+                    <stop offset="100%" stopColor="#0d9488" />
+                  </linearGradient>
+                </defs>
+
+                {/* Background Track */}
+                <circle
+                  cx="70"
+                  cy="70"
+                  r={radius}
+                  className="stroke-slate-100"
+                  strokeWidth="8"
+                  fill="none"
+                />
+
+                {/* Dynamic Animated Foreground Stroke */}
+                <circle
+                  cx="70"
+                  cy="70"
+                  r={radius}
+                  stroke="url(#tealPercentageGradModal)"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  fill="none"
+                  style={{
+                    strokeDasharray: circumference,
+                    strokeDashoffset,
+                    transition: 'stroke-dashoffset 0.06s linear',
+                  }}
+                />
+
+                {/* Dynamic Traveling Head Dot on Circumference */}
+                {!isFinished && progress > 2 && (
+                  <circle
+                    cx={headX}
+                    cy={headY}
+                    r="5.5"
+                    fill="#005c65"
+                    className="filter drop-shadow-[0_0_5px_rgba(0,119,130,0.7)]"
+                  />
+                )}
+              </svg>
+
+              {/* In-Ring Digital Readout */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center select-none">
+                {!isFinished ? (
+                  <div className="flex items-baseline justify-center">
+                    <span className="text-5xl font-black font-mono tracking-tight text-slate-900 tabular-nums leading-none">
+                      {progress}
+                    </span>
+                    <span className="text-2xl font-black text-[#007782] ml-0.5 leading-none">
+                      %
+                    </span>
+                  </div>
+                ) : (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', damping: 15, stiffness: 350 }}
+                    className="w-14 h-14 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30"
+                  >
+                    <span className="material-symbols-outlined text-[32px] font-bold">check</span>
+                  </motion.div>
+                )}
+              </div>
+            </div>
+
+            {/* Active Stage Badge & Description */}
+            <div className="mt-4 flex flex-col items-center gap-1 text-center w-full">
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold bg-teal-50 text-[#005c65] border border-teal-200/80 shadow-2xs">
+                {!isFinished ? (
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#007782]"></span>
+                  </span>
+                ) : (
+                  <span className="material-symbols-outlined text-[14px] text-emerald-600 font-bold">check_circle</span>
+                )}
+                <span>{!isFinished ? currentStage.title : 'Extraction Complete — Ready for Review'}</span>
+              </div>
+
+              <p className="text-xs text-slate-600 mt-1 max-w-sm">
+                {!isFinished ? currentStage.detail : 'Medications identified, verified, and staged into safety queue'}
+              </p>
             </div>
           </div>
 
-          {/* Real-Time Clinical Telemetry Underneath */}
-          <div className="mt-4 flex flex-col items-center gap-1.5 text-center w-full">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-[#005c65] border border-teal-200/80 shadow-2xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#007782]"></span>
-              </span>
-              <span>{!isFinished ? currentStage.title : 'Extraction Complete'}</span>
-            </div>
+          {/* Connected 4-Step Pipeline Stepper */}
+          <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100">
+            {EXTRACTION_STAGES.map((stage) => {
+              const isPassed = progress > stage.max;
+              const isCurrent = progress >= stage.min && progress <= stage.max;
 
-            <p className="text-xs font-medium text-slate-600 leading-snug max-w-xs">
-              {!isFinished ? currentStage.detail : 'Prescription medications extracted and ready for review'}
-            </p>
+              return (
+                <div
+                  key={stage.id}
+                  className={`flex flex-col items-center text-center p-2 rounded-xl transition-colors ${
+                    isPassed
+                      ? 'bg-emerald-50/70 text-emerald-800'
+                      : isCurrent
+                      ? 'bg-teal-50 text-[#005c65] ring-1 ring-teal-200'
+                      : 'bg-slate-50 text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-center mb-1">
+                    {isPassed ? (
+                      <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                    ) : (
+                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        isCurrent ? 'bg-[#007782] text-white' : 'bg-slate-200 text-slate-500'
+                      }`}>
+                        {stage.id}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-bold leading-tight line-clamp-1">{stage.title}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bottom Footer Actions */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <span className="text-[11px] text-slate-400 font-medium">
+              HIPAA &amp; Monograph Compliance Active
+            </span>
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              Cancel / Close
+            </button>
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
