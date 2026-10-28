@@ -257,6 +257,33 @@ export function syncCheckToCloud(check: SafetyCheckRecord) {
   }).catch((err) => console.warn('[CloudSync] Failed to sync check:', err));
 }
 
+export function deleteCheckFromCloud(checkId: string) {
+  const email = getClinicianEmail();
+  if (!email || !API_BASE_URL) return;
+
+  fetch(`${API_BASE_URL}/api/v1/sync/check/${encodeURIComponent(checkId)}?email=${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+  }).catch((err) => console.warn('[CloudSync] Failed to delete check from cloud:', err));
+}
+
+export function deleteAuditLogFromCloud(logId: string) {
+  const email = getClinicianEmail();
+  if (!email || !API_BASE_URL) return;
+
+  fetch(`${API_BASE_URL}/api/v1/sync/audit-log/${encodeURIComponent(logId)}?email=${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+  }).catch((err) => console.warn('[CloudSync] Failed to delete audit log from cloud:', err));
+}
+
+export function clearAllChecksFromCloud() {
+  const email = getClinicianEmail();
+  if (!email || !API_BASE_URL) return;
+
+  fetch(`${API_BASE_URL}/api/v1/sync/all-checks?email=${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+  }).catch((err) => console.warn('[CloudSync] Failed to clear all checks from cloud:', err));
+}
+
 export function syncAuditLogToCloud(auditLog: AuditLogEntry) {
   const email = getClinicianEmail();
   if (!email || !API_BASE_URL) return;
