@@ -1373,14 +1373,17 @@ export default function RulesAdmin() {
                 {addModalMode === 'upload' && (
                   <div className="space-y-4">
                     {isExtracting ? (
-                      <div className="p-1 rounded-2xl overflow-hidden my-2">
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full rounded-2xl overflow-hidden my-1 border border-primary/25 shadow-xs"
+                      >
                         <OpticalScanOverlay
                           imageUrl={imagePreviewUrl}
                           fileName={uploadedFile?.name || 'Prescription / Clinical Document'}
                           fileType={uploadFormat}
                           isScanning={true}
                           title="PropNexAI Agent Model 3 · Clinical Rules Extraction"
-                          className="w-full min-h-[280px] max-h-[360px]"
+                          className="w-full min-h-[340px] border-0 rounded-2xl shadow-none"
                         />
                       </div>
                     ) : (
@@ -1423,6 +1426,7 @@ export default function RulesAdmin() {
                       ref={fileInputRef}
                       type="file"
                       className="hidden"
+                      disabled={isExtracting}
                       accept={
                         uploadFormat === 'image'
                           ? '.png,.jpg,.jpeg'
@@ -1470,6 +1474,7 @@ export default function RulesAdmin() {
                           <button
                             type="button"
                             onClick={() => {
+                              if (isExtracting) return;
                               setUploadSource('file');
                               fileInputRef.current?.click();
                             }}
@@ -1489,6 +1494,7 @@ export default function RulesAdmin() {
                       {!uploadedFile ? (
                         <div
                           onClick={() => {
+                            if (isExtracting) return;
                             setUploadSource('file');
                             fileInputRef.current?.click();
                           }}
