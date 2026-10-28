@@ -9,6 +9,7 @@ import { PrescriptionStorage as VirtualDb, getActiveClinicianName, isTodayIST, f
 import { SafetyCheckRecord, DrugInteractionAlert, InteractionRule, AuditLogEntry } from '../types';
 
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
+import PrescriptionCopyModal from '../components/PrescriptionCopyModal';
 
 import CustomDropdown from '../components/CustomDropdown';
 
@@ -119,6 +120,7 @@ export default function Dashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const [isBatchSyncing, setIsBatchSyncing] = useState(false);
+  const [reviewCopyModal, setReviewCopyModal] = useState<SafetyCheckRecord | null>(null);
 
 
 
@@ -1301,7 +1303,7 @@ export default function Dashboard() {
 
                               whileTap={{ scale: 0.98 }}
 
-                              onClick={() => handleInspect(check)}
+                              onClick={() => setReviewCopyModal(check)}
 
                               className="px-2.5 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors duration-150 text-xs font-bold cursor-pointer"
 
@@ -1568,7 +1570,7 @@ export default function Dashboard() {
                       <span className="text-[10px] text-outline">{check.timestamp}</span>
                       <button
                         type="button"
-                        onClick={() => handleInspect(check)}
+                        onClick={() => setReviewCopyModal(check)}
                         className="text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
                       >
                         <span>Review &amp; Override</span>
@@ -1671,7 +1673,7 @@ export default function Dashboard() {
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => handleInspect(selectedCheck)}
+                    onClick={() => setReviewCopyModal(selectedCheck)}
                     className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-surface-container-low text-primary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors cursor-pointer"
                     title="Review CDS decision, warnings, and attestation"
                   >
@@ -1729,6 +1731,13 @@ export default function Dashboard() {
 
         }}
 
+      />
+
+      {/* Prescription Copy & Clinical Review Modal */}
+      <PrescriptionCopyModal
+        isOpen={!!reviewCopyModal}
+        onClose={() => setReviewCopyModal(null)}
+        check={reviewCopyModal}
       />
 
     </div>
