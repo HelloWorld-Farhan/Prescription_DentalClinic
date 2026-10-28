@@ -346,52 +346,101 @@ export default function NewCheck() {
   // Model architecture details drawer visibility
   const [showModelDetails, setShowModelDetails] = useState(false);
 
+  interface DynamicPresetItem {
+    drug: string;
+    generic: string;
+    dose: string;
+    freq: string;
+    route: string;
+    duration: string;
+    ind: string;
+    count: number;
+  }
+
   // Quick 1-click preset adder for dental clinicians
   const handleAddPreset = (
     drugName: string,
     genericName: string,
     dosage: string,
     frequency: string,
-    indication: string = 'Dental Infection Prophylaxis'
+    indication: string = 'Dental Infection Prophylaxis',
+    route: string = 'Oral (PO)',
+    duration: string = '7 days'
   ) => {
+    if (prescriptions.some((p) => p.drugName.toLowerCase() === drugName.toLowerCase())) {
+      showConfirmation(`${drugName} is already staged in the prescription queue.`, 'info');
+      return;
+    }
+
     const newItem: PrescriptionItem = {
       id: 'rx-preset-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       drugName,
       genericName,
       dosage,
       frequency,
-      route: 'Oral (PO)',
-      duration: '7 days',
-      indication
+      route,
+      duration,
+      indication,
     };
     setPrescriptions((prev) => [...prev, newItem]);
+    showConfirmation(`Added ${drugName} to prescription queue.`, 'success');
   };
 
-  const isPenicillinSensitive = useMemo(() => {
-    return parsedAllergies.some((a) => {
-      const l = a.toLowerCase();
-      return l.includes('penicillin') || l.includes('amoxicillin') || l.includes('ampicillin');
-    });
-  }, [parsedAllergies]);
+  // Dynamically analyze prescriptions across clinical checks & uploaded slips
+  // Only surfaces medications prescribed repeatedly (frequency >= 2)
+  // When no common medications exist, returns empty array (renders nothing / blank)
+  const dynamicCommonPresets = useMemo<DynamicPresetItem[]>(() => {
+    const frequencyMap = new Map<string, DynamicPresetItem>();
+    const allPool: PrescriptionItem[] = [];
 
-  const contextualPresets = useMemo(() => {
-    if (isPenicillinSensitive) {
-      return [
-        { drug: 'Clindamycin 300mg', generic: 'Clindamycin Hydrochloride', dose: '300mg QID', freq: 'Every 6 hours (QID)', ind: 'Penicillin-Safe Prophylaxis', recommended: true },
-        { drug: 'Azithromycin 500mg', generic: 'Azithromycin', dose: '500mg OD', freq: 'Once daily (OD)', ind: 'Macrolide Alternative (Safe for Penicillin Allergy)', recommended: true },
-        { drug: 'Ibuprofen 400mg', generic: 'Ibuprofen', dose: '400mg PRN', freq: 'Every 6-8 hours PRN', ind: 'Post-Surgical Pain & Inflammation', recommended: false },
-        { drug: 'Metronidazole 400mg', generic: 'Metronidazole', dose: '400mg TID', freq: 'Every 8 hours (TID)', ind: 'Anaerobic Odontogenic Infection', recommended: false },
-        { drug: 'Paracetamol 650mg', generic: 'Acetaminophen', dose: '650mg QID', freq: 'Every 6 hours PRN', ind: 'Mild-Moderate Post-Op Analgesia', recommended: false }
-      ];
+    try {
+      const pastChecks = VirtualDb.getChecks();
+      pastChecks.forEach((c) => {
+        if (Array.isArray(c.prescriptions)) {
+          allPool.push(...c.prescriptions);
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to read past checks for dynamic presets', e);
     }
-    return [
-      { drug: 'Amoxicillin 500mg', generic: 'Amoxicillin Trihydrate', dose: '500mg TID', freq: 'Every 8 hours (TID)', ind: 'First-Line Odontogenic Infection', recommended: true },
-      { drug: 'Augmentin 625mg', generic: 'Amoxicillin + Clavulanic Acid', dose: '625mg BID', freq: 'Every 12 hours (BID)', ind: 'Refractory Dental Infection', recommended: true },
-      { drug: 'Ibuprofen 400mg', generic: 'Ibuprofen', dose: '400mg PRN', freq: 'Every 6-8 hours PRN', ind: 'Post-Surgical Pain & Inflammation', recommended: false },
-      { drug: 'Clindamycin 300mg', generic: 'Clindamycin Hydrochloride', dose: '300mg QID', freq: 'Every 6 hours (QID)', ind: 'Penicillin-Allergic Alternative', recommended: false },
-      { drug: 'Metronidazole 400mg', generic: 'Metronidazole', dose: '400mg TID', freq: 'Every 8 hours (TID)', ind: 'Acute Necrotizing Ulcerative Gingivitis', recommended: false }
-    ];
-  }, [isPenicillinSensitive]);
+
+    if (Array.isArray(extractedMedicines)) {
+      allPool.push(...extractedMedicines);
+    }
+
+    allPool.forEach((item) => {
+      const rawName = (item.drugName || '').trim();
+      if (!rawName) return;
+
+      const normKey = rawName.toLowerCase();
+      const existing = frequencyMap.get(normKey);
+
+      if (existing) {
+        existing.count += 1;
+        if (item.dosage && item.dosage !== 'Standard') existing.dose = item.dosage;
+        if (item.frequency && item.frequency !== 'Daily') existing.freq = item.frequency;
+        if (item.indication) existing.ind = item.indication;
+        if (item.genericName) existing.generic = item.genericName;
+      } else {
+        frequencyMap.set(normKey, {
+          drug: item.drugName,
+          generic: item.genericName || item.drugName,
+          dose: item.dosage || 'Standard Dosage',
+          freq: item.frequency || 'PO as Directed',
+          route: item.route || 'Oral (PO)',
+          duration: item.duration || '7 days',
+          ind: item.indication || 'Clinical Prophylaxis / Treatment',
+          count: 1,
+        });
+      }
+    });
+
+    // Only medications written again and again (frequency >= 2)
+    return Array.from(frequencyMap.values())
+      .filter((p) => p.count >= 2)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }, [extractedMedicines, prescriptions]);
 
   // Extract medicines and clinical entities from uploaded document or camera photo
   const extractPrescriptionsFromDocument = async (
@@ -1524,29 +1573,44 @@ export default function NewCheck() {
               </motion.div>
             )}
 
-            {/* Quick Presets Row for Dental Practitioners */}
-            <div className="p-3.5 rounded-xl bg-surface-container-low/70 border border-surface-container-high/80 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-primary text-[16px]">bolt</span>
-                  <span>1-Click Clinical Presets (Quick Dental Prescriptions)</span>
-                </span>
-                <span className="text-[10px] text-outline hidden sm:inline">Tap any chip to queue instantly</span>
+            {/* 1-Click Presets: Dynamically analyzed from repeated prescriptions (Hidden/blank when no repeated medicines) */}
+            {dynamicCommonPresets.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-surface-container-low/70 border border-surface-container-high/80 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-primary text-[16px]">bolt</span>
+                    <span>1-Click Clinical Presets (Frequently Prescribed in Records)</span>
+                  </span>
+                  <span className="text-[10px] text-outline hidden sm:inline">Tap any repeated medicine to queue instantly</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {dynamicCommonPresets.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() =>
+                        handleAddPreset(
+                          preset.drug,
+                          preset.generic,
+                          preset.dose,
+                          preset.freq,
+                          preset.ind,
+                          preset.route,
+                          preset.duration
+                        )
+                      }
+                      className="px-2.5 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-primary-container hover:text-on-primary border border-surface-container-high text-[11px] font-semibold text-on-surface transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs hover:scale-105 active:scale-95 group"
+                    >
+                      <span className="text-primary font-bold group-hover:text-inherit">+</span>
+                      <span>{preset.drug}</span>
+                      <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-primary/10 text-primary group-hover:bg-white/20 group-hover:text-inherit">
+                        {preset.count}x
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {contextualPresets.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleAddPreset(preset.drug, preset.generic, preset.dose, preset.freq, preset.ind)}
-                    className="px-2.5 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-primary-container hover:text-on-primary border border-surface-container-high text-[11px] font-semibold text-on-surface transition-all flex items-center gap-1 cursor-pointer shadow-2xs hover:scale-105 active:scale-95 group"
-                  >
-                    <span className="text-primary font-bold group-hover:text-inherit">+</span>
-                    <span>{preset.drug}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            )}
 
             {/* Candidate Prescriptions Staging Queue */}
             <div className="space-y-3 pt-3 border-t border-surface-container">
@@ -1572,7 +1636,7 @@ export default function NewCheck() {
                     </div>
                     <div className="text-xs font-bold text-on-surface">Prescription Queue is Empty</div>
                     <p className="text-[11px] text-outline max-w-sm">
-                      Upload a prescription slip, snap a camera photo, or click one of the 1-click clinical presets above to stage medications for safety screening.
+                      Upload a prescription slip, snap a camera photo, or enter medication names to stage medications for safety screening.
                     </p>
                   </div>
                 ) : (
