@@ -1377,77 +1377,227 @@ export default function NewCheck() {
 
             {/* TAB 3: DIRECT MANUAL MEDICINE ENTRY */}
             {inputMethod === 'manual' && (
-              <form onSubmit={handleAddManualPrescription} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Medication / Brand Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={manualDrugName}
-                      onChange={(e) => setManualDrugName(e.target.value)}
-                      placeholder="e.g. Ciprofloxacin 500mg or Amoxicillin"
-                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
-                    />
+              <div className="rounded-2xl border border-surface-container-high/80 bg-gradient-to-b from-surface-container-lowest via-surface-container-lowest to-surface-container-low/20 p-5 sm:p-7 shadow-xs">
+                {/* Header with Quick Presets */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-surface-container/70 mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shadow-xs shrink-0">
+                      <span className="material-symbols-outlined text-[22px]">medication</span>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
+                        Prescription Drug Manual Entry
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                          Direct Input
+                        </span>
+                      </h4>
+                      <p className="text-xs text-on-surface-variant font-medium">Add verified medications, doses, and clinical schedules to the screening queue</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Generic Ingredient</label>
-                    <input
-                      type="text"
-                      value={manualGenericName}
-                      onChange={(e) => setManualGenericName(e.target.value)}
-                      placeholder="e.g. Ciprofloxacin Hydrochloride"
-                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
-                    />
+
+                  {/* Quick Dental Presets */}
+                  <div className="flex items-center flex-wrap gap-1.5">
+                    <span className="text-[11px] font-bold text-on-surface-variant flex items-center gap-1 mr-1">
+                      <span className="material-symbols-outlined text-[14px] text-primary">bolt</span>
+                      Quick Dental Rx:
+                    </span>
+                    {[
+                      { drug: 'Amoxicillin', gen: 'Amoxicillin Trihydrate', dose: '500mg', freq: 'Every 8 hours (TID)', dur: '7 days', route: 'Oral (PO)', ind: 'Dental Abscess / Prophylaxis' },
+                      { drug: 'Augmentin', gen: 'Amoxicillin + Clavulanate', dose: '625mg', freq: 'Every 12 hours (BID)', dur: '7 days', route: 'Oral (PO)', ind: 'Severe Odontogenic Infection' },
+                      { drug: 'Ibuprofen', gen: 'Ibuprofen', dose: '400mg', freq: 'As Needed (PRN)', dur: '5 days', route: 'Oral (PO)', ind: 'Post-Op Odontogenic Pain' },
+                      { drug: 'Clindamycin', gen: 'Clindamycin HCl', dose: '300mg', freq: 'Every 8 hours (TID)', dur: '7 days', route: 'Oral (PO)', ind: 'Penicillin-Allergic Infection' },
+                      { drug: 'Metronidazole', gen: 'Metronidazole', dose: '400mg', freq: 'Every 8 hours (TID)', dur: '5 days', route: 'Oral (PO)', ind: 'Periodontal & Anaerobic Infection' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.drug}
+                        type="button"
+                        onClick={() => {
+                          setManualDrugName(preset.drug);
+                          setManualGenericName(preset.gen);
+                          setManualDosage(preset.dose);
+                          setManualFrequency(preset.freq);
+                          setManualDuration(preset.dur);
+                          setManualRoute(preset.route);
+                          setManualIndication(preset.ind);
+                        }}
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-surface-container-low hover:bg-primary/10 text-on-surface-variant hover:text-primary border border-surface-container-high transition-all cursor-pointer"
+                      >
+                        + {preset.drug}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Dose Strength</label>
-                    <input
-                      type="text"
-                      value={manualDosage}
-                      onChange={(e) => setManualDosage(e.target.value)}
-                      placeholder="e.g. 500mg tablet"
-                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
-                    />
+                <form onSubmit={handleAddManualPrescription} className="space-y-4">
+                  {/* Row 1: Drug Name & Generic Name */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-primary">pill</span>
+                        Medication / Brand Name <span className="text-error">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={manualDrugName}
+                        onChange={(e) => setManualDrugName(e.target.value)}
+                        placeholder="e.g. Amoxicillin 500mg or Augmentin"
+                        className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm text-on-surface placeholder:text-outline/60 focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-primary">science</span>
+                        Generic / Active Ingredient
+                      </label>
+                      <input
+                        type="text"
+                        value={manualGenericName}
+                        onChange={(e) => setManualGenericName(e.target.value)}
+                        placeholder="e.g. Amoxicillin Trihydrate"
+                        className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm text-on-surface placeholder:text-outline/60 focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all outline-none"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Frequency</label>
-                    <select
-                      value={manualFrequency}
-                      onChange={(e) => setManualFrequency(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none cursor-pointer"
+
+                  {/* Row 2: Dosage, Frequency, Duration */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-primary">scale</span>
+                          Dose Strength
+                        </label>
+                        <div className="flex items-center gap-1">
+                          {['250mg', '500mg', '625mg'].map(d => (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => setManualDosage(d)}
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                                manualDosage === d
+                                  ? 'bg-primary text-white'
+                                  : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
+                              }`}
+                            >
+                              {d}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={manualDosage}
+                        onChange={(e) => setManualDosage(e.target.value)}
+                        placeholder="e.g. 500mg tablet"
+                        className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm text-on-surface placeholder:text-outline/60 focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-primary">schedule</span>
+                        Frequency
+                      </label>
+                      <select
+                        value={manualFrequency}
+                        onChange={(e) => setManualFrequency(e.target.value)}
+                        className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all outline-none cursor-pointer"
+                      >
+                        <option>Every 8 hours (TID)</option>
+                        <option>Every 12 hours (BID)</option>
+                        <option>Once Daily (QD)</option>
+                        <option>Every 6 hours (QID)</option>
+                        <option>As Needed (PRN)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-primary">event_repeat</span>
+                          Duration
+                        </label>
+                        <div className="flex items-center gap-1">
+                          {['3 days', '5 days', '7 days'].map(dur => (
+                            <button
+                              key={dur}
+                              type="button"
+                              onClick={() => setManualDuration(dur)}
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+                                manualDuration === dur
+                                  ? 'bg-primary text-white'
+                                  : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
+                              }`}
+                            >
+                              {dur}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={manualDuration}
+                        onChange={(e) => setManualDuration(e.target.value)}
+                        placeholder="e.g. 7 days"
+                        className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm text-on-surface placeholder:text-outline/60 focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Route & Clinical Indication */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-primary">route</span>
+                        Administration Route
+                      </label>
+                      <select
+                        value={manualRoute}
+                        onChange={(e) => setManualRoute(e.target.value)}
+                        className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all outline-none cursor-pointer"
+                      >
+                        <option>Oral (PO)</option>
+                        <option>Topical / Oral Rinse</option>
+                        <option>Sublingual (SL)</option>
+                        <option>Intramuscular (IM)</option>
+                        <option>Intravenous (IV)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-primary">clinical_notes</span>
+                        Clinical Indication / Diagnosis
+                      </label>
+                      <input
+                        type="text"
+                        value={manualIndication}
+                        onChange={(e) => setManualIndication(e.target.value)}
+                        placeholder="e.g. Post-Op Dental Infection Prophylaxis"
+                        className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-xs sm:text-sm text-on-surface placeholder:text-outline/60 focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                    <p className="text-[11px] text-on-surface-variant font-medium flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[15px] text-primary">verified_user</span>
+                      Automatically verified against PropNexAI drug monograph rules
+                    </p>
+                    <button
+                      type="submit"
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs hover:shadow-md hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
                     >
-                      <option>Every 8 hours (TID)</option>
-                      <option>Every 12 hours (BID)</option>
-                      <option>Once Daily (QD)</option>
-                      <option>As Needed (PRN)</option>
-                    </select>
+                      <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                      <span>Add Medication to Prescription Queue</span>
+                    </button>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-on-surface">Duration</label>
-                    <input
-                      type="text"
-                      value={manualDuration}
-                      onChange={(e) => setManualDuration(e.target.value)}
-                      placeholder="e.g. 7 days"
-                      className="w-full h-10 px-3 rounded-xl border border-surface-container-high bg-white text-xs sm:text-sm focus:border-primary outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-primary font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">add</span>
-                    <span>Add Medication to Prescription Queue</span>
-                  </button>
-                </div>
-              </form>
+                </form>
+              </div>
             )}
 
             {/* Extracted Clinical Entities & Medications Card */}
