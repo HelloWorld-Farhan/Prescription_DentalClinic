@@ -1775,7 +1775,7 @@ export default function NewCheck() {
             )}
 
             {/* Candidate Prescriptions Staging Queue */}
-            <div className="space-y-3 pt-3 border-t border-surface-container">
+            <div id="prescribed-medication-queue" className="space-y-3 pt-3 border-t border-surface-container scroll-mt-24">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-on-surface">
@@ -1802,10 +1802,13 @@ export default function NewCheck() {
                     </p>
                   </div>
                 ) : (
-                  prescriptions.map((rx) => (
-                    <div
-                      key={rx.id}
-                      className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3 shadow-2xs hover:border-primary/40 transition-colors"
+                  prescriptions.map((rx, idx) => (
+                    <motion.div
+                      key={rx.id || idx}
+                      initial={{ opacity: 0, y: 14, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.32, delay: idx * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                      className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3 shadow-2xs hover:border-primary/40 transition-all hover:shadow-xs"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0 shadow-xs">
@@ -1836,7 +1839,7 @@ export default function NewCheck() {
                       >
                         <span className="material-symbols-outlined text-[18px]">delete</span>
                       </button>
-                    </div>
+                    </motion.div>
                   ))
                 )}
               </div>
@@ -2512,6 +2515,14 @@ export default function NewCheck() {
       {/* AI Multimodal Extraction Progress Modal Popup */}
       <MinimalExtractionOverlay
         isExtracting={isProcessingDocument}
+        onComplete={() => {
+          setTimeout(() => {
+            const queueEl = document.getElementById('prescribed-medication-queue');
+            if (queueEl) {
+              queueEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 300);
+        }}
       />
 
       {/* Patient & Clinical Inquiries Pre-Screening Popup Modal */}
