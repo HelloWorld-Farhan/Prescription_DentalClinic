@@ -163,6 +163,8 @@ export default function Report() {
         alerts_summary: alertsSummaryText,
         alerts_count: currentCheck?.alerts?.length || 0,
         portal_url: window.location.href,
+        download_url: currentCheck?.sourceDocumentUrl || window.location.href,
+        pdf_filename: `SmileClinic_CDS_Report_${reportIdentifier}.pdf`,
         notary_hash: 'SHA256-4f8b9e892c21ad8310c8ff0e34a7812bc88',
       };
 
