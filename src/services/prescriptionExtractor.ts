@@ -480,7 +480,7 @@ const DEMO_PRESCRIPTION_PROFILES: DemoProfile[] = [
 /**
  * Universal prescription extraction engine.
  * Sends PDFs, images, and camera scans to the Smile Clinic Backend API powered by
- * Google Gemini Vision with 14-key failover rotation.
+ * Google PropNexAI Agent Model 3 with 14-key failover rotation.
  * Eliminates all dummy / fabricated medication fallbacks.
  */
 export async function extractPrescriptionData(
@@ -503,7 +503,7 @@ export async function extractPrescriptionData(
     }
   }
 
-  // 2. Call the Real Gemini Vision Backend API
+  // 2. Call the Real PropNexAI Agent Model 3 Backend API
   const env = (import.meta as any).env || {};
   const apiUrl = (env.VITE_API_URL || '').replace(/\/$/, '') || 'https://dentalclinic-backend-eiav.onrender.com';
 
@@ -539,14 +539,14 @@ export async function extractPrescriptionData(
         drugB: r.drugB || 'Target Condition / Agent',
         severity: r.severity || 'major',
         category: r.category || 'Drug-Drug',
-        description: r.description || `Clinical safety rule extracted by Gemini Vision`,
+        description: r.description || `Clinical safety rule extracted by PropNexAI Agent Model 3`,
         active: true,
         sourceFile: file.name,
       }));
 
       return {
-        prescriptionId: `rx-gemini-${now}`,
-        documentType: source === 'camera' ? 'Camera Captured Rx' : `${file.type || 'Clinical Document'} (Gemini Vision)`,
+        prescriptionId: `rx-propnex-${now}`,
+        documentType: source === 'camera' ? 'Camera Captured Rx' : `${file.type || 'Clinical Document'} (PropNexAI Agent Model 3)`,
         patient: {
           name: data.patient?.name || undefined,
           age: data.patient?.age || undefined,
@@ -619,7 +619,7 @@ export interface DocumentRulesExtractionResult {
 }
 
 /**
- * Extracts clinical decision support rules and prescribed medicines from uploaded documents via Gemini Backend.
+ * Extracts clinical decision support rules and prescribed medicines from uploaded documents via PropNexAI Engine.
  */
 export async function extractDocumentRules(file: File): Promise<DocumentRulesExtractionResult> {
   const env = (import.meta as any).env || {};

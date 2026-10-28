@@ -895,11 +895,11 @@ export default function NewCheck() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-emerald-500/10 via-teal-500/15 to-primary/10 text-primary border border-primary/25 shadow-2xs">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>SmileGuard AI™ v4.2</span>
+                      <span>SmileGuard AI™ v1.0</span>
                     </span>
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
                       <span className="material-symbols-outlined text-[13px] text-blue-600">psychology</span>
-                      <span>Gemini 3 Flash Vision</span>
+                      <span>PropNexAI Agent Model 3</span>
                     </span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                       <span className="material-symbols-outlined text-[12px] text-emerald-600">verified</span>
@@ -908,7 +908,7 @@ export default function NewCheck() {
                   </div>
                 </div>
                 <p className="text-xs sm:text-sm text-outline max-w-3xl leading-relaxed">
-                  Submit prescription slip via image upload, camera photo capture, or manual medication entry. Powered by <strong>Gemini 3 Flash Vision</strong> multimodal clinical engine to extract handwritten scripts, normalize dosages, and screen polypharmacy hazard risks against active medical records.
+                  Submit prescription slip via image upload, camera photo capture, or manual medication entry. Powered by <strong>PropNexAI Agent Model 3</strong> multimodal clinical engine to extract handwritten scripts, normalize dosages, and screen polypharmacy hazard risks against active medical records.
                 </p>
               </div>
 
@@ -957,7 +957,7 @@ export default function NewCheck() {
                           <span>Multimodal Vision OCR</span>
                         </div>
                         <p className="text-[11px] text-outline leading-relaxed">
-                          Gemini 3 Flash Vision parses handwritten dental scripts, ink stamps, hospital headers, and multi-page PDF e-prescriptions with high spatial confidence and 14-key failover redundancy.
+                          PropNexAI Agent Model 3 parses handwritten dental scripts, ink stamps, hospital headers, and multi-page PDF e-prescriptions with high spatial confidence and failover redundancy.
                         </p>
                       </div>
 
@@ -1064,7 +1064,7 @@ export default function NewCheck() {
                           fileName={uploadedFileName || 'Prescription Document'}
                           fileType={uploadedFileName?.endsWith('.pdf') ? 'pdf' : 'image'}
                           isScanning={true}
-                          title="Gemini 3 Multimodal Vision OCR"
+                          title="PropNexAI Agent Model 3 · Clinical Vision OCR"
                           className="w-full h-full max-h-[300px]"
                         />
                       </div>

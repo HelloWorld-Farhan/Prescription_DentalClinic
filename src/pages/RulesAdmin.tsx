@@ -266,7 +266,7 @@ export default function RulesAdmin() {
       // 1. Upload to Cloudflare R2 (handles duplicate names automatically)
       const r2Result = await uploadToR2(uploadedFile, currentUserId, currentClinicianName);
 
-      // 2. Extract rules and medications using Gemini Backend
+      // 2. Extract rules and medications using PropNexAI Engine
       const docResult = await extractDocumentRules(uploadedFile);
       let rulesToStage = docResult.rules;
 
@@ -1379,7 +1379,7 @@ export default function RulesAdmin() {
                           fileName={uploadedFile?.name || 'Prescription / Clinical Document'}
                           fileType={uploadFormat}
                           isScanning={true}
-                          title="Gemini 3 Vision · Extracting Rules & Medications"
+                          title="PropNexAI Agent Model 3 · Clinical Rules Extraction"
                           className="w-full min-h-[280px] max-h-[360px]"
                         />
                       </div>
