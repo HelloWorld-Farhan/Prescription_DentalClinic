@@ -1286,34 +1286,46 @@ export default function NewCheck() {
                   </div>
                 ) : (
                   <>
-                    {/* Camera Viewfinder: Always ready so user can easily open live camera again */}
-                    <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 p-6 flex flex-col items-center justify-center min-h-[240px]">
-                      {/* Grid crosshair viewfinder overlay */}
-                      <div className="absolute inset-4 border border-dashed border-white/20 rounded-xl pointer-events-none flex items-center justify-center">
-                        <span className="material-symbols-outlined text-white/30 text-[48px]">crop_free</span>
+                    {/* Camera Viewfinder: White background matching UI theme with dashed teal border */}
+                    <div
+                      onClick={() => setIsCameraModalOpen(true)}
+                      className="relative rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 overflow-hidden p-8 sm:p-11 border-2 border-dashed border-primary/30 bg-gradient-to-b from-surface-container-lowest via-surface-container-lowest to-surface-container-low/40 hover:border-primary hover:bg-surface-container-low/60 hover:shadow-sm cursor-pointer group"
+                    >
+                      {/* Subtle Ambient Radial Glow */}
+                      <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity" />
+
+                      {/* Viewfinder crosshair overlay guide */}
+                      <div className="absolute inset-4 border border-dashed border-primary/20 rounded-xl pointer-events-none flex items-center justify-center">
+                        <span className="material-symbols-outlined text-primary/15 text-[48px]">crop_free</span>
                       </div>
 
-                      <div className="z-10 flex flex-col items-center gap-3 text-center">
-                        <div className="w-14 h-14 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur-md">
-                          <span className="material-symbols-outlined text-[28px]">photo_camera</span>
+                      <div className="relative z-10 flex flex-col items-center gap-3">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/15 via-teal-500/15 to-primary/5 text-primary flex items-center justify-center shadow-xs border border-primary/20 group-hover:scale-105 transition-transform duration-200">
+                          <span className="material-symbols-outlined text-[32px] group-hover:-translate-y-0.5 transition-transform">
+                            photo_camera
+                          </span>
                         </div>
-                        <div className="text-white text-sm font-semibold">
-                          {capturedPhoto ? 'Scan Another Prescription Slip' : 'Hold prescription slip in front of camera'}
-                        </div>
-                        <p className="text-xs text-slate-400 max-w-sm">
-                          Use your laptop or phone front/rear camera to capture dental slips with optical clarity.
-                        </p>
 
-                        <motion.button
+                        <div className="space-y-1">
+                          <div className="text-base font-bold text-on-surface">
+                            {capturedPhoto ? 'Scan Another Prescription Slip' : 'Hold prescription slip in front of camera'}
+                          </div>
+                          <p className="text-xs text-outline max-w-md mx-auto">
+                            Use your laptop or phone front/rear camera to capture dental slips with optical clarity.
+                          </p>
+                        </div>
+
+                        <button
                           type="button"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setIsCameraModalOpen(true)}
-                          className="mt-2 px-6 py-2.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsCameraModalOpen(true);
+                          }}
+                          className="mt-2 px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-xs flex items-center gap-2 shadow-xs cursor-pointer group-hover:shadow-sm transition-all"
                         >
                           <span className="material-symbols-outlined text-[18px]">camera</span>
                           <span>{capturedPhoto ? 'Open Live Camera Again' : 'Open Live Camera & Scan Prescription'}</span>
-                        </motion.button>
+                        </button>
                       </div>
                     </div>
 

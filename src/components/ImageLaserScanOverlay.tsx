@@ -15,13 +15,13 @@ export default function ImageLaserScanOverlay({
   className = '',
 }: ImageLaserScanOverlayProps) {
   return (
-    <div className={`relative rounded-2xl overflow-hidden border border-primary/25 bg-slate-950 flex items-center justify-center max-h-[380px] ${className}`}>
+    <div className={`relative rounded-2xl overflow-hidden border border-primary/25 bg-surface-container-lowest flex items-center justify-center max-h-[380px] ${className}`}>
       {/* Image Preview */}
       <img
         src={imageUrl}
         alt="Optical Scan Preview"
         className={`w-full max-h-[380px] object-contain transition-all duration-300 ${
-          isScanning ? 'filter brightness-90 contrast-105' : ''
+          isScanning ? 'filter brightness-95 contrast-105' : ''
         }`}
       />
 
@@ -44,8 +44,8 @@ export default function ImageLaserScanOverlay({
 
           {/* Large Centered Percentage during Image Scan */}
           {progress > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
-              <span className="text-6xl sm:text-7xl font-black text-white font-mono tracking-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] select-none">
+            <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px]">
+              <span className="text-6xl sm:text-7xl font-black text-primary font-mono tracking-tight drop-shadow-md select-none">
                 {Math.round(progress)}%
               </span>
             </div>
