@@ -135,6 +135,22 @@ export default function RulesAdmin() {
     setAddModalMode('upload');
   };
 
+  // Real-time synchronization of rules and document history across tabs and components
+  useEffect(() => {
+    const handleSync = () => {
+      setRules(VirtualDb.getRules(currentUserId));
+      setDocumentHistory(getDocumentHistory(currentUserId));
+    };
+    window.addEventListener('smileclinic_rules_updated', handleSync);
+    window.addEventListener('smileclinic_documents_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('smileclinic_rules_updated', handleSync);
+      window.removeEventListener('smileclinic_documents_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [currentUserId]);
+
   // Lock body scroll and handle Escape key for active modals
   useEffect(() => {
     if (!isAddModalOpen && !inspectRule && !isCameraModalOpen && !inspectDocModal) return;

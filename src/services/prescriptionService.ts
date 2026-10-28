@@ -162,6 +162,9 @@ export class PrescriptionStorage {
     const rules = this.getRules();
     rules.unshift(...newRules);
     localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
+    }
     return rules;
   }
 
@@ -169,12 +172,18 @@ export class PrescriptionStorage {
     const rules = this.getRules();
     rules.unshift(rule);
     localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
+    }
     return rules;
   }
 
   static deleteRule(ruleId: string): InteractionRule[] {
     const rules = this.getRules().filter(r => r.id !== ruleId);
     localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
+    }
     return rules;
   }
 
@@ -188,6 +197,9 @@ export class PrescriptionStorage {
       return !match;
     });
     localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
+    }
     return rules;
   }
 
@@ -197,6 +209,9 @@ export class PrescriptionStorage {
     if (rule) {
       rule.active = !rule.active;
       localStorage.setItem(STORAGE_KEYS.RULES, JSON.stringify(rules));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
+      }
     }
     return rules;
   }

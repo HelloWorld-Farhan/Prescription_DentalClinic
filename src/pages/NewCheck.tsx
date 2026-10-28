@@ -9,7 +9,7 @@ import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
 import ImageLaserScanOverlay from '../components/ImageLaserScanOverlay';
-import { uploadToR2, updateDocumentExtractedCount, deleteDocumentRecord } from '../services/storageService';
+import { uploadToR2, deleteDocumentRecord } from '../services/storageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
 
@@ -464,8 +464,8 @@ export default function NewCheck() {
     setIsProcessingDocument(true);
     const currentUserId = storedUser?.id || 'clinician-user';
     try {
-      // 1. Upload to Cloudflare R2
-      const r2Result = await uploadToR2(file, currentUserId, prescriberDisplayName);
+      // 1. Upload prescription slip to Cloudflare R2 for check session only (saveRecord = false prevents polluting knowledge base documents)
+      const r2Result = await uploadToR2(file, currentUserId, prescriberDisplayName, undefined, false);
       setUploadedFileName(r2Result.filename);
       const sizeStr =
         file.size > 1024 * 1024
@@ -477,7 +477,6 @@ export default function NewCheck() {
         r2Result.filename.split('.').pop()?.toUpperCase() || (source === 'camera' ? 'CAMERA SCAN' : 'FILE');
 
       const { medicines: extracted, patient: extractedPatient } = await extractPrescriptionsFromDocument(file, source);
-      updateDocumentExtractedCount(r2Result.url, extracted.length);
 
       const previewUrl = localPreviewUrl || (file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
       if (source === 'camera' || previewUrl) {

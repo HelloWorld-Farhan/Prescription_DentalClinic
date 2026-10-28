@@ -23,6 +23,19 @@ export function isAvatarFile(filenameOrUrl: string = ''): boolean {
   );
 }
 
+export function isPrescriptionCheckFile(filenameOrUrl: string = ''): boolean {
+  const lower = (filenameOrUrl || '').toLowerCase();
+  return (
+    lower.includes('rx_slip') ||
+    lower.includes('prescription_') ||
+    lower.includes('prescription-') ||
+    lower.includes('camera_captured_rx') ||
+    lower.startsWith('rx-') ||
+    lower.includes('_rx_') ||
+    lower.includes('cds_report')
+  );
+}
+
 
 
 /**
@@ -85,7 +98,7 @@ export async function uploadToR2(
       if (response.ok) {
         const data = await response.json();
         const finalUrl = data.url || (r2PublicBase ? `${r2PublicBase}/${fileKey}` : '');
-        const shouldSaveRecord = saveRecord && !isAvatarFile(distinctFilename) && !isAvatarFile(file.name);
+        const shouldSaveRecord = saveRecord && !isAvatarFile(distinctFilename) && !isAvatarFile(file.name) && !isPrescriptionCheckFile(distinctFilename) && !isPrescriptionCheckFile(file.name);
         if (shouldSaveRecord) {
           saveDocumentRecord({
             id: 'doc-' + timestamp,
@@ -118,7 +131,7 @@ export async function uploadToR2(
     ? `${r2PublicBase}/${fileKey}`
     : URL.createObjectURL(file);
 
-  const shouldSaveFallback = saveRecord && !isAvatarFile(distinctFilename) && !isAvatarFile(file.name);
+  const shouldSaveFallback = saveRecord && !isAvatarFile(distinctFilename) && !isAvatarFile(file.name) && !isPrescriptionCheckFile(distinctFilename) && !isPrescriptionCheckFile(file.name);
   if (shouldSaveFallback) {
     saveDocumentRecord({
       id: 'doc-' + timestamp,
@@ -149,8 +162,13 @@ export function getDocumentHistory(userId?: string): UploadedDocumentRecord[] {
     let list: UploadedDocumentRecord[] = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
 
-    // Auto-purge any avatar records mistakenly saved in document history
-    const sanitizedList = list.filter((d) => !isAvatarFile(d.filename) && !isAvatarFile(d.storageUrl));
+    // Auto-purge any avatar records or prescription checks mistakenly saved in knowledge document history
+    const sanitizedList = list.filter((d) => 
+      !isAvatarFile(d.filename) && 
+      !isAvatarFile(d.storageUrl) &&
+      !isPrescriptionCheckFile(d.filename) &&
+      !isPrescriptionCheckFile(d.storageUrl)
+    );
     if (sanitizedList.length !== list.length) {
       localStorage.setItem(STORAGE_KEY_DOCS, JSON.stringify(sanitizedList));
       list = sanitizedList;
@@ -166,13 +184,21 @@ export function getDocumentHistory(userId?: string): UploadedDocumentRecord[] {
 }
 
 export function saveDocumentRecord(record: UploadedDocumentRecord): void {
-  if (isAvatarFile(record.filename) || isAvatarFile(record.storageUrl)) {
-    return; // Avatars are never clinical document records
+  if (
+    isAvatarFile(record.filename) ||
+    isAvatarFile(record.storageUrl) ||
+    isPrescriptionCheckFile(record.filename) ||
+    isPrescriptionCheckFile(record.storageUrl)
+  ) {
+    return; // Avatars and patient prescription checks are never clinical rule documents
   }
   try {
     const existing = getDocumentHistory();
     existing.unshift(record);
     localStorage.setItem(STORAGE_KEY_DOCS, JSON.stringify(existing.slice(0, 50)));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
+    }
   } catch {
     // ignore
   }

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName, isTodayIST, formatISTTime } from '../services/prescriptionService';
-import { SafetyCheckRecord, DrugInteractionAlert } from '../types';
+import { SafetyCheckRecord, DrugInteractionAlert, InteractionRule } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CustomDropdown from '../components/CustomDropdown';
 import AnimatedCounter from '../components/AnimatedCounter';
@@ -105,8 +105,20 @@ export default function Dashboard() {
   }, [checks]);
   const highSeverityCount = criticalAlerts.length;
 
-  // 4. Active clinical rules
-  const rulesCount = useMemo(() => VirtualDb.getRules().length, []);
+  // 4. Active clinical rules with real-time update sync
+  const [rules, setRules] = useState<InteractionRule[]>(() => VirtualDb.getRules());
+  useEffect(() => {
+    const handleRulesSync = () => {
+      setRules(VirtualDb.getRules());
+    };
+    window.addEventListener('smileclinic_rules_updated', handleRulesSync);
+    window.addEventListener('storage', handleRulesSync);
+    return () => {
+      window.removeEventListener('smileclinic_rules_updated', handleRulesSync);
+      window.removeEventListener('storage', handleRulesSync);
+    };
+  }, []);
+  const rulesCount = useMemo(() => rules.filter(r => r.active).length || rules.length, [rules]);
 
   const priorityAlerts = useMemo(() => 
     checks
