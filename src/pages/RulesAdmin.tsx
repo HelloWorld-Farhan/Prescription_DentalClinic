@@ -1520,7 +1520,7 @@ export default function RulesAdmin() {
                               isScanning={isExtracting}
                               title={
                                 isExtracting
-                                  ? 'Optical Scan & Rule Extraction in Progress...'
+                                  ? 'PropNexAI Agent Model 3 · Clinical Rules Extraction'
                                   : uploadSource === 'camera'
                                   ? 'Camera Optical Scan Ready'
                                   : 'Image Optical Scan Ready'
