@@ -358,7 +358,10 @@ export default function RulesAdmin() {
     if (!docToDelete) return;
     setIsDeletingDoc(true);
     try {
-      await deleteDocumentRecord(docToDelete.id, docToDelete.storageUrl);
+      await Promise.all([
+        deleteDocumentRecord(docToDelete.id, docToDelete.storageUrl),
+        new Promise((resolve) => setTimeout(resolve, 850))
+      ]);
       VirtualDb.deleteRulesBySource(docToDelete.filename);
       setRules(VirtualDb.getRules(currentUserId));
       setDocumentHistory(getDocumentHistory(currentUserId));
@@ -378,6 +381,8 @@ export default function RulesAdmin() {
     showConfirmation(`Rule "${ruleToDelete.drugA} + ${ruleToDelete.drugB}" permanently removed.`, 'success');
     setRuleToDelete(null);
   };
+
+  const hasActiveFilters = searchQuery.trim() !== '' || categoryFilter !== 'ALL' || statusFilter !== 'ALL';
 
   const filteredRules = rules.filter((r) => {
     const matchesCategory =
@@ -639,20 +644,23 @@ export default function RulesAdmin() {
                 type="button"
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
+                  if (!hasActiveFilters) return;
                   setSearchQuery('');
                   setCategoryFilter('ALL');
                   setStatusFilter('ALL');
                   showConfirmation('Filters cleared: Showing all rules', 'info');
                 }}
-                className={`p-2.5 h-10 rounded-xl transition-all flex items-center justify-center cursor-pointer border ${
-                  searchQuery !== '' || categoryFilter !== 'ALL' || statusFilter !== 'ALL'
+                className={`w-10 h-10 shrink-0 rounded-xl transition-all flex items-center justify-center cursor-pointer border ${
+                  hasActiveFilters
                     ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20 shadow-xs'
                     : 'bg-surface-container-low hover:bg-surface-container border-surface-container-high text-on-surface-variant hover:text-on-surface'
                 }`}
-                title={searchQuery !== '' || categoryFilter !== 'ALL' || statusFilter !== 'ALL' ? 'Reset active filters' : 'Clear filters'}
-                aria-label="Reset filters"
+                title={hasActiveFilters ? 'Reset active filters' : 'Filters clear'}
+                aria-label={hasActiveFilters ? 'Reset active filters' : 'Filter status'}
               >
-                <span className="material-symbols-outlined text-[19px]">filter_alt_off</span>
+                <span className="material-symbols-outlined text-[19px]">
+                  {hasActiveFilters ? 'filter_alt_off' : 'filter_alt'}
+                </span>
               </motion.button>
             </div>
           </div>
@@ -2054,7 +2062,11 @@ export default function RulesAdmin() {
                   >
                     {isDeletingDoc ? (
                       <>
-                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <motion.span
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 0.75, ease: 'linear' }}
+                          className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full shrink-0"
+                        />
                         <span>Vanishing...</span>
                       </>
                     ) : (
