@@ -1,4 +1,13 @@
 /**
+ * ==============================================================================
+ * Smile Clinic — Clinical Decision Support (CDS) & Evaluation Engine
+ * ==============================================================================
+ * Evaluates drug safety rules, contraindications, allergies, pregnancy, and eGFR.
+ * State is hydrated in-memory directly from Cloud Database (cloudSyncService).
+ * ZERO browser localStorage usage for clinical records.
+ * ==============================================================================
+ */
+/**
 
 
 
@@ -599,7 +608,14 @@ export const INITIAL_RULES: InteractionRule[] = [];
 
 
 
-export class PrescriptionStorage {
+/**
+ * Clinical Decision Support (CDS) & Regimen Screening Engine
+ * Evaluates prescription items against dental monograph rules, drug-drug contraindications,
+ * patient allergies, pregnancy status, and renal clearance (eGFR).
+ * Synchronized with backend Cloud SQLite DB via cloudSyncService.
+ * Zero browser localStorage usage for clinical items.
+ */
+export class ClinicalDecisionSupport {
   static setChecks(checks: SafetyCheckRecord[]) {
     _cachedChecks = (checks || []).filter(c => !isDummyCheck(c));
     if (typeof window !== 'undefined') {
@@ -1282,7 +1298,11 @@ export class PrescriptionStorage {
 
 
 
-export const VirtualDb = PrescriptionStorage;
+// Architectural Aliases for backwards compatibility
+export const CDS = ClinicalDecisionSupport;
+export const PrescriptionEngine = ClinicalDecisionSupport;
+export const PrescriptionStorage = ClinicalDecisionSupport;
+export const VirtualDb = ClinicalDecisionSupport;
 
 
 

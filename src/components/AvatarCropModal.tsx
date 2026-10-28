@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { uploadToR2, deleteFromR2, deleteDocumentRecord } from '../services/storageService';
+import { uploadToR2, deleteFromR2, deleteDocumentRecord } from '../services/r2StorageService';
 import { authApi } from '../services/authApi';
 
 interface AvatarCropModalProps {

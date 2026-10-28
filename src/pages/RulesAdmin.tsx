@@ -16,7 +16,7 @@ import {
   updateDocumentExtractedCount,
   deleteDocumentRecord,
   UploadedDocumentRecord,
-} from '../services/storageService';
+} from '../services/r2StorageService';
 import { extractPrescriptionData, extractDocumentRules } from '../services/prescriptionExtractor';
 
 interface DraftRuleItem {

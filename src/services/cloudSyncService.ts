@@ -10,7 +10,7 @@
  */
 
 import { SafetyCheckRecord, AuditLogEntry, InteractionRule, Patient } from '../types';
-import { UploadedDocumentRecord, setDocumentHistory } from './storageService';
+import { UploadedDocumentRecord, setDocumentHistory } from './r2StorageService';
 import { PrescriptionStorage, formatISTTime } from './prescriptionService';
 import { API_BASE_URL } from '../config/api';
 

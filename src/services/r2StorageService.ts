@@ -1,3 +1,12 @@
+/**
+ * ==============================================================================
+ * Smile Clinic — Cloudflare R2 Cloud Object Storage & Document Sync Service
+ * ==============================================================================
+ * Exclusively handles Cloudflare R2 object storage operations (file upload,
+ * URL resolution, and R2 purging) and in-memory document sync.
+ * Zero browser localStorage usage.
+ * ==============================================================================
+ */
 import { syncDocumentToCloud, deleteDocumentFromCloud } from './cloudSyncService';
 import { API_BASE_URL, R2_PUBLIC_URL } from '../config/api';
 

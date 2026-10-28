@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getDocumentHistory, UploadedDocumentRecord, isAvatarFile } from '../services/storageService';
+import { getDocumentHistory, UploadedDocumentRecord, isAvatarFile } from '../services/r2StorageService';
 import { VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, SafetyCheckRecord } from '../types';
 

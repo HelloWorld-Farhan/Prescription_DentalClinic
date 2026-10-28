@@ -8,7 +8,7 @@ import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import ClinicalInquiriesModal from '../components/ClinicalInquiriesModal';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
-import { uploadToR2, deleteDocumentRecord } from '../services/storageService';
+import { uploadToR2, deleteDocumentRecord } from '../services/r2StorageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
 
