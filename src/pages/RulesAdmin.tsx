@@ -1450,6 +1450,9 @@ export default function RulesAdmin() {
                           ? '.csv,.xlsx'
                           : '.docx,.doc'
                       }
+                      onClick={(e) => {
+                        (e.target as HTMLInputElement).value = '';
+                      }}
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           const file = e.target.files[0];
@@ -1460,6 +1463,7 @@ export default function RulesAdmin() {
                             setImagePreviewUrl(null);
                           }
                         }
+                        e.target.value = '';
                       }}
                     />
 
@@ -1490,7 +1494,10 @@ export default function RulesAdmin() {
                             onClick={() => {
                               if (isExtracting) return;
                               setUploadSource('file');
-                              fileInputRef.current?.click();
+                              if (fileInputRef.current) {
+                                fileInputRef.current.value = '';
+                                fileInputRef.current.click();
+                              }
                             }}
                             className="p-3 sm:p-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container transition-all text-left flex items-center gap-2.5 sm:gap-3 cursor-pointer group shadow-2xs"
                           >

@@ -474,6 +474,9 @@ export default function NewCheck() {
       showConfirmation('Document parsed locally; please verify extracted items.', 'info');
     } finally {
       setIsProcessingDocument(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -495,8 +498,11 @@ export default function NewCheck() {
   // File Input Change Handler
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleProcessIncomingFile(e.target.files[0], 'upload');
+      const selectedFile = e.target.files[0];
+      handleProcessIncomingFile(selectedFile, 'upload');
     }
+    // Always clear target value so selecting the same file repeatedly triggers onChange every time
+    e.target.value = '';
   };
 
   // --- START AUTOMATED SAFETY CHECK PIPELINE ---
@@ -1048,7 +1054,10 @@ export default function NewCheck() {
                   }}
                   onClick={() => {
                     if (isProcessingDocument) return;
-                    fileInputRef.current?.click();
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                      fileInputRef.current.click();
+                    }
                   }}
                   className={`relative rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-200 overflow-hidden ${
                     isProcessingDocument
@@ -1062,6 +1071,9 @@ export default function NewCheck() {
                     ref={fileInputRef}
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xlsx,.xls,.csv,application/pdf,image/*,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                    onClick={(e) => {
+                      (e.target as HTMLInputElement).value = '';
+                    }}
                     onChange={handleFileInputChange}
                     className="hidden"
                     disabled={isProcessingDocument}
@@ -1199,6 +1211,9 @@ export default function NewCheck() {
                           setExtractedMeta(null);
                           setExtractedMedicines([]);
                           setCapturedPhoto(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                          }
                           showConfirmation('Document deleted from secure vault and unsaved medications removed.', 'info');
                         }}
                         className="p-1.5 rounded-lg text-outline hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
