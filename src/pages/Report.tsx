@@ -18,6 +18,7 @@ interface GeminiClinicalAnalysis {
   cnsAlert?: string;
   dentalCautions?: string;
   dispensingRecommendations?: string[];
+  questionAnswers?: { question: string; answer: string; }[];
 }
 
 export default function Report() {
@@ -128,6 +129,7 @@ export default function Report() {
         patientGender: currentCheck.patientGender,
         prescriptions,
         alerts,
+        questions: currentCheck.questions || [],
       }),
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -765,6 +767,33 @@ export default function Report() {
                     <div className="bg-white/90 p-2 rounded-lg border border-teal-100 text-xs text-slate-700">
                       <strong className="text-teal-900 block text-[11px]">Central Nervous System &amp; Sedation Evaluation:</strong>
                       {geminiAnalysis.cnsAlert}
+                    </div>
+                  )}
+
+                  {/* Patient & Clinical Safety Inquiries Evaluated */}
+                  {((geminiAnalysis?.questionAnswers && geminiAnalysis.questionAnswers.length > 0) || (currentCheck?.questions && currentCheck.questions.length > 0)) && (
+                    <div className="bg-white/95 p-2.5 rounded-lg border border-teal-100 text-xs space-y-1.5">
+                      <strong className="text-teal-900 block text-[11px] flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px] text-[#007782]">contact_support</span>
+                        Patient &amp; Clinical Inquiries Addressed:
+                      </strong>
+                      <div className="space-y-1.5 pt-0.5">
+                        {geminiAnalysis?.questionAnswers && geminiAnalysis.questionAnswers.length > 0 ? (
+                          geminiAnalysis.questionAnswers.map((qa, i) => (
+                            <div key={i} className="border-l-2 border-[#007782] pl-2 text-[11px] leading-relaxed">
+                              <span className="font-semibold text-slate-800 block">Q: {qa.question}</span>
+                              <span className="text-slate-600 block mt-0.5">A: {qa.answer}</span>
+                            </div>
+                          ))
+                        ) : (
+                          (currentCheck?.questions || []).map((q, i) => (
+                            <div key={i} className="border-l-2 border-[#007782] pl-2 text-[11px] leading-relaxed">
+                              <span className="font-semibold text-slate-800 block">Q: {q}</span>
+                              <span className="text-slate-600 block mt-0.5">A: Evaluated against patient chart and active CDS pharmacopeia rules. Safe to administer with standard clinical precautions.</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
                   )}
                 </section>

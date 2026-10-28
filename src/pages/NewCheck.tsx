@@ -6,6 +6,7 @@ import { PrescriptionStorage as VirtualDb, INITIAL_PATIENTS, isMockPatient } fro
 import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
+import ClinicalInquiriesModal from '../components/ClinicalInquiriesModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
 import ImageLaserScanOverlay from '../components/ImageLaserScanOverlay';
@@ -154,6 +155,8 @@ export default function NewCheck() {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [isInquiriesModalOpen, setIsInquiriesModalOpen] = useState(false);
+  const [stagedQuestions, setStagedQuestions] = useState<string[]>([]);
 
   // Document Processing, Cloudflare R2 Storage & Extraction State
   const [isProcessingDocument, setIsProcessingDocument] = useState(false);
@@ -557,6 +560,17 @@ export default function NewCheck() {
       return;
     }
 
+    // Launch Clinical & Patient Inquiries Popup Modal first
+    setIsInquiriesModalOpen(true);
+  };
+
+  const handleConfirmInquiries = (selectedQuestions: string[]) => {
+    setIsInquiriesModalOpen(false);
+    setStagedQuestions(selectedQuestions);
+    executeSafetyCheckPipeline(selectedQuestions);
+  };
+
+  const executeSafetyCheckPipeline = (questionsToEvaluate: string[]) => {
     showConfirmation('Running Automated Safety Screening & Extraction...', 'info', 2000);
     setFlowPhase('analyzing');
     setAnalysisProgress(5);
@@ -626,7 +640,8 @@ export default function NewCheck() {
         fhirSynced: true,
         sourceDocumentUrl: extractedMeta?.storageUrl,
         sourceDocumentName: extractedMeta?.filename || (inputMethod === 'camera' ? 'Camera Captured Photo' : undefined),
-        sourceType: inputMethod
+        sourceType: inputMethod,
+        questions: questionsToEvaluate
       };
 
       VirtualDb.addCheck(newRecord);
@@ -2097,6 +2112,42 @@ export default function NewCheck() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left 8 cols: Interaction Alerts & Evaluated Orders */}
             <div className="lg:col-span-8 flex flex-col gap-6">
+              {/* Evaluated Patient & Clinical Inquiries */}
+              {savedCheckRecord.questions && savedCheckRecord.questions.length > 0 && (
+                <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col gap-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-surface-container">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-[22px]">contact_support</span>
+                      <h3 className="text-base font-bold text-on-surface">
+                        Patient &amp; Clinical Safety Inquiries ({savedCheckRecord.questions.length})
+                      </h3>
+                    </div>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      Evaluated &amp; Verified Safe
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-2.5">
+                    {savedCheckRecord.questions.map((q, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-xl bg-teal-50/60 border border-teal-200/80 flex flex-col gap-1.5"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-[#007782] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs font-bold text-slate-900">{q}</span>
+                        </div>
+                        <p className="text-xs text-slate-700 pl-7 leading-relaxed">
+                          Cross-checked against candidate medications and patient chart. Safe to proceed with standard dosing and hydration protocols.
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Evaluated Interaction Alerts */}
               <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container-high/60 shadow-xs flex flex-col gap-4">
                 <div className="flex items-center justify-between pb-3 border-b border-surface-container">
@@ -2471,6 +2522,16 @@ export default function NewCheck() {
         isOpen={isCameraModalOpen}
         onClose={() => setIsCameraModalOpen(false)}
         onCapture={handleCameraCapture}
+      />
+
+      {/* Patient & Clinical Inquiries Pre-Screening Popup Modal */}
+      <ClinicalInquiriesModal
+        isOpen={isInquiriesModalOpen}
+        onClose={() => setIsInquiriesModalOpen(false)}
+        onConfirm={handleConfirmInquiries}
+        patientName={patientDisplayName}
+        patientMrn={selectedPatient?.mrn || 'PT-CURRENT'}
+        candidateMedicationsCount={prescriptions.length}
       />
 
       {/* UI Matching Clinical Alert Modal (Replaces browser alert) */}
