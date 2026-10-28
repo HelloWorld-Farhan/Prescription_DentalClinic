@@ -26,52 +26,60 @@ export default function MinimalExtractionOverlay({
 }: MinimalExtractionOverlayProps) {
   const [progress, setProgress] = useState(1);
   const [show, setShow] = useState(false);
-  const progressRef = useRef(1);
-  const isDoneRef = useRef(false);
+  
+  // Use stable refs for callbacks to prevent re-render cancellations
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const isExtractingRef = useRef(isExtracting);
+  isExtractingRef.current = isExtracting;
+
+  const completionTriggeredRef = useRef(false);
 
   useEffect(() => {
     let animFrame: any = null;
     let startTime: number | null = null;
-    const targetDurationMs = 3600; // Complete within 3.6s for responsive feedback
+    const targetDurationMs = 3200; // Complete smoothly within 3.2s
 
     if (isExtracting) {
       setShow(true);
       setProgress(1);
-      progressRef.current = 1;
-      isDoneRef.current = false;
+      completionTriggeredRef.current = false;
+
+      const triggerFinish = () => {
+        if (completionTriggeredRef.current) return;
+        completionTriggeredRef.current = true;
+        setProgress(100);
+
+        // Guaranteed dismissal after brief visual confirmation of completion
+        setTimeout(() => {
+          setShow(false);
+          setProgress(1);
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+          }
+        }, 400);
+      };
 
       const animate = (timestamp: number) => {
         if (!startTime) startTime = timestamp;
         const elapsed = timestamp - startTime;
 
-        if (isDoneRef.current) {
-          // Accelerated finish
-          progressRef.current = 100;
-          setProgress(100);
-          setTimeout(() => {
-            setShow(false);
-            setProgress(1);
-            if (onComplete) onComplete();
-          }, 450);
+        if (!isExtractingRef.current) {
+          // Parent extraction finished early: accelerate immediately to 100%
+          triggerFinish();
           return;
         }
 
-        // Smooth cubic-out easing curve
-        const rawProgress = Math.min(1, elapsed / targetDurationMs);
-        // Easing: fast initial pickup, steady middle, smooth landing to 100%
-        const easeOut = 1 - Math.pow(1 - rawProgress, 2.5);
+        const rawRatio = Math.min(1, elapsed / targetDurationMs);
+        const easeOut = 1 - Math.pow(1 - rawRatio, 2.5);
         const currentP = Math.min(100, Math.max(1, Math.round(easeOut * 100)));
-
-        progressRef.current = currentP;
         setProgress(currentP);
 
         if (currentP >= 100) {
-          isDoneRef.current = true;
-          setTimeout(() => {
-            setShow(false);
-            setProgress(1);
-            if (onComplete) onComplete();
-          }, 450);
+          triggerFinish();
           return;
         }
 
@@ -79,17 +87,17 @@ export default function MinimalExtractionOverlay({
       };
 
       animFrame = requestAnimationFrame(animate);
-    } else if (show) {
-      // Backend resolved early: sweep quickly to 100%
-      isDoneRef.current = true;
+    } else if (show && !completionTriggeredRef.current) {
+      // Backend resolved while overlay is visible: trigger immediate smooth finish
+      completionTriggeredRef.current = true;
       setProgress(100);
-      progressRef.current = 100;
-      const t = setTimeout(() => {
+      setTimeout(() => {
         setShow(false);
         setProgress(1);
-        if (onComplete) onComplete();
-      }, 450);
-      return () => clearTimeout(t);
+        if (onCompleteRef.current) {
+          onCompleteRef.current();
+        }
+      }, 400);
     }
 
     return () => {
@@ -100,7 +108,10 @@ export default function MinimalExtractionOverlay({
   const handleDismiss = () => {
     setShow(false);
     setProgress(1);
-    if (onClose) onClose();
+    completionTriggeredRef.current = true;
+    if (onCloseRef.current) {
+      onCloseRef.current();
+    }
   };
 
   if (!show && !isExtracting) return null;

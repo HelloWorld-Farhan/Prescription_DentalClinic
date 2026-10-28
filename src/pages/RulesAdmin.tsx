@@ -305,6 +305,10 @@ export default function RulesAdmin() {
         storageUrl: '', // Staged in memory - not committed to vault yet
         format: uploadFormat.toUpperCase(),
       });
+      // Guarantee transition to preview
+      setTimeout(() => {
+        setAddModalMode('preview');
+      }, 500);
     } catch (err: any) {
       console.error('Extraction error:', err);
       showConfirmation('Failed to extract document. Please check file format.', 'error');
