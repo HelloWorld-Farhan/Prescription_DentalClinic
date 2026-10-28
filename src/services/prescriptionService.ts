@@ -35,6 +35,39 @@ export function isTodayIST(timestampOrDate?: number | string | Date): boolean {
  * Formats a timestamp into an Indian Standard Time (IST) string.
  * e.g. "06:30 PM IST" or "28 Oct, 06:30 PM IST".
  */
+export function formatISTDateTime(timestampOrDate: number | string | Date = Date.now()): { date: string; time: string; full: string } {
+  let date: Date;
+  if (typeof timestampOrDate === 'number') {
+    date = new Date(timestampOrDate);
+  } else if (typeof timestampOrDate === 'string') {
+    if (timestampOrDate.startsWith('chk-') || timestampOrDate.startsWith('aud-') || timestampOrDate.startsWith('doc-')) {
+      const num = parseInt(timestampOrDate.split('-')[1], 10);
+      date = !isNaN(num) && num > 1000000000000 ? new Date(num) : new Date(timestampOrDate);
+    } else {
+      const d = new Date(timestampOrDate);
+      date = !isNaN(d.getTime()) ? d : new Date();
+    }
+  } else {
+    date = timestampOrDate;
+  }
+
+  const dateStr = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+
+  const timeStr = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date) + ' IST';
+
+  return { date: dateStr, time: timeStr, full: `${dateStr}, ${timeStr}` };
+}
+
 export function formatISTTime(timestampOrDate: number | string | Date = Date.now(), includeDate = false): string {
   let date: Date;
   if (typeof timestampOrDate === 'number') {

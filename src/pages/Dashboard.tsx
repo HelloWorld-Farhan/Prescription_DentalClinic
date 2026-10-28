@@ -544,23 +544,22 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Table Wrapper */}
+          {/* Table Wrapper (Minimal Clean Screening Feed) */}
           <div className="overflow-x-auto w-full max-w-full">
-            <table className="w-full text-left border-collapse min-w-[720px]">
+            <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="text-outline text-xs uppercase tracking-wider border-b border-surface-container font-semibold">
-                  <th className="py-3 px-3 w-[150px] whitespace-nowrap">Check ID</th>
-                  <th className="py-3 px-3 w-[160px] whitespace-nowrap">Patient Key</th>
-                  <th className="py-3 px-3 min-w-[200px]">Prescribed Regimen</th>
-                  <th className="py-3 px-3 w-[140px] whitespace-nowrap">Highest Severity</th>
-                  <th className="py-3 px-3 w-[160px] whitespace-nowrap">Reviewer / Status</th>
-                  <th className="py-3 px-3 w-[150px] text-right whitespace-nowrap">Action</th>
+                  <th className="py-2.5 px-3 w-[140px] whitespace-nowrap">Check ID</th>
+                  <th className="py-2.5 px-3 w-[130px] whitespace-nowrap">Patient</th>
+                  <th className="py-2.5 px-3 min-w-[170px]">Regimen</th>
+                  <th className="py-2.5 px-3 w-[120px] whitespace-nowrap">Safety</th>
+                  <th className="py-2.5 px-3 w-[120px] text-right whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-container text-xs text-on-surface">
                 {filteredChecks.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-14 text-center">
+                    <td colSpan={5} className="py-14 text-center">
                       <div className="flex flex-col items-center justify-center gap-2.5 max-w-sm mx-auto">
                         <div className="w-12 h-12 rounded-2xl bg-surface-container-low text-primary flex items-center justify-center shadow-2xs">
                           <span className="material-symbols-outlined text-[26px]">fact_check</span>
@@ -586,6 +585,8 @@ export default function Dashboard() {
                     const hasContra = check.alerts.some(a => a.severity === 'contraindicated');
                     const hasMajor = check.alerts.some(a => a.severity === 'major');
                     const isSelected = selectedCheck?.id === check.id;
+                    const rxCount = check.prescriptions?.length || check.prescribedDrugs?.length || 1;
+                    const primaryDrug = check.prescriptions?.[0]?.drugName || check.prescribedDrugs?.[0] || 'Prescription Regimen';
 
                     return (
                       <tr
@@ -597,7 +598,7 @@ export default function Dashboard() {
                             : 'hover:bg-surface-container-low/60 border-l-transparent'
                         }`}
                       >
-                        <td className="py-3 px-3 whitespace-nowrap">
+                        <td className="py-2.5 px-3 whitespace-nowrap">
                           <div className="flex items-center gap-1.5 font-mono font-bold text-xs text-primary">
                             <span>{check.checkNumber}</span>
                             <button
@@ -610,82 +611,62 @@ export default function Dashboard() {
                               className="text-outline hover:text-primary transition-colors duration-150 cursor-pointer p-0.5 rounded hover:bg-primary/10"
                               title="Copy Check Number"
                             >
-                              <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                              <span className="material-symbols-outlined text-[12px]">content_copy</span>
                             </button>
                             {isSelected && (
                               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" title="Currently Selected" />
                             )}
                           </div>
-                          <span className="text-[11px] text-outline block">{check.timestamp}</span>
+                          <span className="text-[10px] text-outline block">{check.timestamp}</span>
                         </td>
 
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5 font-bold text-on-surface">
-                            <span className="material-symbols-outlined text-[15px] text-primary">shield</span>
-                            <span>{check.patientKey || check.mrn}</span>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <div className="font-bold text-xs text-on-surface">{check.patientKey || check.mrn}</div>
+                          <span className="text-[10px] text-outline block">{check.unit}</span>
+                        </td>
+
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <span className="font-semibold text-on-surface truncate max-w-[140px]" title={primaryDrug}>
+                              {primaryDrug}
+                            </span>
+                            {rxCount > 1 && (
+                              <span className="px-1.5 py-0.2 rounded-md bg-surface-container-high text-on-surface-variant text-[10px] font-bold shrink-0">
+                                +{rxCount - 1} more
+                              </span>
+                            )}
                           </div>
-                          <span className="text-[11px] text-outline block">{check.unit}</span>
                         </td>
 
-                        <td className="py-3 px-3">
-                          {check.prescriptions && check.prescriptions.length > 0 ? (
-                            <div className="flex flex-col gap-0.5 max-w-[220px]">
-                              <div className="font-semibold text-on-surface text-xs truncate">
-                                {check.prescriptions[0].drugName}
-                                {check.prescriptions[0].dosage ? ` · ${check.prescriptions[0].dosage}` : ''}
-                              </div>
-                              {check.prescriptions.length > 1 && (
-                                <div className="text-[11px] text-on-surface-variant flex items-center gap-1 truncate font-medium">
-                                  <span className="material-symbols-outlined text-[12px] text-primary">add</span>
-                                  <span>{check.prescriptions.slice(1).map(p => p.drugName).join(', ')}</span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="font-semibold text-on-surface text-xs truncate max-w-[220px]">
-                              {check.prescribedDrugs?.[0] || 'Unspecified'}
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-3 whitespace-nowrap">
+                        <td className="py-2.5 px-3 whitespace-nowrap">
                           {hasContra ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] bg-[#FFDAD6] text-[#BA1A1A] font-bold shadow-2xs whitespace-nowrap">
-                              <span className="material-symbols-outlined text-[13px]">error</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[#FFDAD6] text-[#BA1A1A] font-bold shadow-2xs whitespace-nowrap">
+                              <span className="material-symbols-outlined text-[12px]">error</span>
                               Contraindicated
                             </span>
                           ) : hasMajor ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] bg-[#FEF3C7] text-[#975A16] font-bold shadow-2xs whitespace-nowrap">
-                              <span className="material-symbols-outlined text-[13px]">warning</span>
-                              Major Alert
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[#FEF3C7] text-[#975A16] font-bold shadow-2xs whitespace-nowrap">
+                              <span className="material-symbols-outlined text-[12px]">warning</span>
+                              Major
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] bg-emerald-100 text-emerald-800 font-bold shadow-2xs whitespace-nowrap">
-                              <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                              Clear · Safe
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold shadow-2xs whitespace-nowrap">
+                              <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                              Safe
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5 font-semibold text-primary text-xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>
-                            <span className="truncate max-w-[120px]">{check.reviewerName || check.prescriberName}</span>
-                          </div>
-                          <div className="text-[11px] text-outline font-medium">{check.overallStatus}</div>
-                        </td>
-
-                        <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <motion.button
                               type="button"
                               whileTap={{ scale: 0.98 }}
                               onClick={() => navigate(`/report?id=${check.id}`)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors duration-150 text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
+                              className="px-2 py-1 rounded-lg text-secondary bg-surface-container hover:bg-surface-container-high transition-colors duration-150 text-xs font-bold border border-surface-container-high shadow-2xs cursor-pointer"
                               title="Open Clinical Decision Report PDF"
                             >
-                              <span className="material-symbols-outlined text-[14px] text-primary">description</span>
-                              <span>PDF</span>
+                              PDF
                             </motion.button>
                             <motion.button
                               type="button"

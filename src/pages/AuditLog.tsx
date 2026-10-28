@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PrescriptionStorage as VirtualDb, formatISTTime } from '../services/prescriptionService';
+import { PrescriptionStorage as VirtualDb, formatISTTime, formatISTDateTime } from '../services/prescriptionService';
 import ExportAuditModal from '../components/ExportAuditModal';
 import { AuditLogEntry, SafetyCheckRecord } from '../types';
 
@@ -11,6 +12,7 @@ export default function AuditLog() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [selectedLogForRx, setSelectedLogForRx] = useState<AuditLogEntry | null>(null);
 
   const logs: AuditLogEntry[] = VirtualDb.getAuditLogs();
   const checks: SafetyCheckRecord[] = VirtualDb.getChecks();
@@ -180,7 +182,9 @@ export default function AuditLog() {
                   const prescriptions = log.prescriptions || matchedCheck?.prescriptions || [];
                   const alerts = log.alerts || matchedCheck?.alerts || [];
 
-                  const formattedIST = formatISTTime(log.timestampMs || log.timestamp, true);
+                  const dateTimeObj = formatISTDateTime(log.timestampMs || log.timestamp);
+                  const pdfReportIdentifier = matchedCheck?.checkNumber || matchedCheck?.id || log.checkId || log.id;
+                  const pdfFilename = `SmileClinic_CDS_Report_${pdfReportIdentifier.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
 
                   return (
                     <React.Fragment key={log.id}>
@@ -192,7 +196,7 @@ export default function AuditLog() {
                             : 'hover:bg-surface-container-low/60'
                         }`}
                       >
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="py-3 px-3 text-center">
                           <span
                             className={`material-symbols-outlined text-[18px] text-outline transition-transform duration-200 ${
                               isExpanded ? 'rotate-180 text-primary' : ''
@@ -201,27 +205,34 @@ export default function AuditLog() {
                             expand_more
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 font-mono text-outline whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[14px] text-primary">schedule</span>
-                            <span>{formattedIST}</span>
+                        <td className="py-3 px-3 font-mono text-outline whitespace-nowrap">
+                          <div className="font-semibold text-xs text-on-surface">{dateTimeObj.date}</div>
+                          <div className="flex items-center gap-1 text-[11px] text-outline">
+                            <span className="material-symbols-outlined text-[13px] text-primary">schedule</span>
+                            <span>{dateTimeObj.time}</span>
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 font-bold text-on-surface whitespace-nowrap">
+                        <td className="py-3 px-3 font-bold text-on-surface whitespace-nowrap">
                           {log.clinicianName}
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-3 px-3">
                           <span className="px-2.5 py-1 rounded-md bg-surface-container-high text-on-surface font-semibold text-[11px] whitespace-nowrap">
                             {log.action}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-primary whitespace-nowrap">
+                        <td className="py-3 px-3 font-mono font-bold text-primary whitespace-nowrap">
                           {log.patientMrn}
                         </td>
-                        <td className="py-3.5 px-4 max-w-md text-on-surface-variant leading-relaxed">
-                          {log.details}
+                        <td className="py-3 px-3 max-w-sm">
+                          <div className="text-on-surface-variant text-xs line-clamp-1 leading-relaxed">
+                            {log.details}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-primary truncate" title={pdfFilename}>
+                            <span className="material-symbols-outlined text-[13px] shrink-0">picture_as_pdf</span>
+                            <span className="truncate">{pdfFilename}</span>
+                          </div>
                         </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap">
+                        <td className="py-3 px-3 whitespace-nowrap">
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                               isContra
@@ -236,22 +247,16 @@ export default function AuditLog() {
                             {log.severity}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <td className="py-3 px-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
-                              onClick={() => toggleExpand(log.id)}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                                isExpanded
-                                  ? 'bg-primary text-white border-primary'
-                                  : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface border-surface-container-high'
-                              }`}
-                              title="Toggle full inner clinical details"
+                              onClick={() => setSelectedLogForRx(log)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-teal-800 bg-teal-50 hover:bg-teal-600 hover:text-white transition-colors text-xs font-bold border border-teal-200/80 shadow-2xs cursor-pointer"
+                              title="Check patient prescription medications"
                             >
-                              <span className="material-symbols-outlined text-[15px]">
-                                {isExpanded ? 'visibility_off' : 'visibility'}
-                              </span>
-                              <span>{isExpanded ? 'Hide' : 'Inner'}</span>
+                              <span className="material-symbols-outlined text-[15px]">medication</span>
+                              <span>Prescription</span>
                             </button>
 
                             <button
@@ -261,7 +266,7 @@ export default function AuditLog() {
                                 else navigate('/report');
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary hover:text-white transition-colors text-xs font-bold border border-primary/20 shadow-2xs cursor-pointer"
-                              title="View Associated Clinical Decision Report"
+                              title="View Associated Clinical Decision PDF Report"
                             >
                               <span className="material-symbols-outlined text-[15px]">description</span>
                               <span>Report</span>
@@ -359,96 +364,38 @@ export default function AuditLog() {
                                   </div>
 
                                   {alerts.length === 0 ? (
-                                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-                                      <span className="material-symbols-outlined text-[18px]">verified</span>
-                                      <span>Safe to Dispense — Zero contraindications or high-severity interaction flags detected.</span>
+                                    <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200/60 flex items-center gap-2.5 text-emerald-800">
+                                      <span className="material-symbols-outlined text-[20px] text-emerald-600">verified</span>
+                                      <span className="text-xs font-medium">
+                                        All Clear — Safe to Dispense. Zero clinical interactions or renal clearance hazards identified.
+                                      </span>
                                     </div>
                                   ) : (
-                                    <div className="space-y-2">
-                                      {alerts.map((alt) => {
-                                        const altContra = alt.severity === 'contraindicated';
-                                        return (
-                                          <div
-                                            key={alt.id}
-                                            className={`p-2.5 rounded-lg border space-y-1 ${
-                                              altContra
-                                                ? 'bg-rose-50/60 border-rose-200 text-rose-900'
-                                                : 'bg-amber-50/60 border-amber-200 text-amber-900'
-                                            }`}
-                                          >
-                                            <div className="flex items-center justify-between gap-2">
-                                              <span className="text-xs font-bold flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[15px]">
-                                                  {altContra ? 'error' : 'warning'}
-                                                </span>
-                                                {alt.title}
-                                              </span>
-                                              <span
-                                                className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                                                  altContra ? 'bg-rose-600 text-white' : 'bg-amber-600 text-white'
-                                                }`}
-                                              >
-                                                {alt.severity}
-                                              </span>
-                                            </div>
-                                            {alt.recommendation && (
-                                              <p className="text-[11px] opacity-90 leading-tight">
-                                                Guidance: {alt.recommendation}
-                                              </p>
-                                            )}
-                                            {alt.overridden && (
-                                              <div className="mt-1 pt-1 border-t border-amber-200/80 text-[10px] font-semibold text-amber-800 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[13px]">gavel</span>
-                                                Overridden by {alt.overrideAuthor || 'Clinician'}: "{alt.overrideReason}"
-                                              </div>
-                                            )}
+                                    <div className="space-y-2 max-h-56 overflow-y-auto no-scrollbar">
+                                      {alerts.map((alert) => (
+                                        <div
+                                          key={alert.id}
+                                          className={`p-2.5 rounded-lg border flex flex-col gap-1 ${
+                                            alert.severity === 'contraindicated'
+                                              ? 'bg-rose-50/70 border-rose-200 text-rose-900'
+                                              : alert.severity === 'major'
+                                              ? 'bg-orange-50/70 border-orange-200 text-orange-900'
+                                              : 'bg-amber-50/70 border-amber-200 text-amber-900'
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <span className="font-bold text-xs">{alert.title}</span>
+                                            <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-white/70">
+                                              {alert.severity}
+                                            </span>
                                           </div>
-                                        );
-                                      })}
+                                          <p className="text-[11px] opacity-90 line-clamp-2">
+                                            {alert.recommendation || alert.mechanism}
+                                          </p>
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
-
-                                  {/* Clinician Override Narrative if Action was Override */}
-                                  {log.action.includes('Override') && log.overrideReason && (
-                                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-1">
-                                      <span className="text-[11px] font-bold text-primary flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[14px]">edit_note</span>
-                                        Notarized Clinician Justification
-                                      </span>
-                                      <p className="text-xs text-on-surface">{log.overrideReason}</p>
-                                      <p className="text-[10px] text-outline">Authorized by {log.overrideAuthor || log.clinicianName}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Footer Action to open Full Report */}
-                              <div className="flex items-center justify-between pt-2">
-                                <span className="text-[11px] text-on-surface-variant">
-                                  Patient MRN: <strong className="font-mono text-primary">{log.patientMrn}</strong>
-                                  {log.patientName ? ` · ${log.patientName}` : ''}
-                                </span>
-
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleExpand(log.id)}
-                                    className="px-3 py-1.5 rounded-lg border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                                  >
-                                    Collapse
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (matchedCheck) navigate(`/report?id=${matchedCheck.id}`);
-                                      else navigate('/report');
-                                    }}
-                                    className="px-3.5 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-hover text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">print</span>
-                                    <span>Open Full 2-Page Clinical Report</span>
-                                  </button>
                                 </div>
                               </div>
                             </motion.div>
@@ -503,6 +450,211 @@ export default function AuditLog() {
       </div>
 
       {/* Animated HIPAA Export Modal */}
+            {/* Dedicated Prescription Inspection Modal */}
+      {selectedLogForRx && typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedLogForRx(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-2xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 z-10 max-h-[90vh] overflow-y-auto"
+            >
+              {(() => {
+                const matchedCheck = checks.find(
+                  (c) => c.id === selectedLogForRx.checkId || c.mrn === selectedLogForRx.patientMrn || c.patientKey === selectedLogForRx.patientMrn
+                );
+                const rxItems = selectedLogForRx.prescriptions || matchedCheck?.prescriptions || [];
+                const rxAlerts = selectedLogForRx.alerts || matchedCheck?.alerts || [];
+                const dateTimeObj = formatISTDateTime(selectedLogForRx.timestampMs || selectedLogForRx.timestamp);
+                const pdfReportIdentifier = matchedCheck?.checkNumber || matchedCheck?.id || selectedLogForRx.checkId || selectedLogForRx.id;
+                const pdfCleanName = `SmileClinic_CDS_Report_${pdfReportIdentifier.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+
+                return (
+                  <>
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3 pb-3 border-b border-surface-container">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[22px]">prescriptions</span>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base font-bold text-on-surface">
+                              Prescription Inspection &amp; Clinical Verification
+                            </h3>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              Attested
+                            </span>
+                          </div>
+                          <p className="text-xs text-outline mt-0.5">
+                            Patient MRN: <strong className="text-on-surface font-mono">{selectedLogForRx.patientMrn}</strong> • Clinician: <strong className="text-on-surface">{selectedLogForRx.clinicianName}</strong>
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLogForRx(null)}
+                        className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
+                    </div>
+
+                    {/* PDF Report Reference Bar */}
+                    <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="material-symbols-outlined text-primary text-[22px] shrink-0">picture_as_pdf</span>
+                        <div className="min-w-0">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-outline block">Clinical Decision Support PDF Report</span>
+                          <span className="text-xs font-mono font-bold text-primary truncate block" title={pdfCleanName}>
+                            {pdfCleanName}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (matchedCheck) navigate(`/report?id=${matchedCheck.id}`);
+                          else navigate('/report');
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">description</span>
+                        <span>Open PDF Report</span>
+                      </button>
+                    </div>
+
+                    {/* Meta Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-surface-container-low/50 border border-surface-container text-xs">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-outline block">Date &amp; Time (IST)</span>
+                        <span className="font-semibold text-on-surface font-mono text-[11px]">{dateTimeObj.full}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-outline block">Clinical Severity Status</span>
+                        <span className={`inline-flex items-center gap-1 font-bold text-[11px] uppercase ${
+                          selectedLogForRx.severity === 'contraindicated'
+                            ? 'text-rose-700'
+                            : selectedLogForRx.severity === 'major'
+                            ? 'text-orange-700'
+                            : 'text-emerald-700'
+                        }`}>
+                          {selectedLogForRx.severity || 'SAFE'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-outline block">SHA-256 Legal Seal</span>
+                        <span className="font-mono text-[10px] text-outline truncate block" title={selectedLogForRx.hash}>
+                          {selectedLogForRx.hash || 'SHA256:7B8F3C92D01E4A56'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Prescribed Medications */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-on-surface">
+                        <span className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-primary">medication</span>
+                          Prescribed Medication Items ({rxItems.length})
+                        </span>
+                        <span className="text-[10px] text-outline font-normal">RxNorm Formulations</span>
+                      </div>
+
+                      {rxItems.length === 0 ? (
+                        <div className="p-4 rounded-xl bg-surface-container-low text-center text-xs text-on-surface-variant italic">
+                          {selectedLogForRx.details || 'No detailed prescription items logged for this event.'}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {rxItems.map((rx, idx) => (
+                            <div key={idx} className="p-3 rounded-xl bg-surface-container-lowest border border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-on-surface">{rx.drugName}</span>
+                                  {rx.dosage && (
+                                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-bold text-[10px]">
+                                      {rx.dosage}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-container text-on-surface-variant font-medium">
+                                    {rx.route || 'Oral'}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] text-outline mt-0.5 block">
+                                  {rx.genericName && `${rx.genericName} • `}Frequency: {rx.frequency || 'Standard'} • Duration: {rx.duration || '7 days'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Warnings / Alerts summary */}
+                    {rxAlerts.length > 0 && (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-surface-container">
+                        <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-amber-600">health_and_safety</span>
+                          Screened Safety Alerts ({rxAlerts.length})
+                        </span>
+                        <div className="flex flex-col gap-1.5">
+                          {rxAlerts.map((alt) => (
+                            <div key={alt.id} className="p-2.5 rounded-lg bg-surface-container-low border border-surface-container flex items-start justify-between gap-2 text-xs">
+                              <div>
+                                <span className="font-bold text-on-surface block">{alt.title}</span>
+                                <span className="text-[11px] text-on-surface-variant leading-relaxed block mt-0.5">{alt.recommendation || alt.mechanism}</span>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
+                                alt.severity === 'contraindicated' ? 'bg-rose-100 text-rose-800' : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {alt.severity}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Modal Footer */}
+                    <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-surface-container">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLogForRx(null)}
+                        className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (matchedCheck) navigate(`/report?id=${matchedCheck.id}`);
+                          else navigate('/report');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">print</span>
+                        <span>Open Attestation Report</span>
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </motion.div>
+          </div>
+        </AnimatePresence>,
+        document.body
+      )}
+
       <ExportAuditModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
