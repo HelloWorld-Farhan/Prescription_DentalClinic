@@ -366,6 +366,32 @@ export default function NewCheck() {
     setPrescriptions((prev) => [...prev, newItem]);
   };
 
+  const isPenicillinSensitive = useMemo(() => {
+    return parsedAllergies.some((a) => {
+      const l = a.toLowerCase();
+      return l.includes('penicillin') || l.includes('amoxicillin') || l.includes('ampicillin');
+    });
+  }, [parsedAllergies]);
+
+  const contextualPresets = useMemo(() => {
+    if (isPenicillinSensitive) {
+      return [
+        { drug: 'Clindamycin 300mg', generic: 'Clindamycin Hydrochloride', dose: '300mg QID', freq: 'Every 6 hours (QID)', ind: 'Penicillin-Safe Prophylaxis', recommended: true },
+        { drug: 'Azithromycin 500mg', generic: 'Azithromycin', dose: '500mg OD', freq: 'Once daily (OD)', ind: 'Macrolide Alternative (Safe for Penicillin Allergy)', recommended: true },
+        { drug: 'Ibuprofen 400mg', generic: 'Ibuprofen', dose: '400mg PRN', freq: 'Every 6-8 hours PRN', ind: 'Post-Surgical Pain & Inflammation', recommended: false },
+        { drug: 'Metronidazole 400mg', generic: 'Metronidazole', dose: '400mg TID', freq: 'Every 8 hours (TID)', ind: 'Anaerobic Odontogenic Infection', recommended: false },
+        { drug: 'Paracetamol 650mg', generic: 'Acetaminophen', dose: '650mg QID', freq: 'Every 6 hours PRN', ind: 'Mild-Moderate Post-Op Analgesia', recommended: false }
+      ];
+    }
+    return [
+      { drug: 'Amoxicillin 500mg', generic: 'Amoxicillin Trihydrate', dose: '500mg TID', freq: 'Every 8 hours (TID)', ind: 'First-Line Odontogenic Infection', recommended: true },
+      { drug: 'Augmentin 625mg', generic: 'Amoxicillin + Clavulanic Acid', dose: '625mg BID', freq: 'Every 12 hours (BID)', ind: 'Refractory Dental Infection', recommended: true },
+      { drug: 'Ibuprofen 400mg', generic: 'Ibuprofen', dose: '400mg PRN', freq: 'Every 6-8 hours PRN', ind: 'Post-Surgical Pain & Inflammation', recommended: false },
+      { drug: 'Clindamycin 300mg', generic: 'Clindamycin Hydrochloride', dose: '300mg QID', freq: 'Every 6 hours (QID)', ind: 'Penicillin-Allergic Alternative', recommended: false },
+      { drug: 'Metronidazole 400mg', generic: 'Metronidazole', dose: '400mg TID', freq: 'Every 8 hours (TID)', ind: 'Acute Necrotizing Ulcerative Gingivitis', recommended: false }
+    ];
+  }, [isPenicillinSensitive]);
+
   // Extract medicines and clinical entities from uploaded document or camera photo
   const extractPrescriptionsFromDocument = async (
     file: File,
@@ -873,7 +899,7 @@ export default function NewCheck() {
                     </span>
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
                       <span className="material-symbols-outlined text-[13px] text-blue-600">psychology</span>
-                      <span>Gemini 1.5 Pro Vision</span>
+                      <span>Gemini 3 Flash Vision</span>
                     </span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                       <span className="material-symbols-outlined text-[12px] text-emerald-600">verified</span>
@@ -882,7 +908,7 @@ export default function NewCheck() {
                   </div>
                 </div>
                 <p className="text-xs sm:text-sm text-outline max-w-3xl leading-relaxed">
-                  Submit prescription slip via image upload, camera photo capture, or manual medication entry. Powered by <strong>Gemini 1.5 Pro</strong> multimodal clinical vision to extract handwritten scripts, normalize dosages, and screen polypharmacy hazard risks against active medical records.
+                  Submit prescription slip via image upload, camera photo capture, or manual medication entry. Powered by <strong>Gemini 3 Flash Vision</strong> multimodal clinical engine to extract handwritten scripts, normalize dosages, and screen polypharmacy hazard risks against active medical records.
                 </p>
               </div>
 
@@ -931,7 +957,7 @@ export default function NewCheck() {
                           <span>Multimodal Vision OCR</span>
                         </div>
                         <p className="text-[11px] text-outline leading-relaxed">
-                          Gemini 1.5 Pro parses handwritten dental scripts, ink stamps, hospital headers, and multi-page PDF e-prescriptions with high spatial confidence.
+                          Gemini 3 Flash Vision parses handwritten dental scripts, ink stamps, hospital headers, and multi-page PDF e-prescriptions with high spatial confidence and 14-key failover redundancy.
                         </p>
                       </div>
 
@@ -1488,13 +1514,7 @@ export default function NewCheck() {
                 <span className="text-[10px] text-outline hidden sm:inline">Tap any chip to queue instantly</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {[
-                  { drug: 'Amoxicillin 500mg', generic: 'Amoxicillin Trihydrate', dose: '500mg TID', freq: 'Every 8 hours (TID)', ind: 'Dental Abscess / Prophylaxis' },
-                  { drug: 'Augmentin 625mg', generic: 'Amoxicillin + Clavulanic Acid', dose: '625mg BID', freq: 'Every 12 hours (BID)', ind: 'Refractory Odontogenic Infection' },
-                  { drug: 'Ibuprofen 400mg', generic: 'Ibuprofen', dose: '400mg PRN', freq: 'Every 6-8 hours PRN', ind: 'Post-Surgical Pain & Inflammation' },
-                  { drug: 'Clindamycin 300mg', generic: 'Clindamycin Hydrochloride', dose: '300mg QID', freq: 'Every 6 hours (QID)', ind: 'Penicillin-Allergic Dental Prophylaxis' },
-                  { drug: 'Metronidazole 400mg', generic: 'Metronidazole', dose: '400mg TID', freq: 'Every 8 hours (TID)', ind: 'Acute Necrotizing Ulcerative Gingivitis' }
-                ].map((preset, idx) => (
+                {contextualPresets.map((preset, idx) => (
                   <button
                     key={idx}
                     type="button"
