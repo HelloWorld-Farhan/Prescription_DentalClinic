@@ -7,6 +7,7 @@ import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } fr
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
+import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
 import { uploadToR2, updateDocumentExtractedCount, deleteDocumentRecord } from '../services/storageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
@@ -1059,9 +1060,9 @@ export default function NewCheck() {
                       fileInputRef.current.click();
                     }
                   }}
-                  className={`relative rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-200 overflow-hidden ${
+                  className={`relative rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 overflow-hidden ${
                     isProcessingDocument
-                      ? 'border border-primary/25 bg-white shadow-sm min-h-[340px] cursor-default p-0'
+                      ? 'p-8 sm:p-11 border-2 border-primary/40 bg-surface-container-lowest shadow-xs cursor-wait'
                       : isDragOver
                       ? 'p-8 sm:p-11 border-2 border-dashed border-primary bg-primary/10 shadow-lg scale-[1.005] cursor-pointer group'
                       : 'p-8 sm:p-11 border-2 border-dashed border-primary/30 bg-gradient-to-b from-surface-container-lowest via-surface-container-lowest to-surface-container-low/40 hover:border-primary hover:bg-surface-container-low/60 hover:shadow-sm cursor-pointer group'
@@ -1079,80 +1080,65 @@ export default function NewCheck() {
                     disabled={isProcessingDocument}
                   />
 
-                  {/* Processing / Extracting Scanner Overlay: Fills 100% of the container edge-to-edge */}
-                  {isProcessingDocument ? (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full h-full min-h-[340px] flex flex-col"
-                    >
-                      <OpticalScanOverlay
-                        imageUrl={capturedPhoto}
-                        fileName={uploadedFileName || 'Prescription Document'}
-                        fileType={
-                          uploadedFileName?.toLowerCase().endsWith('.pdf')
-                            ? 'pdf'
-                            : uploadedFileName?.toLowerCase().endsWith('.docx') ||
-                              uploadedFileName?.toLowerCase().endsWith('.doc')
-                            ? 'word'
-                            : uploadedFileName?.toLowerCase().endsWith('.csv') ||
-                              uploadedFileName?.toLowerCase().endsWith('.xlsx')
-                            ? 'csv'
-                            : 'image'
-                        }
-                        isScanning={true}
-                        title="PropNexAI Agent Model 3 · Clinical Vision OCR"
-                        className="w-full h-full border-0 rounded-2xl shadow-none"
-                      />
+                  {/* Dropzone Content - Blurs gracefully during extraction without unmounting */}
+                  <div
+                    className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 w-full ${
+                      isProcessingDocument
+                        ? 'filter blur-[5px] opacity-40 pointer-events-none select-none scale-[0.99]'
+                        : ''
+                    }`}
+                  >
+                    {/* Ambient Background Radial Glow */}
+                    <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity" />
+
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/15 via-teal-500/15 to-primary/5 text-primary flex items-center justify-center shadow-xs border border-primary/20 group-hover:scale-105 transition-transform duration-200">
+                      <span className="material-symbols-outlined text-[32px] group-hover:-translate-y-0.5 transition-transform">
+                        upload_file
+                      </span>
                     </div>
-                  ) : (
-                    <>
-                      {/* Ambient Background Radial Glow */}
-                      <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity" />
 
-                      <div className="relative z-10 flex flex-col items-center gap-3">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/15 via-teal-500/15 to-primary/5 text-primary flex items-center justify-center shadow-xs border border-primary/20 group-hover:scale-105 transition-transform duration-200">
-                          <span className="material-symbols-outlined text-[32px] group-hover:-translate-y-0.5 transition-transform">
-                            upload_file
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="text-base font-bold text-on-surface flex items-center justify-center gap-1.5 flex-wrap">
-                            <span>Drop prescription scan, PDF, Word, or Excel file here or</span>
-                            <span className="text-primary underline decoration-primary/40 underline-offset-4 font-extrabold">browse files</span>
-                          </div>
-                          <p className="text-xs text-outline max-w-md mx-auto">
-                            Supports PDF digital slips, Word (.docx), Excel (.xlsx/.csv), and High-Res Images up to 25MB
-                          </p>
-                        </div>
-
-                        {/* Supported Format Pills */}
-                        <div className="flex items-center gap-2 flex-wrap justify-center pt-1">
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-rose-600">picture_as_pdf</span>
-                            <span>PDF (Multi-Page)</span>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-blue-600">image</span>
-                            <span>PNG / JPG / WEBP</span>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-indigo-600">description</span>
-                            <span>Word (.docx / .doc)</span>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-emerald-600">table_chart</span>
-                            <span>Excel / CSV (.xlsx)</span>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px] text-emerald-600">cloud_done</span>
-                            <span>Securely Stored in Vault</span>
-                          </span>
-                        </div>
+                    <div className="space-y-1">
+                      <div className="text-base font-bold text-on-surface flex items-center justify-center gap-1.5 flex-wrap">
+                        <span>Drop prescription scan, PDF, Word, or Excel file here or</span>
+                        <span className="text-primary underline decoration-primary/40 underline-offset-4 font-extrabold">browse files</span>
                       </div>
-                    </>
-                  )}
+                      <p className="text-xs text-outline max-w-md mx-auto">
+                        Supports PDF digital slips, Word (.docx), Excel (.xlsx/.csv), and High-Res Images up to 25MB
+                      </p>
+                    </div>
+
+                    {/* Supported Format Pills */}
+                    <div className="flex items-center gap-2 flex-wrap justify-center pt-1">
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-rose-600">picture_as_pdf</span>
+                        <span>PDF (Multi-Page)</span>
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-blue-600">image</span>
+                        <span>PNG / JPG / WEBP</span>
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-indigo-600">description</span>
+                        <span>Word (.docx / .doc)</span>
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-surface-container-low text-on-surface-variant border border-surface-container-high flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-emerald-600">table_chart</span>
+                        <span>Excel / CSV (.xlsx)</span>
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-emerald-600">cloud_done</span>
+                        <span>Securely Stored in Vault</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Minimal Real-Time Percentage Overlay Floating Over Blurred Dropzone */}
+                  <MinimalExtractionOverlay
+                    isExtracting={isProcessingDocument}
+                    fileName={uploadedFileName}
+                  />
                 </div>
+
                 {/* Attached Document Card with Real-time OCR Readiness */}
                 {uploadedFileName && (
                   <motion.div

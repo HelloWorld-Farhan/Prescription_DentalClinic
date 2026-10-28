@@ -8,6 +8,7 @@ import { showConfirmation } from '../services/confirmation';
 import CustomDropdown from '../components/CustomDropdown';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
+import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
 import {
   uploadToR2,
   getDocumentHistory,
@@ -294,8 +295,8 @@ export default function RulesAdmin() {
         format: uploadFormat.toUpperCase(),
       });
 
-      // Switch to preview step
-      setAddModalMode('preview');
+      // Staged in memory - MinimalExtractionOverlay onComplete transitions to preview smoothly
+      // setAddModalMode('preview') handled upon 100% completion
     } catch (err: any) {
       console.error('Extraction error:', err);
       showConfirmation('Failed to extract document. Please check file format.', 'error');
@@ -1385,215 +1386,208 @@ export default function RulesAdmin() {
 
                 {/* STEP 2A: Upload Document */}
                 {addModalMode === 'upload' && (
-                  <div className="space-y-4">
-                    {isExtracting ? (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full rounded-2xl overflow-hidden my-1 border border-primary/25 shadow-xs"
-                      >
-                        <OpticalScanOverlay
-                          imageUrl={imagePreviewUrl}
-                          fileName={uploadedFile?.name || 'Prescription / Clinical Document'}
-                          fileType={uploadFormat}
-                          isScanning={true}
-                          title="PropNexAI Agent Model 3 · Clinical Rules Extraction"
-                          className="w-full min-h-[340px] border-0 rounded-2xl shadow-none"
-                        />
+                  <div className="relative space-y-4 rounded-2xl overflow-hidden min-h-[320px]">
+                    {/* Content that blurs gracefully during extraction without unmounting */}
+                    <div
+                      className={`space-y-4 transition-all duration-300 ${
+                        isExtracting
+                          ? 'filter blur-[5px] opacity-40 pointer-events-none select-none scale-[0.99]'
+                          : ''
+                      }`}
+                    >
+                      {/* Format Tabs */}
+                      <div>
+                        <label className="block text-xs font-bold text-on-surface mb-2">
+                          1. Select Document Format to Upload
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {[
+                            { id: 'image', label: 'Image Scan', exts: '.png, .jpg, .jpeg', icon: 'image' },
+                            { id: 'pdf', label: 'PDF Document', exts: '.pdf', icon: 'picture_as_pdf' },
+                            { id: 'csv', label: 'CSV / Excel', exts: '.csv, .xlsx', icon: 'table_chart' },
+                            { id: 'word', label: 'Word Document', exts: '.docx, .doc', icon: 'description' },
+                          ].map((fmt) => (
+                            <button
+                              key={fmt.id}
+                              type="button"
+                              onClick={() => {
+                                setUploadFormat(fmt.id as any);
+                                setUploadedFile(null);
+                              }}
+                              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                                uploadFormat === fmt.id
+                                  ? 'bg-primary/10 border-primary text-primary font-bold shadow-xs'
+                                  : 'bg-surface-container-low border-surface-container-high text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[20px]">{fmt.icon}</span>
+                              <span className="text-xs">{fmt.label}</span>
+                              <span className="text-[10px] text-outline font-normal">{fmt.exts}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    ) : (
-                      <>
-                        {/* Format Tabs */}
-                    <div>
-                      <label className="block text-xs font-bold text-on-surface mb-2">
-                        1. Select Document Format to Upload
-                      </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {[
-                          { id: 'image', label: 'Image Scan', exts: '.png, .jpg, .jpeg', icon: 'image' },
-                          { id: 'pdf', label: 'PDF Document', exts: '.pdf', icon: 'picture_as_pdf' },
-                          { id: 'csv', label: 'CSV / Excel', exts: '.csv, .xlsx', icon: 'table_chart' },
-                          { id: 'word', label: 'Word Document', exts: '.docx, .doc', icon: 'description' },
-                        ].map((fmt) => (
-                          <button
-                            key={fmt.id}
-                            type="button"
-                            onClick={() => {
-                              setUploadFormat(fmt.id as any);
-                              setUploadedFile(null);
-                            }}
-                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
-                              uploadFormat === fmt.id
-                                ? 'bg-primary/10 border-primary text-primary font-bold shadow-xs'
-                                : 'bg-surface-container-low border-surface-container-high text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-[20px]">{fmt.icon}</span>
-                            <span className="text-xs">{fmt.label}</span>
-                            <span className="text-[10px] text-outline font-normal">{fmt.exts}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
 
-                    {/* Hidden Native File Input */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      disabled={isExtracting}
-                      accept={
-                        uploadFormat === 'image'
-                          ? '.png,.jpg,.jpeg'
-                          : uploadFormat === 'pdf'
-                          ? '.pdf'
-                          : uploadFormat === 'csv'
-                          ? '.csv,.xlsx'
-                          : '.docx,.doc'
-                      }
-                      onClick={(e) => {
-                        (e.target as HTMLInputElement).value = '';
-                      }}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          const file = e.target.files[0];
-                          setUploadedFile(file);
-                          if (uploadFormat === 'image' || file.type.startsWith('image/')) {
-                            setImagePreviewUrl(URL.createObjectURL(file));
-                          } else {
-                            setImagePreviewUrl(null);
-                          }
+                      {/* Hidden Native File Input */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        disabled={isExtracting}
+                        accept={
+                          uploadFormat === 'image'
+                            ? '.png,.jpg,.jpeg'
+                            : uploadFormat === 'pdf'
+                            ? '.pdf'
+                            : uploadFormat === 'csv'
+                            ? '.csv,.xlsx'
+                            : '.docx,.doc'
                         }
-                        e.target.value = '';
-                      }}
-                    />
+                        onClick={(e) => {
+                          (e.target as HTMLInputElement).value = '';
+                        }}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            setUploadedFile(file);
+                            if (uploadFormat === 'image' || file.type.startsWith('image/')) {
+                              setImagePreviewUrl(URL.createObjectURL(file));
+                            } else {
+                              setImagePreviewUrl(null);
+                            }
+                          }
+                          e.target.value = '';
+                        }}
+                      />
 
-                    {/* Dropzone & Live Camera Area */}
-                    <div>
-                      <label className="block text-xs font-bold text-on-surface mb-1.5">
-                        2. Choose or Capture Document
-                      </label>
+                      {/* Dropzone & Live Camera Area */}
+                      <div>
+                        <label className="block text-xs font-bold text-on-surface mb-1.5">
+                          2. Choose or Capture Document
+                        </label>
 
-                      {uploadFormat === 'image' && !uploadedFile && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 mb-2.5">
-                          <button
-                            type="button"
-                            onClick={() => setIsCameraModalOpen(true)}
-                            className="p-3 sm:p-3.5 rounded-xl border-2 border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all text-left flex items-center gap-2.5 sm:gap-3 cursor-pointer group shadow-2xs"
-                          >
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
-                              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">photo_camera</span>
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-xs font-bold text-primary block group-hover:underline truncate">Open Live Camera</span>
-                              <span className="text-[10px] text-on-surface-variant truncate block">Phone &amp; laptop front/back scanner</span>
-                            </div>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isExtracting) return;
-                              setUploadSource('file');
-                              if (fileInputRef.current) {
-                                fileInputRef.current.value = '';
-                                fileInputRef.current.click();
-                              }
-                            }}
-                            className="p-3 sm:p-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container transition-all text-left flex items-center gap-2.5 sm:gap-3 cursor-pointer group shadow-2xs"
-                          >
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-surface-container-high text-on-surface flex items-center justify-center shrink-0">
-                              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">folder_open</span>
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-xs font-bold text-on-surface block group-hover:underline truncate">Browse Image File</span>
-                              <span className="text-[10px] text-outline truncate block">PNG, JPG, JPEG, WEBP</span>
-                            </div>
-                          </button>
-                        </div>
-                      )}
-
-                      {!uploadedFile ? (
-                        <div
-                          onClick={() => {
-                            if (isExtracting) return;
-                            setUploadSource('file');
-                            fileInputRef.current?.click();
-                          }}
-                          className="border-2 border-dashed border-surface-container-high hover:border-primary rounded-2xl p-4 sm:p-6 text-center cursor-pointer bg-surface-container-low/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2"
-                        >
-                          <div className="w-12 h-12 rounded-xl bg-surface-container text-primary flex items-center justify-center">
-                            <span className="material-symbols-outlined text-[26px]">cloud_upload</span>
-                          </div>
-                          <div>
-                            <span className="text-xs font-bold text-on-surface">Click to browse or drag file here</span>
-                            <p className="text-[11px] text-outline mt-0.5">
-                              Accepts {uploadFormat.toUpperCase()} ({
-                                uploadFormat === 'image'
-                                  ? '.png, .jpg, .jpeg'
-                                  : uploadFormat === 'pdf'
-                                  ? '.pdf'
-                                  : uploadFormat === 'csv'
-                                  ? '.csv, .xlsx'
-                                  : '.docx, .doc'
-                              })
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {imagePreviewUrl && (
-                            <OpticalScanOverlay
-                              imageUrl={imagePreviewUrl}
-                              isScanning={isExtracting}
-                              title={
-                                isExtracting
-                                  ? 'PropNexAI Agent Model 3 · Clinical Rules Extraction'
-                                  : uploadSource === 'camera'
-                                  ? 'Camera Optical Scan Ready'
-                                  : 'Image Optical Scan Ready'
-                              }
-                              className="max-h-[300px]"
-                            />
-                          )}
-
-                          <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-[20px]">
-                                  {uploadSource === 'camera' ? 'photo_camera' : uploadFormat === 'image' ? 'image' : uploadFormat === 'pdf' ? 'picture_as_pdf' : uploadFormat === 'csv' ? 'table_chart' : 'description'}
-                                </span>
+                        {uploadFormat === 'image' && !uploadedFile && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 mb-2.5">
+                            <button
+                              type="button"
+                              onClick={() => setIsCameraModalOpen(true)}
+                              className="p-3 sm:p-3.5 rounded-xl border-2 border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all text-left flex items-center gap-2.5 sm:gap-3 cursor-pointer group shadow-2xs"
+                            >
+                              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[18px] sm:text-[20px]">photo_camera</span>
                               </div>
                               <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-bold text-on-surface truncate block">
-                                    {uploadedFile.name}
-                                  </span>
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary shrink-0">
-                                    {uploadSource === 'camera' ? 'Camera Scan' : 'Uploaded File'}
-                                  </span>
-                                </div>
-                                <span className="text-[11px] text-outline">
-                                  {(uploadedFile.size / 1024).toFixed(1)} KB · Ready to save to secure vault &amp; parse
-                                </span>
+                                <span className="text-xs font-bold text-primary block group-hover:underline truncate">Open Live Camera</span>
+                                <span className="text-[10px] text-on-surface-variant truncate block">Phone & laptop front/back scanner</span>
                               </div>
-                            </div>
+                            </button>
+
                             <button
                               type="button"
                               onClick={() => {
-                                setUploadedFile(null);
-                                setImagePreviewUrl(null);
+                                if (isExtracting) return;
                                 setUploadSource('file');
+                                if (fileInputRef.current) {
+                                  fileInputRef.current.value = '';
+                                  fileInputRef.current.click();
+                                }
                               }}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              className="p-3 sm:p-3.5 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container transition-all text-left flex items-center gap-2.5 sm:gap-3 cursor-pointer group shadow-2xs"
                             >
-                              Remove
+                              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-surface-container-high text-on-surface flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[18px] sm:text-[20px]">folder_open</span>
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-xs font-bold text-on-surface block group-hover:underline truncate">Browse Image File</span>
+                                <span className="text-[10px] text-outline truncate block">PNG, JPG, JPEG, WEBP</span>
+                              </div>
                             </button>
                           </div>
-                        </div>
-                      )}
+                        )}
+
+                        {!uploadedFile ? (
+                          <div
+                            onClick={() => {
+                              if (isExtracting) return;
+                              setUploadSource('file');
+                              fileInputRef.current?.click();
+                            }}
+                            className="border-2 border-dashed border-surface-container-high hover:border-primary rounded-2xl p-4 sm:p-6 text-center cursor-pointer bg-surface-container-low/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2"
+                          >
+                            <div className="w-12 h-12 rounded-xl bg-surface-container text-primary flex items-center justify-center">
+                              <span className="material-symbols-outlined text-[26px]">cloud_upload</span>
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-on-surface">Click to browse or drag file here</span>
+                              <p className="text-[11px] text-outline mt-0.5">
+                                Accepts {uploadFormat.toUpperCase()} ({
+                                  uploadFormat === 'image'
+                                    ? '.png, .jpg, .jpeg'
+                                    : uploadFormat === 'pdf'
+                                    ? '.pdf'
+                                    : uploadFormat === 'csv'
+                                    ? '.csv, .xlsx'
+                                    : '.docx, .doc'
+                                })
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {imagePreviewUrl && (
+                              <div className="rounded-xl overflow-hidden border border-surface-container-high max-h-[220px] bg-surface-container-low flex items-center justify-center">
+                                <img
+                                  src={imagePreviewUrl}
+                                  alt="Clinical Document Preview"
+                                  className="max-h-[220px] w-auto object-contain rounded-lg"
+                                />
+                              </div>
+                            )}
+
+                            <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                  <span className="material-symbols-outlined text-[20px]">
+                                    {uploadSource === 'camera' ? 'photo_camera' : uploadFormat === 'image' ? 'image' : uploadFormat === 'pdf' ? 'picture_as_pdf' : uploadFormat === 'csv' ? 'table_chart' : 'description'}
+                                  </span>
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-on-surface truncate block">
+                                      {uploadedFile.name}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary shrink-0">
+                                      {uploadSource === 'camera' ? 'Camera Scan' : 'Uploaded File'}
+                                    </span>
+                                  </div>
+                                  <span className="text-[11px] text-outline">
+                                    {(uploadedFile.size / 1024).toFixed(1)} KB · Ready to save to secure vault & parse
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUploadedFile(null);
+                                  setImagePreviewUrl(null);
+                                  setUploadSource('file');
+                                }}
+                                className="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                      </>
-                    )}
+
+                    {/* Minimal Real-Time Percentage Overlay Floating Over Blurred Upload Area */}
+                    <MinimalExtractionOverlay
+                      isExtracting={isExtracting}
+                      fileName={uploadedFile?.name}
+                      onComplete={() => setAddModalMode('preview')}
+                    />
                   </div>
                 )}
 

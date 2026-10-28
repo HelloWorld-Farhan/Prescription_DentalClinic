@@ -85,9 +85,9 @@ export default function OpticalScanOverlay({
 
     const interval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 94) return 94; // Hold gracefully near complete until backend returns
-        const increment = Math.max(0.65, (94 - prev) * 0.055);
-        const nextVal = Math.min(94, prev + increment);
+        if (prev >= 98) return 98; // Hold gracefully near complete until backend returns
+        const increment = Math.max(0.65, (98 - prev) * 0.055);
+        const nextVal = Math.min(98, prev + increment);
 
         // Update active stage based on percentage (1 -> 2 -> 3 -> 4)
         if (nextVal < 25) setActiveStageIndex(0);
