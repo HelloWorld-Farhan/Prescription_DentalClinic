@@ -409,6 +409,7 @@ export default function NewCheck() {
       localPreviewUrl = URL.createObjectURL(file);
       setCapturedPhoto(localPreviewUrl);
     }
+    setUploadedFileName(file.name);
     setIsProcessingDocument(true);
     const currentUserId = storedUser?.id || 'clinician-user';
     try {
@@ -1062,7 +1063,7 @@ export default function NewCheck() {
                         <OpticalScanOverlay
                           imageUrl={capturedPhoto}
                           fileName={uploadedFileName || 'Prescription Document'}
-                          fileType={uploadedFileName?.endsWith('.pdf') ? 'pdf' : 'image'}
+                          fileType={uploadedFileName?.toLowerCase().endsWith('.pdf') ? 'pdf' : (uploadedFileName?.toLowerCase().endsWith('.docx') || uploadedFileName?.toLowerCase().endsWith('.doc')) ? 'word' : (uploadedFileName?.toLowerCase().endsWith('.csv') || uploadedFileName?.toLowerCase().endsWith('.xlsx')) ? 'csv' : 'image'}
                           isScanning={true}
                           title="PropNexAI Agent Model 3 · Clinical Vision OCR"
                           className="w-full h-full max-h-[300px]"
@@ -1229,7 +1230,7 @@ export default function NewCheck() {
                       isScanning={isProcessingDocument}
                       title={
                         isProcessingDocument
-                          ? 'AI Vision Optical OCR Processing...'
+                          ? 'PropNexAI Agent Model 3 · Clinical Vision OCR'
                           : 'Optical OCR & Multimodal Scan Verified'
                       }
                       className="min-h-[260px] max-h-[420px]"
