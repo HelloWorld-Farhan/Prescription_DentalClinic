@@ -532,6 +532,18 @@ export async function extractPrescriptionData(
         indication: m.indication || data.patient?.diagnosis || 'Clinical Treatment',
       }));
 
+      const rawRules = data.rules || [];
+      const rules: InteractionRule[] = rawRules.map((r: any, idx: number) => ({
+        id: `rule-ai-${now}-${idx + 1}`,
+        drugA: r.drugA || 'Prescribed Agent',
+        drugB: r.drugB || 'Target Condition / Agent',
+        severity: r.severity || 'major',
+        category: r.category || 'Drug-Drug',
+        description: r.description || `Clinical safety rule extracted by Gemini Vision`,
+        active: true,
+        sourceFile: file.name,
+      }));
+
       return {
         prescriptionId: `rx-gemini-${now}`,
         documentType: source === 'camera' ? 'Camera Captured Rx' : `${file.type || 'Clinical Document'} (Gemini Vision)`,
@@ -546,7 +558,7 @@ export async function extractPrescriptionData(
           address: data.patient?.address || undefined,
         },
         medicines,
-        rules: [],
+        rules,
         rawText: JSON.stringify(data, null, 2),
       };
     } else {
@@ -601,10 +613,15 @@ export async function extractPrescriptionData(
   };
 }
 
+export interface DocumentRulesExtractionResult {
+  rules: InteractionRule[];
+  medicines: PrescriptionItem[];
+}
+
 /**
- * Extracts clinical decision support rules from uploaded documents via Gemini Backend.
+ * Extracts clinical decision support rules and prescribed medicines from uploaded documents via Gemini Backend.
  */
-export async function extractDocumentRules(file: File): Promise<InteractionRule[]> {
+export async function extractDocumentRules(file: File): Promise<DocumentRulesExtractionResult> {
   const env = (import.meta as any).env || {};
   const apiUrl = (env.VITE_API_URL || '').replace(/\/$/, '') || 'https://dentalclinic-backend-eiav.onrender.com';
   const now = Date.now();
@@ -621,7 +638,9 @@ export async function extractDocumentRules(file: File): Promise<InteractionRule[
     if (response.ok) {
       const data = await response.json();
       const rawRules = data.rules || [];
-      return rawRules.map((r: any, idx: number) => ({
+      const rawMeds = data.medicines || [];
+
+      const rules: InteractionRule[] = rawRules.map((r: any, idx: number) => ({
         id: `rule-ai-${now}-${idx + 1}`,
         drugA: r.drugA || 'Primary Molecule',
         drugB: r.drugB || 'Secondary Molecule',
@@ -631,11 +650,33 @@ export async function extractDocumentRules(file: File): Promise<InteractionRule[
         active: true,
         sourceFile: file.name,
       }));
+
+      const medicines: PrescriptionItem[] = rawMeds.map((m: any, idx: number) => ({
+        id: `rx-ai-${now}-${idx + 1}`,
+        drugName: m.drugName || 'Unspecified Medication',
+        genericName: m.genericName || m.drugName || 'Generic Formulation',
+        dosage: m.dosage || 'Standard clinical dose',
+        frequency: m.frequency || 'As directed',
+        duration: m.duration || 'Standard regimen',
+        route: m.route || 'Oral (PO)',
+        indication: m.indication || 'Clinical Regimen',
+      }));
+
+      if (rules.length > 0 || medicines.length > 0) {
+        return { rules, medicines };
+      }
     }
   } catch (err) {
     console.error('[Rules API] Extraction error:', err);
   }
-  return [];
+
+  // Robust fallback: use universal extraction endpoint
+  try {
+    const rxResult = await extractPrescriptionData(file, 'upload');
+    return { rules: rxResult.rules, medicines: rxResult.medicines };
+  } catch {
+    return { rules: [], medicines: [] };
+  }
 }
 
 /**

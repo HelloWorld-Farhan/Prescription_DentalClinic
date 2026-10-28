@@ -1055,24 +1055,19 @@ export default function NewCheck() {
                     className="hidden"
                   />
 
-                  {/* Processing / Extracting Spinner Overlay */}
+                  {/* Processing / Extracting Scanner Overlay */}
                   {isProcessingDocument && (
                     <div className="absolute inset-0 bg-surface-container-lowest/95 backdrop-blur-xs flex flex-col items-center justify-center p-3 z-20">
-                      {capturedPhoto ? (
-                        <div className="w-full h-full max-w-xl">
-                          <OpticalScanOverlay
-                            imageUrl={capturedPhoto}
-                            isScanning={true}
-                            title="AI Vision OCR & Clinical Entity Scan"
-                            className="w-full h-full max-h-[290px]"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <span className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></span>
-                          <span className="text-xs font-bold text-on-surface">Saving to Secure Vault &amp; Extracting Clinical Entities...</span>
-                        </div>
-                      )}
+                      <div className="w-full h-full max-w-xl">
+                        <OpticalScanOverlay
+                          imageUrl={capturedPhoto}
+                          fileName={uploadedFileName || 'Prescription Document'}
+                          fileType={uploadedFileName?.endsWith('.pdf') ? 'pdf' : 'image'}
+                          isScanning={true}
+                          title="Gemini 3 Multimodal Vision OCR"
+                          className="w-full h-full max-h-[300px]"
+                        />
+                      </div>
                     </div>
                   )}
 

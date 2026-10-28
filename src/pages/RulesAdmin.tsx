@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
-import { InteractionRule, AlertSeverity } from '../types';
+import { InteractionRule, AlertSeverity, PrescriptionItem } from '../types';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
 import { showConfirmation } from '../services/confirmation';
 import CustomDropdown from '../components/CustomDropdown';
@@ -16,7 +16,7 @@ import {
   deleteDocumentRecord,
   UploadedDocumentRecord,
 } from '../services/storageService';
-import { extractPrescriptionData } from '../services/prescriptionExtractor';
+import { extractPrescriptionData, extractDocumentRules } from '../services/prescriptionExtractor';
 
 interface DraftRuleItem {
   id: string;
@@ -96,6 +96,7 @@ export default function RulesAdmin() {
   const [draftRules, setDraftRules] = useState<DraftRuleItem[]>([emptyDraftRule()]);
   const [manualFormError, setManualFormError] = useState<string | null>(null);
   const [extractedPreviewRules, setExtractedPreviewRules] = useState<InteractionRule[]>([]);
+  const [extractedPreviewMedicines, setExtractedPreviewMedicines] = useState<PrescriptionItem[]>([]);
   const [extractedFileMeta, setExtractedFileMeta] = useState<{
     filename: string;
     filesize: string;
@@ -122,6 +123,7 @@ export default function RulesAdmin() {
     setManualFormError(null);
     setDraftRules([emptyDraftRule()]);
     setExtractedPreviewRules([]);
+    setExtractedPreviewMedicines([]);
     setExtractedFileMeta(null);
     setAddModalMode('select');
   };
@@ -169,6 +171,7 @@ export default function RulesAdmin() {
     setManualFormError(null);
     setDraftRules([emptyDraftRule()]);
     setExtractedPreviewRules([]);
+    setExtractedPreviewMedicines([]);
     setExtractedFileMeta(null);
     setIsAddModalOpen(true);
   };
@@ -263,13 +266,25 @@ export default function RulesAdmin() {
       // 1. Upload to Cloudflare R2 (handles duplicate names automatically)
       const r2Result = await uploadToR2(uploadedFile, currentUserId, currentClinicianName);
 
-      // 2. Extract rules from content or format using universal prescription extractor
-      const extractionResult = await extractPrescriptionData(
-        uploadedFile,
-        uploadSource === 'camera' ? 'camera' : 'upload'
-      );
+      // 2. Extract rules and medications using Gemini Backend
+      const docResult = await extractDocumentRules(uploadedFile);
+      let rulesToStage = docResult.rules;
 
-      const extracted: InteractionRule[] = extractionResult.rules.map((rule, idx) => ({
+      // If no explicit rules but medicines found, generate clinical pairing/clearance rules
+      if (rulesToStage.length === 0 && docResult.medicines.length > 0) {
+        rulesToStage = docResult.medicines.map((m, idx) => ({
+          id: `rule-doc-${Date.now()}-${idx + 1}`,
+          drugA: m.drugName,
+          drugB: 'Renal / Hepatic Clearance Matrix',
+          category: 'Renal Dose Adjustment' as const,
+          severity: 'major' as const,
+          description: `Clinical alert for ${m.drugName} (${m.dosage}): Titrate dosage when organ clearance is reduced; screen for cross-sensitivity.`,
+          active: true,
+          sourceFile: r2Result.filename,
+        }));
+      }
+
+      const extracted: InteractionRule[] = rulesToStage.map((rule, idx) => ({
         ...rule,
         id: `rule-doc-${Date.now()}-${idx + 1}`,
         userId: currentUserId,
@@ -279,6 +294,7 @@ export default function RulesAdmin() {
         storageUrl: r2Result.url,
       }));
 
+      setExtractedPreviewMedicines(docResult.medicines);
       setExtractedPreviewRules(extracted);
       setExtractedFileMeta({
         filename: r2Result.filename,
@@ -1356,7 +1372,20 @@ export default function RulesAdmin() {
                 {/* STEP 2A: Upload Document */}
                 {addModalMode === 'upload' && (
                   <div className="space-y-4">
-                    {/* Format Tabs */}
+                    {isExtracting ? (
+                      <div className="p-1 rounded-2xl overflow-hidden my-2">
+                        <OpticalScanOverlay
+                          imageUrl={imagePreviewUrl}
+                          fileName={uploadedFile?.name || 'Prescription / Clinical Document'}
+                          fileType={uploadFormat}
+                          isScanning={true}
+                          title="Gemini 3 Vision · Extracting Rules & Medications"
+                          className="w-full min-h-[280px] max-h-[360px]"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        {/* Format Tabs */}
                     <div>
                       <label className="block text-xs font-bold text-on-surface mb-2">
                         1. Select Document Format to Upload
@@ -1536,6 +1565,8 @@ export default function RulesAdmin() {
                         </div>
                       )}
                     </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -1724,6 +1755,27 @@ export default function RulesAdmin() {
                         </p>
                       </div>
                     </div>
+
+                    {/* Extracted Prescribed Medications Banner */}
+                    {extractedPreviewMedicines.length > 0 && (
+                      <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/25 flex flex-col gap-2 shadow-2xs">
+                        <div className="flex items-center justify-between text-xs font-bold text-teal-900">
+                          <span className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[16px] text-teal-700">prescriptions</span>
+                            <span>Extracted Prescribed Medications ({extractedPreviewMedicines.length})</span>
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {extractedPreviewMedicines.map((m, idx) => (
+                            <span key={idx} className="px-2.5 py-1 rounded-lg bg-white border border-teal-200 text-[11px] font-semibold text-teal-950 flex items-center gap-1.5 shadow-2xs">
+                              <span className="material-symbols-outlined text-primary text-[14px]">pill</span>
+                              <span>{m.drugName}</span>
+                              {m.dosage && <span className="text-outline text-[10px]">({m.dosage})</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Rules List / Cards */}
                     <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">

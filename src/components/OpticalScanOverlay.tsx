@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface OpticalScanOverlayProps {
-  imageUrl: string;
+  imageUrl?: string | null;
+  fileName?: string;
+  fileType?: string;
   isScanning: boolean;
   title?: string;
   className?: string;
@@ -18,6 +20,8 @@ const SCAN_STEPS = [
 
 export default function OpticalScanOverlay({
   imageUrl,
+  fileName,
+  fileType,
   isScanning,
   title = 'Optical Prescription Scanner',
   className = '',
@@ -31,22 +35,42 @@ export default function OpticalScanOverlay({
     }
     const interval = setInterval(() => {
       setCurrentStepIndex((prev) => (prev < SCAN_STEPS.length - 1 ? prev + 1 : prev));
-    }, 450);
+    }, 700);
     return () => clearInterval(interval);
   }, [isScanning]);
+
+  const isPdf = fileType?.toLowerCase().includes('pdf') || fileName?.toLowerCase().endsWith('.pdf');
 
   return (
     <div
       className={`relative rounded-2xl overflow-hidden bg-slate-950 border border-emerald-500/30 shadow-2xl flex items-center justify-center select-none ${className}`}
     >
-      {/* Background Image Preview */}
-      <img
-        src={imageUrl}
-        alt="Prescription Slip"
-        className={`w-full h-auto max-h-[380px] sm:max-h-[460px] object-contain transition-all duration-500 ${
-          isScanning ? 'brightness-90 contrast-110 blur-[0.5px]' : 'brightness-100'
-        }`}
-      />
+      {/* Background Image Preview or Document Blueprint Canvas */}
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt="Prescription Slip"
+          className={`w-full h-auto max-h-[380px] sm:max-h-[460px] object-contain transition-all duration-500 ${
+            isScanning ? 'brightness-90 contrast-110 blur-[0.5px]' : 'brightness-100'
+          }`}
+        />
+      ) : (
+        <div className="w-full h-[240px] sm:h-[300px] flex flex-col items-center justify-center p-6 text-center gap-3 bg-gradient-to-b from-slate-900 to-slate-950 relative overflow-hidden">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.2)]">
+            <span className="material-symbols-outlined text-[36px]">
+              {isPdf ? 'picture_as_pdf' : 'description'}
+            </span>
+          </div>
+          <div className="max-w-xs space-y-1">
+            <div className="text-xs font-mono font-bold text-slate-200 truncate">
+              {fileName || 'Clinical Prescription Document'}
+            </div>
+            <div className="text-[10px] font-mono text-emerald-400/80">
+              {isPdf ? 'PORTABLE DOCUMENT FORMAT (PDF)' : 'CLINICAL DOCUMENT SCAN'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Optical HUD Grid Matrix */}
       <div
