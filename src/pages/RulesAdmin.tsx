@@ -8,7 +8,6 @@ import { showConfirmation } from '../services/confirmation';
 import CustomDropdown from '../components/CustomDropdown';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
-import DocumentExtractionAnimation, { DocumentExtractionRef } from '../components/DocumentExtractionAnimation';
 import {
   uploadToR2,
   getDocumentHistory,
@@ -110,7 +109,6 @@ export default function RulesAdmin() {
   const [inspectDocModal, setInspectDocModal] = useState<UploadedDocumentRecord | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const rulesExtractionAnimRef = useRef<DocumentExtractionRef | null>(null);
 
   const handleCloseAddModal = () => {
     setIsAddModalOpen(false);
@@ -254,43 +252,37 @@ export default function RulesAdmin() {
         setImagePreviewUrl(URL.createObjectURL(uploadedFile));
       }
 
-      const extractionTask = async () => {
-        const docResult = await extractDocumentRules(uploadedFile);
-        let rulesToStage = docResult.rules;
-
-        if (rulesToStage.length === 0 && docResult.medicines.length > 0) {
-          rulesToStage = docResult.medicines.map((m, idx) => ({
-            id: `rule-doc-${Date.now()}-${idx + 1}`,
-            drugA: m.drugName,
-            drugB: 'Renal / Hepatic Clearance Matrix',
-            category: 'Renal Dose Adjustment' as const,
-            severity: 'major' as const,
-            description: `Clinical alert for ${m.drugName} (${m.dosage}): Titrate dosage when organ clearance is reduced; screen for cross-sensitivity.`,
-            active: true,
-            sourceFile: uploadedFile.name,
-          }));
-        }
-
-        const extracted: InteractionRule[] = rulesToStage.map((rule, idx) => ({
-          ...rule,
-          id: `rule-doc-${Date.now()}-${idx + 1}`,
-          userId: currentUserId,
-          authorName: currentClinicianName,
-          createdAt: new Date().toLocaleString(),
-          sourceFile: uploadedFile.name,
-        }));
-
-        return { docResult, extracted };
-      };
-
-      const taskPromise = extractionTask();
-
-      // Trigger document extraction animation
-      if (rulesExtractionAnimRef.current) {
-        await rulesExtractionAnimRef.current.playExtraction(taskPromise);
+      // Allow optical scan laser animation to run for visual clarity
+      if (isImage) {
+        await new Promise((r) => setTimeout(r, 1400));
       }
 
-      const { docResult, extracted } = await taskPromise;
+      // 1. Extract rules and medications using PropNexAI Engine directly in-memory (DO NOT upload to R2 yet)
+      const docResult = await extractDocumentRules(uploadedFile);
+      let rulesToStage = docResult.rules;
+
+      // If no explicit rules but medicines found, generate clinical pairing/clearance rules
+      if (rulesToStage.length === 0 && docResult.medicines.length > 0) {
+        rulesToStage = docResult.medicines.map((m, idx) => ({
+          id: `rule-doc-${Date.now()}-${idx + 1}`,
+          drugA: m.drugName,
+          drugB: 'Renal / Hepatic Clearance Matrix',
+          category: 'Renal Dose Adjustment' as const,
+          severity: 'major' as const,
+          description: `Clinical alert for ${m.drugName} (${m.dosage}): Titrate dosage when organ clearance is reduced; screen for cross-sensitivity.`,
+          active: true,
+          sourceFile: uploadedFile.name,
+        }));
+      }
+
+      const extracted: InteractionRule[] = rulesToStage.map((rule, idx) => ({
+        ...rule,
+        id: `rule-doc-${Date.now()}-${idx + 1}`,
+        userId: currentUserId,
+        authorName: currentClinicianName,
+        createdAt: new Date().toLocaleString(),
+        sourceFile: uploadedFile.name,
+      }));
 
       setExtractedPreviewMedicines(docResult.medicines);
       setExtractedPreviewRules(extracted);
@@ -1513,7 +1505,6 @@ export default function RulesAdmin() {
                         </div>
                       )}
 
-                      <DocumentExtractionAnimation ref={rulesExtractionAnimRef} className="rounded-2xl w-full">
                       {!uploadedFile ? (
                         <div
                           onClick={() => {
@@ -1593,7 +1584,6 @@ export default function RulesAdmin() {
                           </div>
                         </div>
                       )}
-                      </DocumentExtractionAnimation>
                     </div>
                       </>
                     )}
