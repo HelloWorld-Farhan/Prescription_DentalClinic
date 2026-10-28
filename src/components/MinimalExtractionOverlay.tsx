@@ -46,16 +46,16 @@ export default function MinimalExtractionOverlay({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
-        className={`absolute inset-0 z-30 flex items-center justify-center bg-white/20 backdrop-blur-[2px] rounded-2xl pointer-events-none select-none ${className}`}
+        className={`absolute inset-0 z-30 flex items-center justify-center bg-white/45 backdrop-blur-[1px] rounded-2xl pointer-events-none select-none ${className}`}
       >
         <motion.span
           key="percentage-display"
           initial={{ scale: 0.88, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-          className="text-6xl sm:text-7xl font-black text-primary font-mono tracking-tight drop-shadow-md select-none"
+          className="text-7xl sm:text-8xl md:text-9xl font-black text-primary font-mono tracking-tighter drop-shadow-md select-none"
         >
           {displayProgress}%
         </motion.span>

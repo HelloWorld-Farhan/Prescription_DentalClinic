@@ -8,6 +8,7 @@ import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
+import ImageLaserScanOverlay from '../components/ImageLaserScanOverlay';
 import { uploadToR2, updateDocumentExtractedCount, deleteDocumentRecord } from '../services/storageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
@@ -1142,7 +1143,7 @@ export default function NewCheck() {
                   <div
                     className={`relative z-10 flex flex-col items-center gap-3 transition-all duration-300 w-full ${
                       isProcessingDocument
-                        ? 'filter blur-[5px] opacity-40 pointer-events-none select-none scale-[0.99]'
+                        ? 'filter blur-[2px] opacity-75 pointer-events-none select-none scale-[0.99]'
                         : ''
                     }`}
                   >
@@ -1274,102 +1275,106 @@ export default function NewCheck() {
             {/* TAB 2: CAMERA PHOTO SCAN */}
             {inputMethod === 'camera' && (
               <div className="space-y-4">
-                {!capturedPhoto ? (
-                  <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 p-6 flex flex-col items-center justify-center min-h-[280px]">
-                    {/* Grid crosshair viewfinder overlay */}
-                    <div className="absolute inset-4 border border-dashed border-white/20 rounded-xl pointer-events-none flex items-center justify-center">
-                      <span className="material-symbols-outlined text-white/30 text-[48px]">crop_free</span>
-                    </div>
-
-                    <div className="z-10 flex flex-col items-center gap-3 text-center">
-                      <div className="w-14 h-14 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur-md">
-                        <span className="material-symbols-outlined text-[28px]">photo_camera</span>
-                      </div>
-                      <div className="text-white text-sm font-semibold">
-                        Hold prescription slip in front of camera
-                      </div>
-                      <p className="text-xs text-slate-400 max-w-sm">
-                        Use your laptop or phone front/rear camera to capture dental slips with optical clarity.
-                      </p>
-
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setIsCameraModalOpen(true)}
-                        className="mt-2 px-6 py-2.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">camera</span>
-                        <span>Open Live Camera &amp; Scan Prescription</span>
-                      </motion.button>
-                    </div>
+                {/* Active Laser Scanning State when extracting captured photo */}
+                {isProcessingDocument && capturedPhoto ? (
+                  <div className="space-y-3">
+                    <ImageLaserScanOverlay
+                      imageUrl={capturedPhoto}
+                      isScanning={true}
+                      progress={documentProgress}
+                    />
                   </div>
                 ) : (
-                  /* Optical Scan HUD & Action Toolbar */
-                  <div className="space-y-3">
-                    <OpticalScanOverlay
-                      imageUrl={capturedPhoto}
-                      isScanning={isProcessingDocument}
-                      title={
-                        isProcessingDocument
-                          ? 'PropNexAI Agent Model 3 · Clinical Vision OCR'
-                          : 'Optical OCR & Multimodal Scan Verified'
-                      }
-                      className="min-h-[260px] max-h-[420px]"
-                    />
-
-                    <div className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-[18px]">verified</span>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-on-surface truncate">
-                            {extractedMeta?.filename || 'Prescription Photo Captured'}
-                          </div>
-                          <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                            <span>
-                              {extractedMedicines.length > 0
-                                ? `Extracted ${extractedMedicines.length} medications from prescription slip`
-                                : 'Analyzing clinical entities...'}
-                            </span>
-                          </div>
-                        </div>
+                  <>
+                    {/* Camera Viewfinder: Always ready so user can easily open live camera again */}
+                    <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 p-6 flex flex-col items-center justify-center min-h-[240px]">
+                      {/* Grid crosshair viewfinder overlay */}
+                      <div className="absolute inset-4 border border-dashed border-white/20 rounded-xl pointer-events-none flex items-center justify-center">
+                        <span className="material-symbols-outlined text-white/30 text-[48px]">crop_free</span>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
+                      <div className="z-10 flex flex-col items-center gap-3 text-center">
+                        <div className="w-14 h-14 rounded-full bg-white/10 text-white flex items-center justify-center backdrop-blur-md">
+                          <span className="material-symbols-outlined text-[28px]">photo_camera</span>
+                        </div>
+                        <div className="text-white text-sm font-semibold">
+                          {capturedPhoto ? 'Scan Another Prescription Slip' : 'Hold prescription slip in front of camera'}
+                        </div>
+                        <p className="text-xs text-slate-400 max-w-sm">
+                          Use your laptop or phone front/rear camera to capture dental slips with optical clarity.
+                        </p>
+
+                        <motion.button
                           type="button"
-                          onClick={async () => {
-                            if (extractedMeta?.storageUrl) {
-                              await deleteDocumentRecord(extractedMeta.storageKey || '', extractedMeta.storageUrl);
-                            }
-                            if (extractedMedicines.length > 0) {
-                              const extractedNames = new Set(extractedMedicines.map((m) => m.drugName.toLowerCase()));
-                              setPrescriptions((prev) => prev.filter((p) => !extractedNames.has(p.drugName.toLowerCase())));
-                            }
-                            setCapturedPhoto(null);
-                            setExtractedMeta(null);
-                            setExtractedMedicines([]);
-                            showConfirmation('Captured prescription deleted from secure vault.', 'info');
-                          }}
-                          className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-                          title="Delete photo and purge from secure vault"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">delete</span>
-                          <span>Delete Photo</span>
-                        </button>
-                        <button
-                          type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => setIsCameraModalOpen(true)}
-                          className="px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer"
+                          className="mt-2 px-6 py-2.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer"
                         >
-                          Retake / Switch Camera
-                        </button>
+                          <span className="material-symbols-outlined text-[18px]">camera</span>
+                          <span>{capturedPhoto ? 'Open Live Camera Again' : 'Open Live Camera & Scan Prescription'}</span>
+                        </motion.button>
                       </div>
                     </div>
-                  </div>
+
+                    {/* Clean Compact Captured Photo Card (Displayed below camera viewfinder) */}
+                    {capturedPhoto && (
+                      <div className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img
+                            src={capturedPhoto}
+                            alt="Captured Slip"
+                            className="w-12 h-12 rounded-xl object-cover border border-primary/20 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-on-surface truncate">
+                              {extractedMeta?.filename || 'Prescription Photo Captured'}
+                            </div>
+                            <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                              <span>
+                                {extractedMedicines.length > 0
+                                  ? `Extracted ${extractedMedicines.length} medications from prescription slip`
+                                  : 'Prescription slip captured & verified'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setIsCameraModalOpen(true)}
+                            className="px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">refresh</span>
+                            <span>Retake Photo</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (extractedMeta?.storageUrl) {
+                                await deleteDocumentRecord(extractedMeta.storageKey || '', extractedMeta.storageUrl);
+                              }
+                              if (extractedMedicines.length > 0) {
+                                const extractedNames = new Set(extractedMedicines.map((m) => m.drugName.toLowerCase()));
+                                setPrescriptions((prev) => prev.filter((p) => !extractedNames.has(p.drugName.toLowerCase())));
+                              }
+                              setCapturedPhoto(null);
+                              setExtractedMeta(null);
+                              setExtractedMedicines([]);
+                              showConfirmation('Captured prescription deleted from secure vault.', 'info');
+                            }}
+                            className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                            title="Delete photo and purge from secure vault"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">delete</span>
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

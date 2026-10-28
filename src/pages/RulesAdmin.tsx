@@ -9,6 +9,7 @@ import CustomDropdown from '../components/CustomDropdown';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import OpticalScanOverlay from '../components/OpticalScanOverlay';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
+import ImageLaserScanOverlay from '../components/ImageLaserScanOverlay';
 import {
   uploadToR2,
   getDocumentHistory,
@@ -1397,7 +1398,7 @@ export default function RulesAdmin() {
                     <div
                       className={`space-y-4 transition-all duration-300 ${
                         isExtracting
-                          ? 'filter blur-[5px] opacity-40 pointer-events-none select-none scale-[0.99]'
+                          ? 'filter blur-[2px] opacity-75 pointer-events-none select-none scale-[0.99]'
                           : ''
                       }`}
                     >
@@ -1541,13 +1542,12 @@ export default function RulesAdmin() {
                         ) : (
                           <div className="space-y-3">
                             {imagePreviewUrl && (
-                              <div className="rounded-xl overflow-hidden border border-surface-container-high max-h-[220px] bg-surface-container-low flex items-center justify-center">
-                                <img
-                                  src={imagePreviewUrl}
-                                  alt="Clinical Document Preview"
-                                  className="max-h-[220px] w-auto object-contain rounded-lg"
-                                />
-                              </div>
+                              <ImageLaserScanOverlay
+                                imageUrl={imagePreviewUrl}
+                                isScanning={isExtracting}
+                                progress={extractionProgress}
+                                className="max-h-[240px]"
+                              />
                             )}
 
                             <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high flex items-center justify-between gap-3">
