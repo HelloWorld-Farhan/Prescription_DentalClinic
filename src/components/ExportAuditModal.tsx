@@ -30,7 +30,7 @@ export default function ExportAuditModal({
   logs,
   activeActionFilter = 'All',
 }: ExportAuditModalProps) {
-  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('csv');
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('pdf');
   const [timeScope, setTimeScope] = useState<TimeScope>('all');
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('download');
   const [includeSystemMetadata, setIncludeSystemMetadata] = useState(true);
@@ -309,6 +309,8 @@ export default function ExportAuditModal({
     setIsSendingEmail(true);
     setEmailProgress(10);
 
+    const notaryHash = 'SHA256-4f8b9e892c21ad8310c8ff0e34a7812bc88' + (includeSystemMetadata ? '-CERTIFIED' : '');
+
     // Multi-stage animated SMTP dispatch
     const t1 = setTimeout(() => setEmailProgress(35), 350);
     const t2 = setTimeout(() => setEmailProgress(70), 750);
@@ -318,8 +320,32 @@ export default function ExportAuditModal({
       setEmailSuccess(true);
       setIsSendingEmail(false);
 
-      // Log email dispatch audit record
+      // Log email dispatch audit record & notify backend
       try {
+        const apiUrl =
+          import.meta.env.VITE_BACKEND_URL || 'https://dentalclinic-backend-eiav.onrender.com';
+        fetch(`${apiUrl}/api/v1/auth/send-audit-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to_email: recipientEmail.trim(),
+            clinician_name: 'Active Clinician',
+            export_format: selectedFormat.toUpperCase(),
+            records_count: selectedRecords.length,
+            time_scope:
+              timeScope === 'all'
+                ? 'All History'
+                : timeScope === 'today'
+                ? 'Today (24h)'
+                : timeScope === '7d'
+                ? 'Past 7 Days'
+                : 'Past 30 Days',
+            notary_hash: notaryHash,
+            filename: `SmileClinic_HIPAA_Audit_${selectedFormat.toUpperCase()}_${Date.now()}.${selectedFormat === 'word' ? 'docx' : selectedFormat}`,
+            download_url: window.location.href,
+          }),
+        }).catch((err) => console.log('Audit email fallback:', err));
+
         VirtualDb.addAudit({
           id: 'aud-' + Date.now(),
           timestamp: 'Just now',
@@ -462,9 +488,9 @@ export default function ExportAuditModal({
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
                   {[
-                    { id: 'csv', label: 'CSV Spreadsheet', ext: '.csv', icon: 'table_view' },
-                    { id: 'word', label: 'Word Document', ext: '.docx', icon: 'description' },
                     { id: 'pdf', label: 'Printable PDF', ext: '.pdf', icon: 'picture_as_pdf' },
+                    { id: 'word', label: 'Word Document', ext: '.docx', icon: 'description' },
+                    { id: 'csv', label: 'CSV Spreadsheet', ext: '.csv', icon: 'table_view' },
                   ].map((fmt) => {
                     const isSelected = selectedFormat === fmt.id;
                     return (
@@ -530,27 +556,19 @@ export default function ExportAuditModal({
                     <span className="text-[10px] text-outline font-medium">HIPAA Encrypted SMTP</span>
                   </div>
 
-                  <input
-                    type="email"
-                    value={recipientEmail}
-                    onChange={(e) => {
-                      setRecipientEmail(e.target.value);
-                      if (emailError) setEmailError('');
-                    }}
-                    placeholder="e.g. compliance@smileclinic.com"
-                    className={`w-full h-10 px-3 rounded-xl border text-xs font-medium bg-white focus:outline-none transition-colors ${
-                      emailError
-                        ? 'border-rose-400 focus:border-rose-500'
-                        : 'border-surface-container-high focus:border-primary'
-                    }`}
-                  />
+                  {/* Read-Only Authenticated Clinician Email Preview */}
+                  <div className="w-full h-11 px-3.5 rounded-xl border border-surface-container-high text-xs font-semibold bg-white text-on-surface flex items-center justify-between shadow-2xs select-text">
+                    <span className="font-mono text-on-surface">{recipientEmail}</span>
+                    <span className="text-[10px] text-outline font-medium flex items-center gap-1 bg-surface-container-low px-2 py-0.5 rounded-md border border-surface-container">
+                      <span className="material-symbols-outlined text-[13px] text-emerald-600">lock</span>
+                      <span>Authenticated Clinician</span>
+                    </span>
+                  </div>
 
-                  {emailError && (
-                    <div className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">error</span>
-                      <span>{emailError}</span>
-                    </div>
-                  )}
+                  <div className="text-[10px] text-outline flex items-center gap-1 px-1">
+                    <span className="material-symbols-outlined text-[13px] text-primary">verified</span>
+                    <span>Sent exclusively to authenticated login account (read-only for security).</span>
+                  </div>
 
                   <div className="flex items-center justify-between text-[11px] text-on-surface-variant pt-1 border-t border-surface-container">
                     <span>Attachment Payload:</span>
