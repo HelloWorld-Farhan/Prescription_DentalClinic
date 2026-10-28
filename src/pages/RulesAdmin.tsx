@@ -105,21 +105,18 @@ export default function RulesAdmin() {
     format: string;
   } | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isSavingStagedDoc, setIsSavingStagedDoc] = useState(false);
   const [inspectDocModal, setInspectDocModal] = useState<UploadedDocumentRecord | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleCloseAddModal = async () => {
-    if (extractedFileMeta?.storageUrl) {
-      await deleteDocumentRecord('', extractedFileMeta.storageUrl);
-      setDocumentHistory(getDocumentHistory(currentUserId));
-      showConfirmation(`Cancelled: Staged document "${extractedFileMeta.filename}" purged from secure vault.`, 'info');
-    }
+  const handleCloseAddModal = () => {
     setIsAddModalOpen(false);
     setUploadedFile(null);
     setImagePreviewUrl(null);
     setUploadSource('file');
     setIsExtracting(false);
+    setIsSavingStagedDoc(false);
     setManualFormError(null);
     setDraftRules([emptyDraftRule()]);
     setExtractedPreviewRules([]);
@@ -128,14 +125,11 @@ export default function RulesAdmin() {
     setAddModalMode('select');
   };
 
-  const handleBackToUpload = async () => {
-    if (extractedFileMeta?.storageUrl) {
-      await deleteDocumentRecord('', extractedFileMeta.storageUrl);
-      setDocumentHistory(getDocumentHistory(currentUserId));
-    }
+  const handleBackToUpload = () => {
     setImagePreviewUrl(null);
     setExtractedFileMeta(null);
     setExtractedPreviewRules([]);
+    setExtractedPreviewMedicines([]);
     setAddModalMode('upload');
   };
 
@@ -263,10 +257,7 @@ export default function RulesAdmin() {
         await new Promise((r) => setTimeout(r, 1400));
       }
 
-      // 1. Upload to Cloudflare R2 (handles duplicate names automatically)
-      const r2Result = await uploadToR2(uploadedFile, currentUserId, currentClinicianName);
-
-      // 2. Extract rules and medications using PropNexAI Engine
+      // 1. Extract rules and medications using PropNexAI Engine directly in-memory (DO NOT upload to R2 yet)
       const docResult = await extractDocumentRules(uploadedFile);
       let rulesToStage = docResult.rules;
 
@@ -280,7 +271,7 @@ export default function RulesAdmin() {
           severity: 'major' as const,
           description: `Clinical alert for ${m.drugName} (${m.dosage}): Titrate dosage when organ clearance is reduced; screen for cross-sensitivity.`,
           active: true,
-          sourceFile: r2Result.filename,
+          sourceFile: uploadedFile.name,
         }));
       }
 
@@ -290,17 +281,16 @@ export default function RulesAdmin() {
         userId: currentUserId,
         authorName: currentClinicianName,
         createdAt: new Date().toLocaleString(),
-        sourceFile: r2Result.filename,
-        storageUrl: r2Result.url,
+        sourceFile: uploadedFile.name,
       }));
 
       setExtractedPreviewMedicines(docResult.medicines);
       setExtractedPreviewRules(extracted);
       setExtractedFileMeta({
-        filename: r2Result.filename,
+        filename: uploadedFile.name,
         filesize: (uploadedFile.size / 1024).toFixed(1) + ' KB',
         extractedAt: new Date().toLocaleString(),
-        storageUrl: r2Result.url,
+        storageUrl: '', // Staged in memory - not committed to vault yet
         format: uploadFormat.toUpperCase(),
       });
 
@@ -314,19 +304,43 @@ export default function RulesAdmin() {
     }
   };
 
-  const handleConfirmPreviewRules = () => {
-    if (extractedPreviewRules.length === 0) return;
+  const handleConfirmPreviewRules = async () => {
+    if (extractedPreviewRules.length === 0 || !uploadedFile) return;
+    setIsSavingStagedDoc(true);
 
-    const updated = VirtualDb.addRules(extractedPreviewRules);
-    setRules([...updated]);
+    try {
+      // 1. Permanently upload to Cloudflare R2 and save document record in vault
+      const r2Result = await uploadToR2(uploadedFile, currentUserId, currentClinicianName);
 
-    if (extractedFileMeta?.storageUrl) {
-      updateDocumentExtractedCount(extractedFileMeta.storageUrl, extractedPreviewRules.length);
+      // 2. Finalize rules with verified R2 storageUrl and non-colliding filename
+      const finalizedRules: InteractionRule[] = extractedPreviewRules.map((rule) => ({
+        ...rule,
+        sourceFile: r2Result.filename,
+        storageUrl: r2Result.url,
+      }));
+
+      const updated = VirtualDb.addRules(finalizedRules);
+      setRules([...updated]);
+
+      // 3. Update extracted count and refresh Document History table
+      updateDocumentExtractedCount(r2Result.url, finalizedRules.length);
       setDocumentHistory(getDocumentHistory(currentUserId));
-    }
 
-    setIsAddModalOpen(false);
-    showConfirmation(`Saved ${extractedPreviewRules.length} extracted rules to History & Data.`, 'success');
+      setIsAddModalOpen(false);
+      setUploadedFile(null);
+      setImagePreviewUrl(null);
+      setExtractedPreviewRules([]);
+      setExtractedPreviewMedicines([]);
+      setExtractedFileMeta(null);
+      setAddModalMode('select');
+
+      showConfirmation(`Saved document to Secure Vault and imported ${finalizedRules.length} extracted rules.`, 'success');
+    } catch (err) {
+      console.error('Save error:', err);
+      showConfirmation('Failed to save document to secure vault. Please try again.', 'error');
+    } finally {
+      setIsSavingStagedDoc(false);
+    }
   };
 
   const handleToggle = (id: string) => {
@@ -1714,39 +1728,27 @@ export default function RulesAdmin() {
                         className="max-h-[240px]"
                       />
                     )}
-                    {/* Secure Vault Storage Confirmation Card */}
-                    <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                    {/* Staged Document Preview Confirmation Card */}
+                    <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                          <span className="material-symbols-outlined text-[24px]">cloud_done</span>
+                        <div className="w-11 h-11 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <span className="material-symbols-outlined text-[24px]">visibility</span>
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-bold text-emerald-950 truncate max-w-xs block">
+                            <span className="text-xs font-bold text-on-surface truncate max-w-xs block">
                               {extractedFileMeta?.filename}
                             </span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900 shrink-0">
-                              Securely Stored in Vault
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200 shrink-0 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px]">schedule</span>
+                              <span>Staged Preview (Unsaved)</span>
                             </span>
                           </div>
-                          <p className="text-[11px] text-emerald-800 mt-0.5 font-medium">
-                            {extractedFileMeta?.filesize} · Extracted {extractedFileMeta?.extractedAt}
+                          <p className="text-[11px] text-on-surface-variant mt-0.5 font-medium">
+                            {extractedFileMeta?.filesize} · Extracted {extractedFileMeta?.extractedAt} · Click Save below to ingest to Vault &amp; add rules
                           </p>
                         </div>
                       </div>
-
-                      {extractedFileMeta?.storageUrl && (
-                        <a
-                          href={extractedFileMeta.storageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 text-[11px] font-bold hover:bg-emerald-50 transition-colors shadow-2xs self-start sm:self-center shrink-0"
-                          title="Open original file from secure vault"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">open_in_new</span>
-                          <span>View Original File</span>
-                        </a>
-                      )}
                     </div>
 
                     {/* Section Header */}
@@ -1867,7 +1869,7 @@ export default function RulesAdmin() {
                         >
                           <span className="material-symbols-outlined text-[17px]">sync</span>
                         </motion.span>
-                        <span className="tracking-wide">Saving to Secure Vault &amp; Extracting...</span>
+                        <span className="tracking-wide">Analyzing &amp; Extracting Clinical Rules...</span>
                       </>
                     ) : (
                       <>
@@ -1883,28 +1885,40 @@ export default function RulesAdmin() {
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <button
                         type="button"
+                        disabled={isSavingStagedDoc}
                         onClick={handleCloseAddModal}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-rose-200 text-xs font-bold text-rose-700 bg-rose-50/70 hover:bg-rose-100 cursor-pointer transition-colors flex items-center justify-center gap-1.5"
-                        title="Discard rules and purge document from secure vault"
+                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        title="Discard extracted rules without saving"
                       >
-                        <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
+                        <span className="material-symbols-outlined text-[15px]">close</span>
                         <span>Cancel &amp; Discard</span>
                       </button>
                       <button
                         type="button"
+                        disabled={isSavingStagedDoc}
                         onClick={handleBackToUpload}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors disabled:opacity-50"
                       >
                         Back to Upload
                       </button>
                     </div>
                     <button
                       type="button"
+                      disabled={isSavingStagedDoc}
                       onClick={handleConfirmPreviewRules}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
                     >
-                      <span className="material-symbols-outlined text-[16px]">save</span>
-                      <span>Confirm &amp; Save All {extractedPreviewRules.length} Rules</span>
+                      {isSavingStagedDoc ? (
+                        <>
+                          <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                          <span>Saving to Vault &amp; Rules...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[16px]">save</span>
+                          <span>Confirm &amp; Save All {extractedPreviewRules.length} Rules to Vault</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
