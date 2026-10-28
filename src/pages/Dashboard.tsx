@@ -971,11 +971,11 @@ export default function Dashboard() {
 
       {/* 3. 2-COLUMN MAIN CONTENT (8 cols Left / 4 cols Right) */}
 
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-w-0 max-w-full">
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch min-w-0 max-w-full">
 
         {/* LEFT COLUMN: Recent Checks Table */}
 
-        <div className="lg:col-span-8 flex flex-col gap-4 bg-surface-container-lowest rounded-2xl p-4 sm:p-6 shadow-xs border border-surface-container-high/60 min-w-0 max-w-full">
+        <div className="lg:col-span-8 flex flex-col justify-between bg-surface-container-lowest rounded-2xl p-4 sm:p-6 shadow-xs border border-surface-container-high/60 min-w-0 max-w-full h-full">
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-container">
 
@@ -1051,7 +1051,7 @@ export default function Dashboard() {
 
           {/* Table Wrapper (Minimal Clean Screening Feed) */}
 
-          <div className="overflow-x-auto w-full max-w-full">
+          <div className="overflow-x-auto w-full max-w-full flex-1">
 
             <table className="w-full text-left border-collapse min-w-[600px]">
 
@@ -1335,7 +1335,7 @@ export default function Dashboard() {
 
           {/* Footer of Table */}
 
-          <div className="flex flex-col sm:flex-row items-center justify-between pt-3 border-t border-surface-container gap-2.5 w-full">
+          <div className="flex flex-col sm:flex-row items-center justify-between pt-3 border-t border-surface-container gap-2.5 w-full mt-auto">
 
             <span className="text-xs text-on-surface-variant font-medium text-center sm:text-left">
 
@@ -1427,7 +1427,7 @@ export default function Dashboard() {
 
         {/* RIGHT COLUMN: Action CTA & Critical Review Queue */}
 
-        <div className="lg:col-span-4 flex flex-col gap-4 min-w-0 max-w-full">
+        <div className="lg:col-span-4 flex flex-col gap-4 min-w-0 max-w-full h-full">
 
           {/* Quick CTAs */}
 
@@ -1510,7 +1510,7 @@ export default function Dashboard() {
 
 
           {/* Unified Needs Review & Clinical Decision Support Section */}
-          <div className="bg-surface-container-lowest rounded-2xl p-4.5 sm:p-5 shadow-xs border border-surface-container-high/60 flex flex-col gap-3.5">
+          <div className="bg-surface-container-lowest rounded-2xl p-4.5 sm:p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between gap-3.5 flex-1">
             <div className="flex items-center justify-between pb-3 border-b border-surface-container">
               <div className="flex items-center gap-2.5">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
@@ -1659,7 +1659,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Primary Dual Actions: PDF Report & Review CDS */}
-                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-surface-container">
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-surface-container mt-auto">
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.98 }}
