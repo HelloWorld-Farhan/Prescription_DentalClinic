@@ -86,6 +86,11 @@ export function getClinicianEmail(): string {
 
 let isSyncing = false;
 let autoSyncTimer: any = null;
+let _cachedCustomQuestions: Array<{ id: string; text: string; createdAt?: string }> = [];
+
+export function getCachedCustomQuestions(): Array<{ id: string; text: string; createdAt?: string }> {
+  return [..._cachedCustomQuestions];
+}
 
 /**
  * Pulls all persistent data from Supabase PostgreSQL for the authenticated clinician.
@@ -205,6 +210,14 @@ export async function pullFromCloud(): Promise<boolean> {
         active: r.active !== false,
       }));
       PrescriptionStorage.setRules(mappedRules);
+    }
+
+    // 6. Reconcile Custom Clinical Questions
+    if (Array.isArray(data.customQuestions)) {
+      _cachedCustomQuestions = data.customQuestions;
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smileclinic_questions_updated', { detail: _cachedCustomQuestions }));
+      }
     }
 
     // 5. Reconcile Patients
@@ -351,6 +364,71 @@ export function deleteRulesBySourceFromCloud(source: string) {
   fetch(`${API_BASE_URL}/api/v1/sync/rules-by-source?source=${encodeURIComponent(source)}&email=${encodeURIComponent(email)}`, {
     method: 'DELETE',
   }).catch((err) => console.warn('[CloudSync] Failed to delete rules by source from cloud:', err));
+}
+
+export async function fetchCustomQuestionsFromCloud(): Promise<Array<{ id: string; text: string; createdAt?: string }>> {
+  const email = getClinicianEmail();
+  if (!email || !API_BASE_URL) return _cachedCustomQuestions;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/sync/custom-questions?email=${encodeURIComponent(email)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.customQuestions)) {
+        _cachedCustomQuestions = data.customQuestions;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('smileclinic_questions_updated', { detail: _cachedCustomQuestions }));
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[CloudSync] Failed to fetch custom questions:', err);
+  }
+  return _cachedCustomQuestions;
+}
+
+export async function saveCustomQuestionToCloud(questionText: string): Promise<void> {
+  const email = getClinicianEmail();
+  const trimmed = questionText.trim();
+  if (!email || !API_BASE_URL || !trimmed) return;
+
+  // Optimistically add to in-memory list if not present
+  if (!_cachedCustomQuestions.some((q) => q.text.toLowerCase() === trimmed.toLowerCase())) {
+    _cachedCustomQuestions = [
+      { id: `cq-local-${Date.now()}`, text: trimmed, createdAt: new Date().toISOString() },
+      ..._cachedCustomQuestions,
+    ].slice(0, 20);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smileclinic_questions_updated', { detail: _cachedCustomQuestions }));
+    }
+  }
+
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/sync/custom-questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, text: trimmed }),
+    });
+  } catch (err) {
+    console.warn('[CloudSync] Failed to save custom question:', err);
+  }
+}
+
+export async function deleteCustomQuestionFromCloud(questionId: string): Promise<void> {
+  const email = getClinicianEmail();
+  if (!email || !API_BASE_URL || !questionId) return;
+
+  _cachedCustomQuestions = _cachedCustomQuestions.filter((q) => q.id !== questionId);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('smileclinic_questions_updated', { detail: _cachedCustomQuestions }));
+  }
+
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/sync/custom-questions/${encodeURIComponent(questionId)}?email=${encodeURIComponent(email)}`, {
+      method: 'DELETE',
+    });
+  } catch (err) {
+    console.warn('[CloudSync] Failed to delete custom question:', err);
+  }
 }
 
 /**

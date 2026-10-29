@@ -465,8 +465,12 @@ export default function NewCheck() {
     setIsProcessingDocument(true);
     const currentUserId = storedUser?.id || 'clinician-user';
     try {
-      // 1. Upload prescription slip to Cloudflare R2 for check session only (saveRecord = false prevents polluting knowledge base documents)
-      const r2Result = await uploadToR2(file, currentUserId, prescriberDisplayName, undefined, false);
+      // 1. Concurrently run Cloudflare R2 upload and multimodal AI extraction for ultra-fast processing
+      const [r2Result, { medicines: extracted, patient: extractedPatient }] = await Promise.all([
+        uploadToR2(file, currentUserId, prescriberDisplayName, undefined, false),
+        extractPrescriptionsFromDocument(file, source),
+      ]);
+
       setUploadedFileName(r2Result.filename);
       const sizeStr =
         file.size > 1024 * 1024
@@ -476,8 +480,6 @@ export default function NewCheck() {
 
       const ext =
         r2Result.filename.split('.').pop()?.toUpperCase() || (source === 'camera' ? 'CAMERA SCAN' : 'FILE');
-
-      const { medicines: extracted, patient: extractedPatient } = await extractPrescriptionsFromDocument(file, source);
 
       const previewUrl = localPreviewUrl || (file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
       if (source === 'camera' || previewUrl) {

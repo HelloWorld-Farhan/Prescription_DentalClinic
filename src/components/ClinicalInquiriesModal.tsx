@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  getCachedCustomQuestions,
+  fetchCustomQuestionsFromCloud,
+  saveCustomQuestionToCloud,
+  deleteCustomQuestionFromCloud,
+} from '../services/cloudSyncService';
 
 export interface ClinicalInquiriesModalProps {
   isOpen: boolean;
@@ -17,9 +23,9 @@ interface DefaultQuestionOption {
   subtitle: string;
   category: string;
   icon: string;
-  recommended?: boolean;
 }
 
+// Exactly 4 Top Dental-Pharmacology Suggested Questions
 const DEFAULT_QUESTIONS: DefaultQuestionOption[] = [
   {
     id: 'q1',
@@ -27,7 +33,6 @@ const DEFAULT_QUESTIONS: DefaultQuestionOption[] = [
     subtitle: 'Checks all ingredients against your allergies and medical history',
     category: 'Safety & Allergies',
     icon: 'verified_user',
-    recommended: true,
   },
   {
     id: 'q2',
@@ -35,7 +40,6 @@ const DEFAULT_QUESTIONS: DefaultQuestionOption[] = [
     subtitle: 'Clear meal timing, daily dosing, and empty stomach guidance',
     category: 'Food & Timing',
     icon: 'restaurant',
-    recommended: true,
   },
   {
     id: 'q3',
@@ -43,31 +47,13 @@ const DEFAULT_QUESTIONS: DefaultQuestionOption[] = [
     subtitle: 'Detects dangerous drug-drug interactions or conflicts',
     category: 'Drug Interactions',
     icon: 'medication',
-    recommended: true,
   },
   {
     id: 'q4',
-    text: 'What side effects or warning signs should I watch for?',
-    subtitle: 'Common side reactions and urgent symptoms to report',
-    category: 'Side Effects',
-    icon: 'warning',
-    recommended: false,
-  },
-  {
-    id: 'q5',
     text: 'Is this safe with dental anesthesia & dental procedures?',
     subtitle: 'Bleeding risks, epinephrine safety, and sedation compatibility',
     category: 'Dental Operatory',
     icon: 'dentistry',
-    recommended: true,
-  },
-  {
-    id: 'q6',
-    text: 'Is this safe for my kidneys and liver (dosage check)?',
-    subtitle: 'Evaluates eGFR filtration rate and organ clearance safety',
-    category: 'Kidney & Liver',
-    icon: 'vital_signs',
-    recommended: false,
   },
 ];
 
@@ -79,27 +65,49 @@ export default function ClinicalInquiriesModal({
   patientMrn = 'PT-CURRENT',
   candidateMedicationsCount = 0,
 }: ClinicalInquiriesModalProps) {
-  // Pre-select recommended default questions initially
-  const [selectedDefaultIds, setSelectedDefaultIds] = useState<Set<string>>(() => {
-    return new Set(DEFAULT_QUESTIONS.filter((q) => q.recommended).map((q) => q.id));
+  // 1. By default, NOTHING is selected (user must manually select)
+  const [selectedDefaultIds, setSelectedDefaultIds] = useState<Set<string>>(() => new Set());
+  
+  // 2. Recent Questions from Cloud DB
+  const [recentQuestions, setRecentQuestions] = useState<Array<{ id: string; text: string }>>(() => {
+    return getCachedCustomQuestions();
   });
+  const [selectedRecentIds, setSelectedRecentIds] = useState<Set<string>>(() => new Set());
 
+  // 3. Staged Custom Questions for current check
   const [customQuestions, setCustomQuestions] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState('');
   const [validationError, setValidationError] = useState('');
 
-  // Lock body scroll and listen for escape key
+  // Lock body scroll and listen for escape key & fetch cloud questions
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       setValidationError('');
+      
+      // Pull latest custom questions from cloud DB
+      fetchCustomQuestionsFromCloud().then((qs) => {
+        if (Array.isArray(qs)) {
+          setRecentQuestions(qs);
+        }
+      });
+
+      const handleQuestionsSync = (e: any) => {
+        if (Array.isArray(e.detail)) {
+          setRecentQuestions(e.detail);
+        }
+      };
+      window.addEventListener('smileclinic_questions_updated', handleQuestionsSync);
+
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') onClose();
       };
       window.addEventListener('keydown', handleKeyDown);
+
       return () => {
         document.body.style.overflow = '';
         window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('smileclinic_questions_updated', handleQuestionsSync);
       };
     }
   }, [isOpen, onClose]);
@@ -119,14 +127,39 @@ export default function ClinicalInquiriesModal({
     });
   };
 
+  const toggleRecentQuestion = (id: string) => {
+    setValidationError('');
+    setSelectedRecentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteRecentQuestion = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setSelectedRecentIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    deleteCustomQuestionFromCloud(id);
+    setRecentQuestions((prev) => prev.filter((q) => q.id !== id));
+  };
+
   const handleAddCustomQuestion = () => {
     const trimmed = customInput.trim();
     if (!trimmed) return;
-    if (customQuestions.includes(trimmed)) {
-      setCustomInput('');
-      return;
+
+    if (!customQuestions.includes(trimmed)) {
+      setCustomQuestions((prev) => [...prev, trimmed]);
     }
-    setCustomQuestions((prev) => [...prev, trimmed]);
+    // Optimistically save to cloud DB
+    saveCustomQuestionToCloud(trimmed);
     setCustomInput('');
     setValidationError('');
   };
@@ -137,37 +170,58 @@ export default function ClinicalInquiriesModal({
 
   const handleSelectAll = () => {
     setSelectedDefaultIds(new Set(DEFAULT_QUESTIONS.map((q) => q.id)));
+    setSelectedRecentIds(new Set(recentQuestions.map((q) => q.id)));
     setValidationError('');
   };
 
   const handleClearAll = () => {
     setSelectedDefaultIds(new Set());
+    setSelectedRecentIds(new Set());
     setCustomQuestions([]);
     setCustomInput('');
   };
 
-  const totalQuestionsCount = selectedDefaultIds.size + customQuestions.length + (customInput.trim() ? 1 : 0);
+  const totalQuestionsCount =
+    selectedDefaultIds.size +
+    selectedRecentIds.size +
+    customQuestions.length +
+    (customInput.trim() ? 1 : 0);
 
   const handleSubmit = () => {
     const finalQuestions: string[] = [];
 
-    // Collect checked default questions
+    // 1. Collect checked default questions
     DEFAULT_QUESTIONS.forEach((q) => {
       if (selectedDefaultIds.has(q.id)) {
         finalQuestions.push(q.text);
       }
     });
 
-    // Collect custom questions
-    customQuestions.forEach((q) => {
-      finalQuestions.push(q);
+    // 2. Collect checked recent questions
+    recentQuestions.forEach((q) => {
+      if (selectedRecentIds.has(q.id) && !finalQuestions.includes(q.text)) {
+        finalQuestions.push(q.text);
+      }
     });
 
-    // Auto-include pending text in input if user typed but forgot to click "+ Add"
+    // 3. Collect staged custom questions
+    customQuestions.forEach((q) => {
+      if (!finalQuestions.includes(q)) {
+        finalQuestions.push(q);
+      }
+    });
+
+    // 4. Auto-include pending text in input if user typed but forgot to click "+ Add"
     const pending = customInput.trim();
     if (pending && !finalQuestions.includes(pending)) {
       finalQuestions.push(pending);
+      saveCustomQuestionToCloud(pending);
     }
+
+    // Also persist all staged custom questions to the cloud DB
+    customQuestions.forEach((q) => {
+      saveCustomQuestionToCloud(q);
+    });
 
     // Validation: At least one question required
     if (finalQuestions.length === 0) {
@@ -235,8 +289,12 @@ export default function ClinicalInquiriesModal({
           <div className="flex items-center justify-between pt-3 pb-1 text-xs shrink-0">
             <div className="flex items-center gap-2">
               <span className="font-bold text-slate-800">Select Questions to Answer:</span>
-              <span className="px-2.5 py-0.5 rounded-full bg-teal-50 text-[#005c65] font-bold text-[11px] border border-teal-200">
-                {selectedDefaultIds.size + customQuestions.length} selected
+              <span className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] border ${
+                totalQuestionsCount > 0
+                  ? 'bg-teal-50 text-[#005c65] border-teal-200'
+                  : 'bg-slate-100 text-slate-500 border-slate-200'
+              }`}>
+                {totalQuestionsCount} selected
               </span>
             </div>
             <div className="flex items-center gap-2.5">
@@ -258,107 +316,164 @@ export default function ClinicalInquiriesModal({
             </div>
           </div>
 
-          {/* Horizontal 2-Column Grid (No Scrollbars) */}
-          <div className="py-2.5 flex-1 overflow-y-auto no-scrollbar space-y-3.5 pr-0.5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {DEFAULT_QUESTIONS.map((q) => {
-                const isSelected = selectedDefaultIds.has(q.id);
-                return (
-                  <motion.div
-                    key={q.id}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.985 }}
-                    onClick={() => toggleDefaultQuestion(q.id)}
-                    className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3 select-none ${
-                      isSelected
-                        ? 'bg-teal-50/70 border-teal-600/70 shadow-xs ring-1 ring-teal-600/30'
-                        : 'bg-white hover:bg-slate-50/80 border-slate-200 text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    {/* Checkbox Icon */}
-                    <div
-                      className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+          {/* Scrollable Questions Container */}
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {/* SECTION 1: Top 4 Suggested Questions (2-Column Grid) */}
+            <div>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-2 block">
+                Suggested Clinical Questions (4)
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {DEFAULT_QUESTIONS.map((q) => {
+                  const isSelected = selectedDefaultIds.has(q.id);
+
+                  return (
+                    <motion.div
+                      key={q.id}
+                      whileHover={{ scale: 1.008 }}
+                      whileTap={{ scale: 0.992 }}
+                      onClick={() => toggleDefaultQuestion(q.id)}
+                      className={`relative flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
                         isSelected
-                          ? 'bg-[#007782] text-white shadow-2xs'
-                          : 'border-2 border-slate-300 bg-white'
+                          ? 'bg-teal-50/70 border-teal-500 shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-teal-300 hover:bg-slate-50/60'
                       }`}
                     >
-                      {isSelected && (
-                        <span className="material-symbols-outlined text-[15px] font-bold">check</span>
-                      )}
-                    </div>
-
-                    {/* Question Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1.5 mb-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[12px] text-teal-700">{q.icon}</span>
-                          <span>{q.category}</span>
-                        </span>
-                        {q.recommended && (
-                          <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
-                            Recommended
-                          </span>
-                        )}
+                      {/* Checkbox indicator */}
+                      <div className="pt-0.5 shrink-0">
+                        <div
+                          className={`w-5 h-5 rounded-lg flex items-center justify-center transition-colors border ${
+                            isSelected
+                              ? 'bg-[#007782] border-[#007782] text-white shadow-2xs'
+                              : 'bg-white border-slate-300 text-transparent'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[15px] font-bold">check</span>
+                        </div>
                       </div>
-                      <h4
-                        className={`text-xs sm:text-sm font-bold leading-snug ${
-                          isSelected ? 'text-slate-900' : 'text-slate-800'
-                        }`}
-                      >
-                        {q.text}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                        {q.subtitle}
-                      </p>
-                    </div>
-                  </motion.div>
-                );
-              })}
+
+                      {/* Question Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-slate-100 text-slate-700">
+                            <span className="material-symbols-outlined text-[11px] text-teal-700">{q.icon}</span>
+                            <span>{q.category}</span>
+                          </span>
+                        </div>
+
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                          {q.text}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
+                          {q.subtitle}
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Custom Question Entry Section */}
-            <div className="pt-2 border-t border-slate-100 space-y-2.5">
+            {/* SECTION 2: Recent Custom Questions (Saved in DB for this user across all devices) */}
+            {recentQuestions.length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-teal-800 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px] text-teal-700">history</span>
+                    <span>Recent Inquiries (Saved in Cloud)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">Synced across your devices</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {recentQuestions.map((q) => {
+                    const isSelected = selectedRecentIds.has(q.id);
+
+                    return (
+                      <div
+                        key={q.id}
+                        onClick={() => toggleRecentQuestion(q.id)}
+                        className={`relative flex items-center justify-between gap-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none group ${
+                          isSelected
+                            ? 'bg-teal-50/80 border-teal-500 shadow-2xs'
+                            : 'bg-slate-50/60 border-slate-200 hover:border-teal-300 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div
+                            className={`w-4 h-4 rounded-md flex items-center justify-center transition-colors border shrink-0 ${
+                              isSelected
+                                ? 'bg-[#007782] border-[#007782] text-white'
+                                : 'bg-white border-slate-300 text-transparent'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[12px] font-bold">check</span>
+                          </div>
+                          <span className="text-xs font-semibold text-slate-800 truncate" title={q.text}>
+                            {q.text}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteRecentQuestion(e, q.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 rounded transition-all cursor-pointer shrink-0"
+                          title="Delete from saved questions"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">delete</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* SECTION 3: Custom Question Entry Section */}
+            <div className="pt-2 border-t border-slate-100 space-y-2">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px] text-teal-700">edit_note</span>
                 <span>Ask your own specific question (e.g. pregnancy, kidney health, or food timing):</span>
               </label>
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={customInput}
-                  onChange={(e) => {
-                    setCustomInput(e.target.value);
-                    if (validationError) setValidationError('');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddCustomQuestion();
-                    }
-                  }}
-                  placeholder="Type a custom question and press Enter..."
-                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#007782] focus:border-[#007782] text-slate-900 placeholder:text-slate-400 shadow-2xs"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddCustomQuestion}
-                  disabled={!customInput.trim()}
-                  className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
-                    customInput.trim()
-                      ? 'bg-[#007782] hover:bg-[#005c65] text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">add</span>
-                  <span>Add Question</span>
-                </button>
+              {/* Input container with px-1 py-1 so focus outline / ring is NEVER cut off on left edge */}
+              <div className="p-1">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={customInput}
+                    onChange={(e) => {
+                      setCustomInput(e.target.value);
+                      if (validationError) setValidationError('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomQuestion();
+                      }
+                    }}
+                    placeholder="Type a custom question and press Enter..."
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white text-slate-900 placeholder:text-slate-400 shadow-2xs transition-all focus:outline-none focus:border-[#007782] focus:ring-2 focus:ring-[#007782]/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomQuestion}
+                    disabled={!customInput.trim()}
+                    className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+                      customInput.trim()
+                        ? 'bg-[#007782] hover:bg-[#005c65] text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    <span>Add Question</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Custom Questions Tags List */}
+              {/* Staged Custom Questions Tags List */}
               {customQuestions.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
+                <div className="flex flex-wrap gap-2 pt-1 px-1">
                   {customQuestions.map((q, idx) => (
                     <div
                       key={idx}
