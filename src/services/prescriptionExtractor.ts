@@ -512,10 +512,19 @@ export async function extractPrescriptionData(
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${apiUrl}/api/prescriptions/extract`, {
-      method: 'POST',
-      body: formData,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+    let response: Response;
+    try {
+      response = await fetch(`${apiUrl}/api/prescriptions/extract`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (response.ok) {
       const data = await response.json();
@@ -631,10 +640,19 @@ export async function extractDocumentRules(file: File): Promise<DocumentRulesExt
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${apiUrl}/api/prescriptions/extract-rules`, {
-      method: 'POST',
-      body: formData,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+    let response: Response;
+    try {
+      response = await fetch(`${apiUrl}/api/prescriptions/extract-rules`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (response.ok) {
       const data = await response.json();

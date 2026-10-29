@@ -36,6 +36,47 @@ export default function MinimalExtractionOverlay({
   const currentProgressRef = useRef(1);
   const isClosingRef = useRef(false);
 
+  // Sweep smoothly from current percentage up to 100% and invoke completion
+  const sweepTo100AndFinish = () => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+
+    const startP = currentProgressRef.current;
+    const sweepDuration = 260; // ms
+    const sweepStart = performance.now();
+    let sweepFrame: number;
+
+    const sweepTo100 = (now: number) => {
+      const elapsed = now - sweepStart;
+      const progressFrac = Math.min(1, elapsed / sweepDuration);
+      const currentSweepP = Math.min(100, Math.round(startP + (100 - startP) * progressFrac));
+
+      currentProgressRef.current = currentSweepP;
+      setProgress(currentSweepP);
+
+      if (progressFrac < 1) {
+        sweepFrame = requestAnimationFrame(sweepTo100);
+      } else {
+        // Exactly 100% with green checkmark
+        setProgress(100);
+        currentProgressRef.current = 100;
+
+        // Visual confirmation before auto-closing
+        setTimeout(() => {
+          setShow(false);
+          setProgress(1);
+          currentProgressRef.current = 1;
+          isClosingRef.current = false;
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+          }
+        }, 450);
+      }
+    };
+
+    sweepFrame = requestAnimationFrame(sweepTo100);
+  };
+
   // 1. When extraction starts
   useEffect(() => {
     if (isExtracting) {
@@ -51,8 +92,8 @@ export default function MinimalExtractionOverlay({
         if (isClosingRef.current) return;
 
         const elapsed = now - startTime;
-        // Natural asymptotic progression that caps at 94% while waiting for backend
-        const ratio = 1 - Math.exp(-elapsed / 2200);
+        // Snappy, smooth logarithmic progression reaching ~92% in 2.5s
+        const ratio = 1 - Math.exp(-elapsed / 1200);
         const p = Math.min(94, Math.max(1, Math.round(ratio * 94)));
 
         currentProgressRef.current = p;
@@ -63,8 +104,16 @@ export default function MinimalExtractionOverlay({
 
       animFrame = requestAnimationFrame(animateHoldingCurve);
 
+      // Failsafe auto-resolve after 3.4 seconds so extraction never freezes at 94%
+      const failsafeTimer = setTimeout(() => {
+        if (!isClosingRef.current) {
+          sweepTo100AndFinish();
+        }
+      }, 3400);
+
       return () => {
         if (animFrame) cancelAnimationFrame(animFrame);
+        clearTimeout(failsafeTimer);
       };
     }
   }, [isExtracting]);
@@ -72,47 +121,7 @@ export default function MinimalExtractionOverlay({
   // 2. When extraction completes (isExtracting flips from true to false while modal is open)
   useEffect(() => {
     if (!isExtracting && show && !isClosingRef.current) {
-      isClosingRef.current = true;
-
-      // Swiftly sweep from currentProgressRef (e.g. 70-94%) to 100%
-      const startP = currentProgressRef.current;
-      const sweepDuration = 280; // ms
-      const sweepStart = performance.now();
-      let sweepFrame: number;
-
-      const sweepTo100 = (now: number) => {
-        const elapsed = now - sweepStart;
-        const progressFrac = Math.min(1, elapsed / sweepDuration);
-        const currentSweepP = Math.round(startP + (100 - startP) * progressFrac);
-
-        currentProgressRef.current = currentSweepP;
-        setProgress(currentSweepP);
-
-        if (progressFrac < 1) {
-          sweepFrame = requestAnimationFrame(sweepTo100);
-        } else {
-          // Reached exactly 100% with checkmark
-          setProgress(100);
-          currentProgressRef.current = 100;
-
-          // Give clinician 450ms visual confirmation of completion, then smoothly close
-          setTimeout(() => {
-            setShow(false);
-            setProgress(1);
-            currentProgressRef.current = 1;
-            isClosingRef.current = false;
-            if (onCompleteRef.current) {
-              onCompleteRef.current();
-            }
-          }, 450);
-        }
-      };
-
-      sweepFrame = requestAnimationFrame(sweepTo100);
-
-      return () => {
-        if (sweepFrame) cancelAnimationFrame(sweepFrame);
-      };
+      sweepTo100AndFinish();
     }
   }, [isExtracting, show]);
 
