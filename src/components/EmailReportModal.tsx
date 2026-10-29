@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionItem, DrugInteractionAlert } from '../types';
 import { API_BASE_URL } from '../config/api';
 import { getClinicianEmail } from '../services/cloudSyncService';
+import { getActiveClinicianName } from '../services/prescriptionService';
 import { showConfirmation } from '../services/confirmation';
 
 interface EmailReportModalProps {
@@ -37,11 +38,26 @@ export default function EmailReportModal({
   const [emailProgress, setEmailProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync mode and initialEmail reactively
+  useEffect(() => {
+    setActiveTab(mode);
+  }, [mode, isOpen]);
+
+  useEffect(() => {
+    if (initialEmail) {
+      setEmailRecipient(initialEmail);
+    } else {
+      const active = getClinicianEmail();
+      if (active) setEmailRecipient(active);
+    }
+  }, [initialEmail, isOpen]);
+
   if (!isOpen) return null;
 
   const cleanCheckId = checkId || 'CHK-REPORT';
   const cleanPdfName = `SmileClinic_CDS_Report_${cleanCheckId.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
   const subject = `Prescription CDS Verification Report · #${cleanCheckId} · ${patientMrn}`;
+  const pdfDownloadLink = `${API_BASE_URL}/api/v1/sync/report-pdf?id=${encodeURIComponent(cleanCheckId)}&email=${encodeURIComponent(emailRecipient.trim() || 'clinician')}`;
 
   const handleSendEmail = async () => {
     setError(null);
@@ -60,40 +76,58 @@ export default function EmailReportModal({
     try {
       const clinicianEmail = getClinicianEmail();
       if (API_BASE_URL) {
-        await fetch(`${API_BASE_URL}/api/v1/auth/send-report-email`, {
+        const payload = {
+          to_email: trimmed,
+          recipient_email: trimmed,
+          clinician_email: clinicianEmail,
+          clinician_name: getActiveClinicianName(),
+          clinician_npi: 'DENT-CLINIC',
+          report_id: cleanCheckId,
+          patient_name: patientName,
+          patient_mrn: patientMrn,
+          overall_status: overallStatus,
+          candidate_drugs: prescriptions.map((p) => p.drugName).join('; '),
+          rx_count: prescriptions.length,
+          alerts_summary:
+            alerts.length > 0
+              ? alerts.map((a) => `[${(a.severity || 'MAJOR').toUpperCase()}] ${a.title || 'Hazard'}: ${a.description || ''}`).join('; ')
+              : 'Screened clean. Zero interactions.',
+          alerts_count: alerts.length,
+          download_url: pdfDownloadLink,
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/send-report-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipient_email: trimmed,
-            clinician_email: clinicianEmail,
-            report_id: cleanCheckId,
-            patient_name: patientName,
-            patient_mrn: patientMrn,
-            overall_status: overallStatus,
-            prescriptions: prescriptions.map((p) => ({
-              drug_name: p.drugName,
-              dosage: p.dosage,
-              frequency: p.frequency,
-              route: p.route,
-            })),
-            alerts_count: alerts.length,
-          }),
+          body: JSON.stringify(payload),
         });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || errData.message || 'Server error sending report email');
+        }
       }
-    } catch (err) {
-      console.warn('[Email Dispatch]:', err);
-    } finally {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+
       setEmailProgress(100);
-      setIsSending(false);
-      showConfirmation(`Certified 2-Page CDS Report dispatched to ${trimmed}`, 'success', 2500);
+      showConfirmation(`Certified 2-Page CDS Report & PDF dispatched to ${trimmed}`, 'success', 2500);
       setTimeout(() => {
         onClose();
         setEmailProgress(0);
       }, 900);
+    } catch (err: any) {
+      console.warn('[Email Dispatch]:', err);
+      setError(err?.message || 'Failed to dispatch report email. Please check network connectivity.');
+      showConfirmation(err?.message || 'Email delivery failed', 'error');
+    } finally {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      setIsSending(false);
     }
+  };
+
+  const handleDownloadPdfDirect = () => {
+    window.open(pdfDownloadLink, '_blank', 'noopener,noreferrer');
   };
 
   return createPortal(
@@ -127,7 +161,7 @@ export default function EmailReportModal({
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                  {activeTab === 'send' ? 'Send Certified CDS Report via Email' : 'Email Delivery Preview'}
+                  {activeTab === 'send' ? 'Send Certified CDS Report via Email' : 'Email Delivery Preview & Verification'}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Report #{cleanCheckId} • Patient: <strong className="text-slate-800">{patientName}</strong> ({patientMrn})
@@ -172,30 +206,39 @@ export default function EmailReportModal({
             </button>
           </div>
 
+          {/* GLOBAL EDITABLE RECIPIENT INPUT (Available in BOTH tabs) */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800">
+                Recipient Email Address {activeTab === 'preview' ? '(Editable Live Preview)' : ''}
+              </label>
+              <span className="text-[10px] text-teal-800 bg-teal-50 border border-teal-200 font-bold px-2 py-0.5 rounded-full">
+                Can be changed anytime
+              </span>
+            </div>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">
+                alternate_email
+              </span>
+              <input
+                type="email"
+                value={emailRecipient}
+                onChange={(e) => {
+                  setEmailRecipient(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="doctor@dentalclinic.com"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700/20 focus:border-teal-700 font-medium text-slate-800"
+              />
+            </div>
+            {error && <p className="text-xs text-rose-600 font-semibold">{error}</p>}
+          </div>
+
           {/* TAB 1: SEND EMAIL */}
           {activeTab === 'send' && (
             <div className="space-y-4 pt-1">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Recipient Clinician or Patient Email Address
-                </label>
-                <div className="relative">
-                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">
-                    alternate_email
-                  </span>
-                  <input
-                    type="email"
-                    value={emailRecipient}
-                    onChange={(e) => setEmailRecipient(e.target.value)}
-                    placeholder="doctor@dentalclinic.com"
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-700/20 focus:border-teal-700 font-medium"
-                  />
-                </div>
-                {error && <p className="text-xs text-rose-600 mt-1 font-semibold">{error}</p>}
-              </div>
-
               {/* Document Specs */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 space-y-1.5">
+              <div className="p-3.5 rounded-2xl bg-teal-50/50 border border-teal-100 text-xs text-slate-600 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Attached Report:</span>
                   <strong className="font-mono text-slate-800 truncate max-w-xs">{cleanPdfName}</strong>
@@ -205,8 +248,11 @@ export default function EmailReportModal({
                   <span className="font-semibold text-slate-800">2-Page A4 Notarized CDS Report</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Clinical Attestation:</span>
-                  <span className="font-semibold text-emerald-700">HIPAA Safe Harbor Verified</span>
+                  <span className="text-slate-500">Attachment Delivery:</span>
+                  <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px]">attach_file</span>
+                    Direct Encrypted PDF Attachment &amp; Web Link
+                  </span>
                 </div>
               </div>
 
@@ -214,7 +260,7 @@ export default function EmailReportModal({
               {isSending && (
                 <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-xs text-slate-600 font-medium">
-                    <span>Transmitting encrypted PDF attachment...</span>
+                    <span>Generating 2-page PDF &amp; transmitting attachment...</span>
                     <span>{emailProgress}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -227,24 +273,36 @@ export default function EmailReportModal({
               )}
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-between pt-2">
                 <button
                   type="button"
-                  onClick={onClose}
-                  disabled={isSending}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
+                  onClick={handleDownloadPdfDirect}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Directly download and view the 2-page PDF right now"
                 >
-                  Cancel
+                  <span className="material-symbols-outlined text-[16px]">download</span>
+                  <span>Inspect PDF</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSendEmail}
-                  disabled={isSending}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-teal-800 text-white hover:bg-teal-900 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">send</span>
-                  <span>{isSending ? 'Sending...' : 'Send Report via Email'}</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={isSending}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendEmail}
+                    disabled={isSending}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-teal-800 text-white hover:bg-teal-900 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">send</span>
+                    <span>{isSending ? 'Sending...' : 'Send Report via Email'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -260,7 +318,9 @@ export default function EmailReportModal({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400 font-semibold w-12 shrink-0">To:</span>
-                  <span className="text-slate-800 font-bold truncate">{emailRecipient || 'recipient@clinic.com'}</span>
+                  <span className="text-teal-900 font-bold truncate bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                    {emailRecipient.trim() || 'recipient@clinic.com'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400 font-semibold w-12 shrink-0">Subject:</span>
@@ -310,31 +370,54 @@ export default function EmailReportModal({
                 </div>
 
                 {/* Attached File Card */}
-                <div className="p-3 rounded-xl bg-teal-50/60 border border-teal-200/80 flex items-center justify-between gap-3">
+                <div className="p-3 rounded-xl bg-teal-50/70 border border-teal-200 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="material-symbols-outlined text-[22px] text-teal-800 shrink-0">picture_as_pdf</span>
                     <div className="min-w-0">
                       <span className="text-xs font-bold text-slate-900 truncate block">{cleanPdfName}</span>
-                      <span className="text-[10px] text-slate-500">PDF Attachment · 2-Page A4 Notarized Export</span>
+                      <span className="text-[10px] text-slate-600">Attached directly to this email &bull; 2-Page A4 Notarized Export</span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold text-teal-800 px-2 py-0.5 rounded bg-white border border-teal-200 shrink-0">
-                    Attached
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDownloadPdfDirect}
+                    className="text-[11px] font-bold text-teal-800 px-2.5 py-1 rounded-lg bg-white border border-teal-300 hover:bg-teal-50 shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">download</span>
+                    <span>Download</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Bottom Trigger to switch to Send */}
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-slate-500">Ready to dispatch?</span>
+              {/* Bottom Actions: Inspect PDF & Send Email */}
+              <div className="flex items-center justify-between pt-2">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('send')}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-800 text-white hover:bg-teal-900 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  onClick={handleDownloadPdfDirect}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[15px]">send</span>
-                  <span>Proceed to Send Email</span>
+                  <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+                  <span>Inspect PDF Document</span>
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendEmail}
+                    disabled={isSending}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-teal-800 text-white hover:bg-teal-900 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">send</span>
+                    <span>{isSending ? 'Sending...' : 'Send to this Recipient'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

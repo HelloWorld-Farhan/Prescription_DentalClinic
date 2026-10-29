@@ -1037,9 +1037,10 @@ export default function AuditLog() {
         }
       />
 
-      {/* Individual Email Send / Preview Modal */}
+      {/* Individual Email Send / Preview Modal with Live Editable Recipient and PDF Attachment */}
       {emailModalLog && (
         <EmailReportModal
+          key={`${emailModalLog.id}-${emailModalMode}`}
           isOpen={!!emailModalLog}
           onClose={() => setEmailModalLog(null)}
           mode={emailModalMode}
@@ -1049,6 +1050,7 @@ export default function AuditLog() {
           prescriptions={emailModalLog.prescriptions || []}
           alerts={emailModalLog.alerts || []}
           overallStatus={emailModalLog.severity === 'safe' ? 'Safe to Dispense' : 'Requires Review'}
+          initialEmail={getClinicianEmail()}
         />
       )}
 
