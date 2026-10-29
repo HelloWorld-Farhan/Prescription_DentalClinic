@@ -8,6 +8,7 @@ import { getDeviceId } from '../services/sessionAudit';
 import { PrescriptionStorage } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
 import { ConfirmationEventDetail, showConfirmation } from '../services/confirmation';
+import { parseMedicationTiming } from '../services/medicationScheduleService';
 
 interface NotificationItem {
   id: string;
@@ -48,6 +49,8 @@ export default function Layout() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+
+
 
   // Global Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -390,6 +393,46 @@ export default function Layout() {
       setRealChecks(PrescriptionStorage.getChecks());
     }
   }, [isSearchOpen]);
+
+  // Compute live clinical notifications from recent checks
+  useEffect(() => {
+    const list: NotificationItem[] = [];
+    (realChecks || []).slice(0, 4).forEach((check) => {
+      // 1. Safety hazard alerts
+      (check.alerts || []).forEach((al, idx) => {
+        list.push({
+          id: `notif-al-${check.id}-${idx}`,
+          title: al.title || 'Pharmacological Interaction Alert',
+          desc: `${check.patientName} (${check.mrn}): ${al.mechanism || al.description || 'Clinical hazard detected.'}`,
+          time: check.timestamp || 'Recently',
+          category: 'Safety Alert',
+          icon: 'warning',
+          unread: !al.overridden,
+          bgClass: al.severity === 'contraindicated' ? 'bg-rose-500/10' : 'bg-amber-500/10',
+          textClass: al.severity === 'contraindicated' ? 'text-rose-600' : 'text-amber-600',
+        });
+      });
+
+      // 2. Medication intake timing reminders
+      (check.prescriptions || []).forEach((rx, idx) => {
+        const drugName = rx.drugName || (rx as any).name || 'Medication';
+        const timing = parseMedicationTiming(rx.frequency || '', drugName);
+        list.push({
+          id: `notif-rx-${check.id}-${idx}`,
+          title: `${drugName} ${rx.dosage || ''} • Intake Due`,
+          desc: `⏰ ${timing.scheduledTime} (${timing.foodInstruction}) for ${check.patientName}`,
+          time: timing.scheduledTime,
+          category: 'Medication Timing',
+          icon: 'alarm',
+          unread: true,
+          bgClass: 'bg-sky-500/10',
+          textClass: 'text-sky-600',
+        });
+      });
+    });
+
+    setNotifications(list);
+  }, [realChecks]);
 
   const filteredSearchItems: SearchResultItem[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -872,7 +915,14 @@ export default function Layout() {
                           </div>
                         ) : (
                           notifications.map((n) => (
-                            <div key={n.id} className="p-3.5 hover:bg-surface-container-low transition-colors flex items-start gap-3">
+                            <div
+  key={n.id}
+  onClick={() => {
+    setNotificationsOpen(false);
+    navigate('/alerts');
+  }}
+  className="p-3.5 hover:bg-surface-container-low transition-colors flex items-start gap-3 cursor-pointer"
+>
                               <div className={`p-2 rounded-xl shrink-0 ${n.bgClass} ${n.textClass}`}>
                                 <span className="material-symbols-outlined text-[18px]">{n.icon}</span>
                               </div>
