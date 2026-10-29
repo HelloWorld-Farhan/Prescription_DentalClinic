@@ -121,6 +121,7 @@ export default function Dashboard() {
 
   const [isBatchSyncing, setIsBatchSyncing] = useState(false);
   const [reviewCopyModal, setReviewCopyModal] = useState<SafetyCheckRecord | null>(null);
+  const [isCheckDropdownOpen, setIsCheckDropdownOpen] = useState(false);
 
 
 
@@ -1303,7 +1304,10 @@ export default function Dashboard() {
 
                               whileTap={{ scale: 0.98 }}
 
-                              onClick={() => setReviewCopyModal(check)}
+                              onClick={() => {
+                                setSelectedCheckId(check.id);
+                                setReviewCopyModal(check);
+                              }}
 
                               className="px-2.5 py-1 rounded-lg text-primary bg-primary/10 hover:bg-primary/20 transition-colors duration-150 text-xs font-bold cursor-pointer"
 
@@ -1510,204 +1514,279 @@ export default function Dashboard() {
 
 
           {/* Unified Needs Review & Clinical Decision Support Section */}
-          <div className="bg-surface-container-lowest rounded-2xl p-4.5 sm:p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between gap-3.5 flex-1">
-            <div className="flex items-center justify-between pb-3 border-b border-surface-container">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between gap-3.5 flex-1 max-h-[620px] overflow-hidden">
+            {/* Header with Title and Current Status */}
+            <div className="flex items-center justify-between pb-3 border-b border-surface-container shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
-                  priorityAlerts.length > 0 ? 'bg-[#FFDAD6] text-[#BA1A1A]' : 'bg-primary/10 text-primary'
+                  selectedCheck?.overallStatus === 'Contraindicated'
+                    ? 'bg-[#FFDAD6] text-[#BA1A1A]'
+                    : selectedCheck?.overallStatus === 'Requires Review'
+                    ? 'bg-[#FEF3C7] text-[#975A16]'
+                    : 'bg-emerald-100 text-emerald-800'
                 }`}>
                   <span className="material-symbols-outlined text-[18px]">
-                    {priorityAlerts.length > 0 ? 'warning' : 'rate_review'}
+                    {selectedCheck?.overallStatus === 'Contraindicated'
+                      ? 'warning'
+                      : selectedCheck?.overallStatus === 'Requires Review'
+                      ? 'rate_review'
+                      : 'verified_user'}
                   </span>
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-on-surface">Needs Review</h2>
-                  <p className="text-[11px] text-on-surface-variant">Clinical Decision Support &amp; Review</p>
+                  <h2 className="text-sm font-bold text-on-surface">Screening Review</h2>
+                  <p className="text-[11px] text-on-surface-variant">CDS Decision &amp; Regimen Details</p>
                 </div>
               </div>
 
               <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                priorityAlerts.length > 0
-                  ? 'bg-[#FFDAD6] text-[#BA1A1A]'
-                  : selectedCheck?.overallStatus === 'Contraindicated'
+                selectedCheck?.overallStatus === 'Contraindicated'
                   ? 'bg-[#FFDAD6] text-[#BA1A1A]'
                   : selectedCheck?.overallStatus === 'Requires Review'
                   ? 'bg-[#FEF3C7] text-[#975A16]'
                   : 'bg-emerald-100 text-emerald-800'
               }`}>
-                {priorityAlerts.length > 0
-                  ? `${priorityAlerts.length} Action Needed`
-                  : selectedCheck ? (selectedCheck.overallStatus || 'All Clear') : 'All Clear'}
+                {selectedCheck ? (selectedCheck.overallStatus || 'Safe to Dispense') : 'All Clear'}
               </span>
             </div>
 
-            {/* Sub-section 1: Active Contraindicated or Major Alerts requiring review */}
-            {priorityAlerts.length > 0 && (
-              <div className="space-y-2">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-rose-600 block">
-                  Urgent Clinical Flags ({priorityAlerts.length})
-                </span>
-                {priorityAlerts.map(({ check, alert }) => (
-                  <div
-                    key={alert.id}
-                    className="bg-surface-container-low rounded-xl p-3 flex flex-col gap-1.5 hover:bg-surface-container border border-surface-container-high/60 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="text-xs font-bold text-on-surface">{check.patientKey || check.mrn}</span>
-                        <span className="text-outline text-xs block">{alert.title}</span>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        alert.severity === 'contraindicated' ? 'bg-[#FFDAD6] text-[#BA1A1A]' : 'bg-[#FEF3C7] text-[#975A16]'
-                      }`}>
-                        {alert.severity}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                      {alert.mechanism || alert.clinicalImpact || alert.recommendation}
-                    </p>
-                    <div className="flex items-center justify-between pt-2 border-t border-surface-container-high">
-                      <span className="text-[10px] text-outline">{check.timestamp}</span>
-                      <button
-                        type="button"
-                        onClick={() => setReviewCopyModal(check)}
-                        className="text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        <span>Review &amp; Override</span>
-                        <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
-                      </button>
-                    </div>
+            {/* Check Selector Dropdown (Clean, compact picker allowing instant switching) */}
+            {checks.length > 0 && selectedCheck && (
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsCheckDropdownOpen(!isCheckDropdownOpen)}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-surface-container-low border border-surface-container-high hover:border-primary/40 text-xs font-semibold text-on-surface transition-colors cursor-pointer shadow-2xs"
+                  title="Switch screening check"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="material-symbols-outlined text-[17px] text-primary shrink-0">fact_check</span>
+                    <span className="font-mono font-bold text-primary">{selectedCheck.checkNumber || selectedCheck.id}</span>
+                    <span className="text-outline truncate">· {selectedCheck.patientName || selectedCheck.patientKey || selectedCheck.mrn}</span>
                   </div>
-                ))}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                    <span className="text-[10px] text-outline font-mono hidden sm:inline">{selectedCheck.timestamp}</span>
+                    <span className={`material-symbols-outlined text-[18px] text-outline transition-transform duration-150 ${isCheckDropdownOpen ? 'rotate-180 text-primary' : ''}`}>
+                      expand_more
+                    </span>
+                  </div>
+                </button>
+
+                {isCheckDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setIsCheckDropdownOpen(false)}
+                    />
+                    <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-surface-container-lowest border border-surface-container-high rounded-xl shadow-xl p-1.5 max-h-56 overflow-y-auto no-scrollbar">
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-surface-container mb-1">
+                        Select Screening Check ({checks.length})
+                      </div>
+                      {checks.map((chk) => {
+                        const isChkSelected = chk.id === selectedCheck.id;
+                        const isContra = chk.overallStatus === 'Contraindicated';
+                        const isReview = chk.overallStatus === 'Requires Review';
+                        return (
+                          <button
+                            key={chk.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCheckId(chk.id);
+                              setIsCheckDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between p-2 rounded-lg text-xs transition-colors cursor-pointer ${
+                              isChkSelected
+                                ? 'bg-primary/10 text-primary font-bold'
+                                : 'hover:bg-surface-container-low text-on-surface'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="font-mono font-bold">{chk.checkNumber || chk.id}</span>
+                              <span className="text-outline truncate">· {chk.patientName || chk.patientKey || chk.mrn}</span>
+                            </div>
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ml-1 shrink-0 ${
+                              isContra
+                                ? 'bg-[#FFDAD6] text-[#BA1A1A]'
+                                : isReview
+                                ? 'bg-[#FEF3C7] text-[#975A16]'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {chk.overallStatus || 'Safe'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
-            {/* Sub-section 2: Active Selected Check Inspection Details */}
-            {selectedCheck ? (
-              <div className="flex flex-col gap-3 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-outline">
-                    {priorityAlerts.length > 0 ? 'Inspected Check' : 'Active Patient Regimen'}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-md border border-primary/15">
-                      {selectedCheck.checkNumber}
-                    </span>
-                    <span className="text-[10px] text-outline">{selectedCheck.timestamp}</span>
-                  </div>
-                </div>
+            {/* Scrollable Per-Check Details Area (Strictly Bounded to Prevent Page Stretching) */}
+            <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar pr-0.5">
+              {selectedCheck ? (
+                <>
+                  {/* Per-Check Alerts Section */}
+                  {selectedCheck.alerts && selectedCheck.alerts.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-rose-600 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">warning</span>
+                          Clinical CDS Flags ({selectedCheck.alerts.length})
+                        </span>
+                        <span className="text-[10px] font-mono text-outline">
+                          {selectedCheck.unit || 'Dental Operatory'}
+                        </span>
+                      </div>
 
-                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-on-surface">
-                      {selectedCheck.patientKey || selectedCheck.mrn}
-                    </span>
-                    <span className="text-[11px] font-semibold text-primary">{selectedCheck.unit}</span>
-                  </div>
+                      <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
+                        {selectedCheck.alerts.map((alert: any, aIdx: number) => {
+                          const alertSeverity = ((alert.severity || 'major') as string).toLowerCase();
+                          const isContra = alertSeverity === 'contraindicated' || alertSeverity === 'critical';
+                          const isMaj = alertSeverity === 'major' || alertSeverity === 'high';
+                          const alertTitle =
+                            alert.title ||
+                            (alert.drugA && alert.drugB
+                              ? `${alert.drugA} ↔ ${alert.drugB} Hazard`
+                              : alert.name || (alert.category ? `${alert.category} Warning` : 'Clinical Interaction Hazard'));
+                          const alertDesc =
+                            alert.description ||
+                            alert.mechanism ||
+                            alert.clinicalImpact ||
+                            alert.finding ||
+                            'Clinical safety warning flagged during automated cross-check.';
 
-                  {/* Status Banner */}
-                  {selectedCheck.alerts && selectedCheck.alerts.some(a => a.severity === 'contraindicated' && !a.overridden) ? (
-                    <div className="p-2 rounded-lg bg-[#FFDAD6] text-[#BA1A1A] border border-[#BA1A1A]/30 flex items-center gap-2 text-xs">
-                      <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
-                      <span className="font-bold">Contraindicated Safety Hazard</span>
-                    </div>
-                  ) : selectedCheck.alerts && selectedCheck.alerts.some(a => a.severity === 'major' && !a.overridden) ? (
-                    <div className="p-2 rounded-lg bg-[#FEF3C7] text-[#975A16] border border-[#975A16]/30 flex items-center gap-2 text-xs">
-                      <span className="material-symbols-outlined text-[16px] shrink-0">warning</span>
-                      <span className="font-bold">Major Clinical Safety Review</span>
+                          return (
+                            <div
+                              key={alert.id || `alt-${aIdx}`}
+                              className={`rounded-xl p-3 flex flex-col gap-1.5 border transition-colors shadow-2xs ${
+                                isContra
+                                  ? 'bg-rose-50/80 border-rose-200 text-rose-950'
+                                  : isMaj
+                                  ? 'bg-orange-50/80 border-orange-200 text-orange-950'
+                                  : 'bg-amber-50/80 border-amber-200 text-amber-950'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="font-bold text-xs leading-snug">{alertTitle}</span>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0 ${
+                                    isContra ? 'bg-rose-600 text-white' : 'bg-orange-600 text-white'
+                                  }`}
+                                >
+                                  {alertSeverity}
+                                </span>
+                              </div>
+                              <p className="text-[11px] leading-relaxed opacity-95 line-clamp-2">
+                                {alertDesc}
+                              </p>
+                              <div className="flex items-center justify-between pt-1.5 border-t border-black/5 mt-0.5">
+                                <span className="text-[10px] text-outline font-semibold">
+                                  {alert.category || 'Drug-Drug'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewCopyModal(selectedCheck)}
+                                  className="text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-0.5"
+                                >
+                                  <span>Review &amp; Override</span>
+                                  <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : (
-                    <div className="p-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-2 text-xs">
-                      <span className="material-symbols-outlined text-[16px] text-emerald-600 shrink-0">check_circle</span>
-                      <span className="font-bold">Safe to Dispense — All Clear</span>
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-emerald-800 shadow-2xs">
+                      <span className="material-symbols-outlined text-[22px] text-emerald-600 shrink-0">verified</span>
+                      <div>
+                        <span className="text-xs font-bold block">Safe to Dispense — All Clear</span>
+                        <span className="text-[11px] text-emerald-700">
+                          Zero contraindicated drug interactions or organ clearance warnings flagged.
+                        </span>
+                      </div>
                     </div>
                   )}
 
-                  {/* Regimen Chips */}
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {selectedCheck.prescriptions && selectedCheck.prescriptions.length > 0 ? (
-                      selectedCheck.prescriptions.map((rx, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-container-lowest text-on-surface text-[11px] font-semibold border border-surface-container-high/60 shadow-2xs"
-                        >
-                          <span className="material-symbols-outlined text-[12px] text-primary">medication</span>
-                          <span>{rx.drugName}</span>
-                          {rx.dosage && <span className="text-[10px] text-outline font-normal">({rx.dosage})</span>}
-                        </span>
-                      ))
-                    ) : (
-                      (selectedCheck.prescribedDrugs || ['Unspecified']).map((drug, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-container-lowest text-on-surface text-[11px] font-semibold border border-surface-container-high/60 shadow-2xs"
-                        >
-                          <span className="material-symbols-outlined text-[12px] text-primary">medication</span>
-                          <span>{drug}</span>
-                        </span>
-                      ))
-                    )}
-                  </div>
+                  {/* Active Patient Regimen Summary */}
+                  <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px] text-primary">medication</span>
+                        Prescribed Regimen ({selectedCheck.prescriptions?.length || selectedCheck.prescribedDrugs?.length || 0})
+                      </span>
+                      <span className="font-mono text-[10px] text-outline">{selectedCheck.timestamp}</span>
+                    </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant pt-1 border-t border-surface-container">
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[13px] text-secondary">person_check</span>
-                      <span>{selectedCheck.reviewerName || selectedCheck.prescriberName || 'Active Clinician'}</span>
-                    </span>
-                    <span className="font-semibold text-slate-700">{selectedCheck.overallStatus || 'Attested'}</span>
-                  </div>
-                </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto no-scrollbar">
+                      {selectedCheck.prescriptions && selectedCheck.prescriptions.length > 0 ? (
+                        selectedCheck.prescriptions.map((rx, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-container-lowest text-on-surface text-[11px] font-semibold border border-surface-container-high/60 shadow-2xs"
+                          >
+                            <span>{rx.drugName}</span>
+                            {rx.dosage && <span className="text-[10px] text-outline font-normal">({rx.dosage})</span>}
+                          </span>
+                        ))
+                      ) : (
+                        (selectedCheck.prescribedDrugs || ['Unspecified']).map((drug, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-container-lowest text-on-surface text-[11px] font-semibold border border-surface-container-high/60 shadow-2xs"
+                          >
+                            <span>{drug}</span>
+                          </span>
+                        ))
+                      )}
+                    </div>
 
-                {/* Primary Dual Actions: PDF Report & Review CDS */}
-                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-surface-container mt-auto">
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => navigate(`/report?id=${selectedCheck.id}`)}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-primary text-white hover:bg-primary-hover shadow-xs text-xs font-bold transition-colors cursor-pointer"
-                    title={`Open Printable PDF Report for ${selectedCheck.checkNumber}`}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">description</span>
-                    <span>Open PDF Report</span>
-                  </motion.button>
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setReviewCopyModal(selectedCheck)}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-surface-container-low text-primary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors cursor-pointer"
-                    title="Review CDS decision, warnings, and attestation"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">rate_review</span>
-                    <span>Review Check</span>
-                  </motion.button>
+                    <div className="flex items-center justify-between text-[11px] text-on-surface-variant pt-1.5 border-t border-surface-container">
+                      <span className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-secondary">person_check</span>
+                        <span>{selectedCheck.reviewerName || selectedCheck.prescriberName || 'Active Clinician'}</span>
+                      </span>
+                      <span className="font-semibold text-slate-700">{selectedCheck.overallStatus || 'Attested'}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="p-5 text-center text-xs text-on-surface-variant">
+                  No screening checks available.
                 </div>
-              </div>
-            ) : priorityAlerts.length === 0 && (
-              <div className="bg-surface-container-low rounded-xl p-5 flex flex-col items-center text-center gap-2 border border-surface-container-high/40">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[22px]">verified_user</span>
-                </div>
-                <h3 className="font-bold text-xs text-on-surface">All Clear — Zero Critical Flags</h3>
-                <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                  No contraindicated or major drug interaction alerts pending review in the current queue.
-                </p>
-                <button
+              )}
+            </div>
+
+            {/* Bottom Actions Bar (Firmly Anchored at Bottom) */}
+            {selectedCheck && (
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-surface-container shrink-0">
+                <motion.button
                   type="button"
-                  onClick={() => navigate('/check')}
-                  className="mt-1 text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate(`/report?id=${selectedCheck.id}`)}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-primary text-white hover:bg-primary-hover shadow-xs text-xs font-bold transition-colors cursor-pointer"
+                  title={`Open Printable PDF Report for ${selectedCheck.checkNumber}`}
                 >
-                  <span>Screen New Prescription</span>
-                  <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                </button>
+                  <span className="material-symbols-outlined text-[16px]">description</span>
+                  <span>Open PDF Report</span>
+                </motion.button>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setReviewCopyModal(selectedCheck)}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-surface-container-low text-primary hover:bg-surface-container shadow-xs text-xs font-bold border border-surface-container-high transition-colors cursor-pointer"
+                  title="Review CDS decision, warnings, and attestation"
+                >
+                  <span className="material-symbols-outlined text-[16px]">rate_review</span>
+                  <span>Review Check</span>
+                </motion.button>
               </div>
             )}
           </div>
-
         </div>
-
       </section>
-
-
 
       {/* Modals & Drawers */}
 
