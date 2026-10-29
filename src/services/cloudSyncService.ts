@@ -127,12 +127,34 @@ export async function pullFromCloud(): Promise<boolean> {
             ...rx,
             drugName: rx.drugName || rx.name || 'Rx Medication',
           })),
-          alerts: (Array.isArray(c.alerts) ? c.alerts : []).map((al: any) => ({
-            ...al,
-            interactingDrugs: Array.isArray(al.interactingDrugs)
+          alerts: (Array.isArray(c.alerts) ? c.alerts : []).map((al: any, idx: number) => {
+            const interacting = Array.isArray(al.interactingDrugs)
               ? al.interactingDrugs
-              : (Array.isArray(al.interacting_drugs) ? al.interacting_drugs : (al.drugName ? [al.drugName] : [])),
-          })),
+              : Array.isArray(al.interacting_drugs)
+              ? al.interacting_drugs
+              : al.drugA && al.drugB
+              ? [al.drugA, al.drugB]
+              : al.drugName
+              ? [al.drugName]
+              : [];
+
+            const title =
+              al.title ||
+              (al.drugA && al.drugB
+                ? `${al.drugA} ↔ ${al.drugB} Hazard`
+                : al.name || (al.category ? `${al.category} Warning` : 'Clinical Interaction Hazard'));
+
+            return {
+              ...al,
+              id: al.id || `alt-${c.id || c.checkNumber || 'chk'}-${idx + 1}`,
+              title,
+              severity: (al.severity || 'major').toLowerCase(),
+              interactingDrugs: interacting,
+              overridden: !!al.overridden,
+              description: al.description || al.mechanism || al.clinicalImpact || al.finding || '',
+              recommendation: al.recommendation || al.clinicalRecommendation || al.action || 'Review dosage regimen.',
+            };
+          }),
           overallStatus:
             c.status === 'safe' || c.highestSeverity === 'clear' || c.highestSeverity === 'safe'
               ? 'Safe to Dispense'
@@ -173,7 +195,25 @@ export async function pullFromCloud(): Promise<boolean> {
           patientName: a.patientName || a.innerData?.patientName || a.patientMrn,
           checkId: a.checkId || a.innerData?.checkId,
           prescriptions: a.prescriptions || a.innerData?.prescriptions || [],
-          alerts: a.alerts || a.innerData?.alerts || [],
+          alerts: (Array.isArray(a.alerts || a.innerData?.alerts) ? (a.alerts || a.innerData?.alerts) : []).map((al: any, idx: number) => {
+            const interacting = Array.isArray(al.interactingDrugs)
+              ? al.interactingDrugs
+              : Array.isArray(al.interacting_drugs)
+              ? al.interacting_drugs
+              : al.drugA && al.drugB
+              ? [al.drugA, al.drugB]
+              : al.drugName
+              ? [al.drugName]
+              : [];
+            return {
+              ...al,
+              id: al.id || `alt-aud-${idx + 1}`,
+              title: al.title || (al.drugA && al.drugB ? `${al.drugA} ↔ ${al.drugB} Hazard` : 'Clinical CDS Alert'),
+              severity: (al.severity || 'major').toLowerCase(),
+              interactingDrugs: interacting,
+              description: al.description || al.mechanism || al.clinicalImpact || '',
+            };
+          }),
           details: a.eventDetails || a.details || '',
           severity: (a.severity || 'safe').toLowerCase(),
           hash: a.hash || 'SHA256:AUTHENTICATED',

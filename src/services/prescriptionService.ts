@@ -840,10 +840,10 @@ export class ClinicalDecisionSupport {
   }
 
   static overrideAlert(checkId: string, alertId: string, reason: string, author: string) {
-    const check = _cachedChecks.find(c => c.id === checkId);
+    const check = _cachedChecks.find(c => c.id === checkId || c.checkNumber === checkId);
     if (!check) return;
 
-    const alert = check.alerts.find(a => a.id === alertId);
+    const alert = (check.alerts || []).find(a => a.id === alertId || a.title === alertId);
     if (alert) {
       alert.overridden = true;
       alert.overrideReason = reason;

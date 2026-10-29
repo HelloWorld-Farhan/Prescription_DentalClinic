@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
+import { pullFromCloud } from '../services/cloudSyncService';
 import { DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import EmailScheduleAlertModal from '../components/EmailScheduleAlertModal';
@@ -28,6 +29,9 @@ export default function Alerts() {
   });
 
   useEffect(() => {
+    // Proactively pull latest checks & alerts from cloud database on view mount
+    pullFromCloud().catch(() => {});
+
     const handleChecksSync = () => {
       setChecks(VirtualDb.getChecks());
     };
@@ -65,28 +69,48 @@ export default function Alerts() {
 
   const latestCheck = checks[0];
 
-  // Dynamic Tabs with exact counts
+  // Exact counts strictly partitioned between active queue and overridden history
+  const activeSafetyHazards = useMemo(
+    () => unifiedQueue.filter((a) => a.type === 'safety_hazard' && !a.alert?.overridden),
+    [unifiedQueue]
+  );
+  const intakeSchedules = useMemo(
+    () => unifiedQueue.filter((a) => a.type === 'intake_schedule'),
+    [unifiedQueue]
+  );
+  const courseExpiries = useMemo(
+    () => unifiedQueue.filter((a) => a.type === 'course_expiry'),
+    [unifiedQueue]
+  );
+  const overriddenAlerts = useMemo(
+    () => unifiedQueue.filter((a) => !!a.alert?.overridden),
+    [unifiedQueue]
+  );
+
+  const activeQueueCount = activeSafetyHazards.length + intakeSchedules.length + courseExpiries.length;
+
+  // Dynamic Tabs with exact counts matching Dashboard metrics 1:1
   const availableTabs = [
-    { key: 'all' as const, label: 'All Alerts & Schedules', count: unifiedQueue.length },
+    { key: 'all' as const, label: 'All Active Queue', count: activeQueueCount },
     {
       key: 'safety' as const,
-      label: 'Safety Hazards (Contraindicated)',
-      count: unifiedQueue.filter((a) => a.type === 'safety_hazard').length,
+      label: 'Safety Hazards',
+      count: activeSafetyHazards.length,
     },
     {
       key: 'intake' as const,
       label: 'Medication Intake (Timing)',
-      count: unifiedQueue.filter((a) => a.type === 'intake_schedule').length,
+      count: intakeSchedules.length,
     },
     {
       key: 'expiry' as const,
-      label: 'Course Expiration (Completion)',
-      count: unifiedQueue.filter((a) => a.type === 'course_expiry').length,
+      label: 'Course Expiration',
+      count: courseExpiries.length,
     },
     {
       key: 'overridden' as const,
       label: 'Overridden History',
-      count: unifiedQueue.filter((a) => a.alert?.overridden).length,
+      count: overriddenAlerts.length,
     },
   ].filter((tab) => tab.key === 'all' || tab.count > 0);
 
@@ -100,7 +124,8 @@ export default function Alerts() {
   const filtered = useMemo(() => {
     return unifiedQueue.filter((item) => {
       let matchesTab = true;
-      if (activeTab === 'safety') matchesTab = item.type === 'safety_hazard';
+      if (activeTab === 'all') matchesTab = !item.alert?.overridden;
+      else if (activeTab === 'safety') matchesTab = item.type === 'safety_hazard' && !item.alert?.overridden;
       else if (activeTab === 'intake') matchesTab = item.type === 'intake_schedule';
       else if (activeTab === 'expiry') matchesTab = item.type === 'course_expiry';
       else if (activeTab === 'overridden') matchesTab = !!item.alert?.overridden;

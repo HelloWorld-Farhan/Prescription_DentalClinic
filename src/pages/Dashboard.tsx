@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName, isTodayIST, formatISTTime } from '../services/prescriptionService';
+import { pullFromCloud } from '../services/cloudSyncService';
 
 import { SafetyCheckRecord, DrugInteractionAlert, InteractionRule, AuditLogEntry } from '../types';
 
@@ -220,6 +221,8 @@ export default function Dashboard() {
   const [rules, setRules] = useState<InteractionRule[]>(() => VirtualDb.getRules());
 
   useEffect(() => {
+    // Proactively refresh live cloud state from PostgreSQL on mount
+    pullFromCloud().catch(() => {});
 
     const handleRulesSync = () => {
 
