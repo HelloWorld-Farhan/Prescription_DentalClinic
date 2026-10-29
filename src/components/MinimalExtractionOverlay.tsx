@@ -92,9 +92,9 @@ export default function MinimalExtractionOverlay({
         if (isClosingRef.current) return;
 
         const elapsed = now - startTime;
-        // Snappy, smooth logarithmic progression reaching ~92% in 2.5s
-        const ratio = 1 - Math.exp(-elapsed / 1200);
-        const p = Math.min(94, Math.max(1, Math.round(ratio * 94)));
+        // Natural progression reaching ~85% in 4.5s and smoothly holding up to 96% until AI finishes
+        const ratio = 1 - Math.exp(-elapsed / 2400);
+        const p = Math.min(96, Math.max(1, Math.round(ratio * 96)));
 
         currentProgressRef.current = p;
         setProgress(p);
@@ -104,16 +104,16 @@ export default function MinimalExtractionOverlay({
 
       animFrame = requestAnimationFrame(animateHoldingCurve);
 
-      // Failsafe auto-resolve after 3.4 seconds so extraction never freezes at 94%
-      const failsafeTimer = setTimeout(() => {
+      // Emergency ceiling timeout (25s) only as an ultimate fallback if client network drops
+      const emergencyTimeout = setTimeout(() => {
         if (!isClosingRef.current) {
           sweepTo100AndFinish();
         }
-      }, 3400);
+      }, 25000);
 
       return () => {
         if (animFrame) cancelAnimationFrame(animFrame);
-        clearTimeout(failsafeTimer);
+        clearTimeout(emergencyTimeout);
       };
     }
   }, [isExtracting]);
