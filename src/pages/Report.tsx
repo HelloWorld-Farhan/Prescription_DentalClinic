@@ -665,9 +665,11 @@ export default function Report() {
                         <div className="flex justify-between">
                           <span className="text-slate-500">Documented Allergies:</span>
                           <span className="font-semibold text-slate-800">
-                            {currentCheck?.patientAllergies && currentCheck.patientAllergies.length > 0
+                            {Array.isArray(currentCheck?.patientAllergies) && currentCheck.patientAllergies.length > 0
                               ? currentCheck.patientAllergies.join(', ')
-                              : 'NKDA (No Known Allergies)'}
+                              : (typeof currentCheck?.patientAllergies === 'string' && currentCheck.patientAllergies
+                                  ? currentCheck.patientAllergies
+                                  : 'NKDA (No Known Allergies)')}
                           </span>
                         </div>
                         <div className="flex justify-between">

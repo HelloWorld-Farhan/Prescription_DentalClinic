@@ -394,40 +394,51 @@ export default function Layout() {
   const filteredSearchItems: SearchResultItem[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) {
-      return realChecks.slice(0, 5).map(check => ({
-        id: check.id,
-        name: `${check.patientName} (${check.mrn})`,
-        category: `Safety Check #${check.id}`,
-        icon: 'assignment',
-        path: `/report/${check.id}`,
-        type: 'record' as const,
-        badge: check.overallStatus || (check.alerts.length > 0 ? 'Flagged' : 'Cleared'),
-        badgeStyle: check.alerts.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800',
-        subtitle: check.prescriptions.map(p => p.drugName).join(', ') || 'No medications listed'
-      }));
+      return realChecks.slice(0, 5).map(check => {
+        const rxList = Array.isArray(check.prescriptions) ? check.prescriptions : [];
+        const alertList = Array.isArray(check.alerts) ? check.alerts : [];
+        return {
+          id: check.id,
+          name: `${check.patientName || 'Patient'} (${check.mrn || 'MRN'})`,
+          category: `Safety Check #${check.id}`,
+          icon: 'assignment',
+          path: `/report/${check.id}`,
+          type: 'record' as const,
+          badge: check.overallStatus || (alertList.length > 0 ? 'Flagged' : 'Cleared'),
+          badgeStyle: alertList.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800',
+          subtitle: rxList.map(p => p?.drugName || (p as any)?.name).filter(Boolean).join(', ') || 'No medications listed'
+        };
+      });
     }
 
     const matchingChecks: SearchResultItem[] = realChecks
-      .filter(check =>
-        check.patientName.toLowerCase().includes(q) ||
-        check.mrn.toLowerCase().includes(q) ||
-        check.id.toLowerCase().includes(q) ||
-        check.prescriptions.some(p =>
-          p.drugName.toLowerCase().includes(q) ||
-          (p.genericName && p.genericName.toLowerCase().includes(q))
-        )
-      )
-      .map(check => ({
-        id: check.id,
-        name: `${check.patientName} (${check.mrn})`,
-        category: `Safety Check #${check.id}`,
-        icon: 'assignment',
-        path: `/report/${check.id}`,
-        type: 'record' as const,
-        badge: check.overallStatus || (check.alerts.length > 0 ? 'Flagged' : 'Cleared'),
-        badgeStyle: check.alerts.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800',
-        subtitle: check.prescriptions.map(p => p.drugName).join(', ') || 'No medications listed'
-      }));
+      .filter(check => {
+        const rxList = Array.isArray(check.prescriptions) ? check.prescriptions : [];
+        return (
+          (check.patientName || '').toLowerCase().includes(q) ||
+          (check.mrn || '').toLowerCase().includes(q) ||
+          (check.id || '').toLowerCase().includes(q) ||
+          rxList.some(p =>
+            (p?.drugName || '').toLowerCase().includes(q) ||
+            (p?.genericName && p.genericName.toLowerCase().includes(q))
+          )
+        );
+      })
+      .map(check => {
+        const rxList = Array.isArray(check.prescriptions) ? check.prescriptions : [];
+        const alertList = Array.isArray(check.alerts) ? check.alerts : [];
+        return {
+          id: check.id,
+          name: `${check.patientName || 'Patient'} (${check.mrn || 'MRN'})`,
+          category: `Safety Check #${check.id}`,
+          icon: 'assignment',
+          path: `/report/${check.id}`,
+          type: 'record' as const,
+          badge: check.overallStatus || (alertList.length > 0 ? 'Flagged' : 'Cleared'),
+          badgeStyle: alertList.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800',
+          subtitle: rxList.map(p => p?.drugName || (p as any)?.name).filter(Boolean).join(', ') || 'No medications listed'
+        };
+      });
 
     const matchingActions: SearchResultItem[] = SYSTEM_ACTIONS.filter(act =>
       act.name.toLowerCase().includes(q) ||
@@ -994,7 +1005,7 @@ export default function Layout() {
 
         {/* Content Route with Page Transition */}
         <main className="flex-1 p-4 lg:p-8 mt-16 max-w-7xl w-full mx-auto min-h-[calc(100vh-140px)]">
-          <ErrorBoundary fallbackTitle="Unable to load this clinical safety view">
+          <ErrorBoundary key={location.pathname} resetKey={location.pathname} fallbackTitle="Unable to load this clinical safety view">
             <motion.div
               key={location.pathname}
               initial={{ opacity: 0, y: 14, filter: 'blur(3px)' }}

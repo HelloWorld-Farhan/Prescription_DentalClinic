@@ -308,7 +308,7 @@ export default function NewCheck() {
     if (p) {
       setCustomWeight(p.weightKg);
       setCustomEgfr(p.egfr);
-      setActiveMeds(p.activeMedications);
+      setActiveMeds(Array.isArray(p.activeMedications) ? p.activeMedications : []);
       setAllergies(p.allergies);
       setPtKey('MRN-HASH-' + p.mrn.replace(/[^0-9]/g, '').slice(0, 4) + '-XF');
     }

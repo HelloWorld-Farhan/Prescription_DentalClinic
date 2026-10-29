@@ -123,8 +123,16 @@ export async function pullFromCloud(): Promise<boolean> {
           patientName: c.patientName || c.patientMrn || 'Patient',
           mrn: c.patientMrn || c.patientId || 'PT-UNKNOWN',
           unit: c.unit || 'Dental Operatory',
-          prescriptions: c.prescriptions || [],
-          alerts: c.alerts || [],
+          prescriptions: (Array.isArray(c.prescriptions) ? c.prescriptions : []).map((rx: any) => ({
+            ...rx,
+            drugName: rx.drugName || rx.name || 'Rx Medication',
+          })),
+          alerts: (Array.isArray(c.alerts) ? c.alerts : []).map((al: any) => ({
+            ...al,
+            interactingDrugs: Array.isArray(al.interactingDrugs)
+              ? al.interactingDrugs
+              : (Array.isArray(al.interacting_drugs) ? al.interacting_drugs : (al.drugName ? [al.drugName] : [])),
+          })),
           overallStatus:
             c.status === 'safe' || c.highestSeverity === 'clear' || c.highestSeverity === 'safe'
               ? 'Safe to Dispense'
