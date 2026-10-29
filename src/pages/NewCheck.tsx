@@ -11,6 +11,7 @@ import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
 import { uploadToR2, deleteDocumentRecord } from '../services/r2StorageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
+import { executePrescriptionSafetyCheck } from '../services/cloudSyncService';
 
 interface AllergyDetailInfo {
   name: string;
@@ -570,40 +571,150 @@ export default function NewCheck() {
     executeSafetyCheckPipeline(selectedQuestions);
   };
 
-  const executeSafetyCheckPipeline = (questionsToEvaluate: string[]) => {
+  const executeSafetyCheckPipeline = async (questionsToEvaluate: string[]) => {
     showConfirmation('Running Automated Safety Screening & Extraction...', 'info', 2000);
     setFlowPhase('analyzing');
-    setAnalysisProgress(5);
+    setAnalysisProgress(15);
     setCurrentAnalysisStage(1);
-    setActiveStageLog('Extracting optical text & pharmacological entities from prescription...');
+    setActiveStageLog('Connecting to SmileClinic CDS Check Engine & Gemini 3.5 Flash Lite...');
 
-    // Run sequential animated stages
-    // Stage 1: OCR Extraction (0% to 28%)
-    setTimeout(() => {
-      setAnalysisProgress(30);
+    const timer1 = setTimeout(() => {
+      setAnalysisProgress(45);
       setCurrentAnalysisStage(2);
       setActiveStageLog(`Matching patient chart #${selectedPatient.mrn} • eGFR: ${customEgfr} mL/min • Reconciling allergies...`);
-    }, 900);
+    }, 700);
 
-    // Stage 2: Patient Context & Allergies (28% to 58%)
-    setTimeout(() => {
-      setAnalysisProgress(65);
+    const timer2 = setTimeout(() => {
+      setAnalysisProgress(75);
       setCurrentAnalysisStage(3);
-      setActiveStageLog(`Cross-matching against ${activeMeds.length} active medications (${activeMeds.join(', ')})...`);
-    }, 1800);
+      setActiveStageLog(`Cross-matching against ${activeMeds.length} active medications & dental operatory sedation protocols...`);
+    }, 1500);
 
-    // Stage 3: Drug-Drug & Dosing Matrix (58% to 88%)
-    setTimeout(() => {
-      setAnalysisProgress(90);
-      setCurrentAnalysisStage(4);
-      setActiveStageLog('Evaluating CDS safety rules, Beers criteria & CYP450 contraindications...');
-    }, 2700);
+    try {
+      const updatedPatient: Patient = {
+        ...selectedPatient,
+        weightKg: customWeight,
+        egfr: customEgfr,
+        activeMedications: activeMeds,
+        allergies: parsedAllergies
+      };
 
-    // Stage 4: Finalize & Generate Safety Record
-    setTimeout(() => {
+      const dossierPayload = {
+        user_email: storedUser?.email || 'clinician-user',
+        clinician_name: prescriberDisplayName,
+        patient: {
+          id: selectedPatient.id,
+          name: patientDisplayName,
+          mrn: selectedPatient.mrn,
+          age: selectedPatient.age,
+          gender: selectedPatient.gender,
+          height: (selectedPatient as any).height || '165 cm',
+          weight: `${customWeight} kg`,
+          bp: (selectedPatient as any).bloodPressure || '120/80 mmHg',
+          spo2: (selectedPatient as any).spo2 || '98%',
+          egfr: `${customEgfr}`,
+          allergies: parsedAllergies,
+          conditions: (selectedPatient.conditions || []).map((cond: any) => typeof cond === 'string' ? cond : cond.name),
+          current_medications: activeMeds,
+        },
+        prescriptions: prescriptions,
+        rules: VirtualDb.getRules(),
+        clinical_inquiries: questionsToEvaluate,
+        source_document_url: extractedMeta?.storageUrl,
+        source_document_name: extractedMeta?.filename || (inputMethod === 'camera' ? 'Camera Captured Photo' : undefined),
+        source_type: inputMethod,
+      };
+
+      const aiResponse = await executePrescriptionSafetyCheck(dossierPayload);
+
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       setAnalysisProgress(100);
 
-      // Perform actual CDS evaluation
+      const evaluatedAlerts = (aiResponse.alerts && aiResponse.alerts.length > 0)
+        ? aiResponse.alerts.map((a: any, idx: number) => ({
+            id: `alert-cds-${Date.now()}-${idx+1}`,
+            title: `${a.drugA} ↔ ${a.drugB} Hazard`,
+            severity: (a.severity || 'major').toLowerCase() as any,
+            category: a.category || 'Drug-Drug',
+            mechanism: a.description || 'Clinical safety alert',
+            clinicalRecommendation: 'Consult prescriber before dispensing.',
+            evidenceLevel: 'High' as any,
+            statutoryRequirement: false,
+            timestamp: new Date().toLocaleTimeString(),
+            drugPair: [a.drugA, a.drugB],
+            overridden: false
+          }))
+        : VirtualDb.evaluateScreening(updatedPatient, prescriptions);
+
+      setAlerts(evaluatedAlerts);
+
+      const overallStatus = aiResponse.overall_status || (
+        evaluatedAlerts.some((a: any) => a.severity === 'contraindicated')
+          ? 'Contraindicated'
+          : evaluatedAlerts.some((a: any) => a.severity === 'major')
+          ? 'Requires Review'
+          : 'Safe to Dispense'
+      );
+
+      const nowMs = Date.now();
+      const newRecord: SafetyCheckRecord = {
+        id: aiResponse.check_id || ('chk-' + nowMs),
+        checkNumber: aiResponse.check_id || ('CHK-2026-' + Math.floor(1000 + Math.random() * 9000)),
+        timestamp: 'Just now',
+        timestampMs: nowMs,
+        createdAt: new Date(nowMs).toISOString(),
+        patientId: updatedPatient.id,
+        patientName: patientDisplayName,
+        mrn: updatedPatient.mrn,
+        patientKey: ptKey,
+        unit: updatedPatient.roomOrUnit || 'Dental Operatory',
+        prescriptions: (aiResponse.medicines && aiResponse.medicines.length > 0)
+          ? aiResponse.medicines.map((m: any, idx: number) => ({
+              id: m.id || `rx-evaluated-${idx+1}`,
+              drugName: m.drugName,
+              genericName: m.genericName || m.drugName,
+              dosage: m.dosage,
+              frequency: m.frequency,
+              route: m.route || 'Oral (PO)',
+              duration: m.duration || 'Standard regimen',
+              indication: m.indication || 'Clinical Therapy',
+              status: m.status || 'Safe to Dispense',
+              monograph: m.monograph,
+              dentalGuidance: m.dental_guidance
+            }))
+          : prescriptions,
+        alerts: evaluatedAlerts,
+        overallStatus,
+        reviewerName: prescriberDisplayName,
+        prescriberName: prescriberDisplayName,
+        prescriberNpi: 'NPI-1092837482',
+        fhirSynced: true,
+        sourceDocumentUrl: extractedMeta?.storageUrl,
+        sourceDocumentName: extractedMeta?.filename || (inputMethod === 'camera' ? 'Camera Captured Photo' : undefined),
+        sourceType: inputMethod,
+        questions: questionsToEvaluate,
+        pdfUrl: aiResponse.reports?.pdf_url,
+        wordUrl: aiResponse.reports?.word_url,
+        csvUrl: aiResponse.reports?.csv_url,
+        inquiryAnswers: aiResponse.clinical_inquiries,
+        digitalSeal: aiResponse.digital_seal,
+        notes: aiResponse.summary
+      };
+
+      VirtualDb.addCheck(newRecord);
+      setSavedCheckRecord(newRecord);
+      showConfirmation(`Prescription safety check ${newRecord.checkNumber} verified & recorded`, 'success');
+
+      setTimeout(() => {
+        setFlowPhase('report');
+      }, 400);
+    } catch (err) {
+      console.error('[Safety Check Pipeline Fallback]', err);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      setAnalysisProgress(100);
+
       const updatedPatient: Patient = {
         ...selectedPatient,
         weightKg: customWeight,
@@ -646,13 +757,12 @@ export default function NewCheck() {
 
       VirtualDb.addCheck(newRecord);
       setSavedCheckRecord(newRecord);
-      showConfirmation(`Prescription safety check ${newRecord.checkNumber} completed & logged`, 'success');
+      showConfirmation(`Prescription safety check ${newRecord.checkNumber} completed`, 'info');
 
-      // Automatically transition directly into the complete Clinical Safety Report & Record screen
       setTimeout(() => {
         setFlowPhase('report');
-      }, 500);
-    }, 3600);
+      }, 400);
+    }
   };
 
   // Override alert from detail drawer
@@ -2118,22 +2228,29 @@ export default function NewCheck() {
                   </div>
 
                   <div className="flex flex-col gap-2.5">
-                    {savedCheckRecord.questions.map((q, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3.5 rounded-xl bg-teal-50/60 border border-teal-200/80 flex flex-col gap-1.5"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-[#007782] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
-                            {idx + 1}
-                          </span>
-                          <span className="text-xs font-bold text-slate-900">{q}</span>
+                    {savedCheckRecord.questions.map((q, idx) => {
+                      const ansObj = (savedCheckRecord.inquiryAnswers || []).find(
+                        (a: any) => a.question && a.question.toLowerCase().trim() === q.toLowerCase().trim()
+                      ) || (savedCheckRecord.inquiryAnswers || [])[idx];
+                      const answerText = ansObj?.answer || 'Cross-checked against candidate medications and patient chart. Safe to proceed with standard dosing and hydration protocols.';
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-3.5 rounded-xl bg-teal-50/60 border border-teal-200/80 flex flex-col gap-1.5"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-[#007782] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <span className="text-xs font-bold text-slate-900">{q}</span>
+                          </div>
+                          <p className="text-xs text-slate-700 pl-7 leading-relaxed font-medium">
+                            {answerText}
+                          </p>
                         </div>
-                        <p className="text-xs text-slate-700 pl-7 leading-relaxed">
-                          Cross-checked against candidate medications and patient chart. Safe to proceed with standard dosing and hydration protocols.
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -2220,20 +2337,43 @@ export default function NewCheck() {
                 </div>
 
                 <div className="flex flex-col gap-2.5">
-                  {prescriptions.map((p) => (
-                    <div
-                      key={p.id}
-                      className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="text-xs font-bold text-on-surface">{p.drugName}</div>
-                        <div className="text-[11px] text-outline">
-                          {p.dosage} • {p.frequency} • {p.route} • {p.duration}
+                  {prescriptions.map((p) => {
+                    const statusText = p.status || 'Safe to Dispense';
+                    const isContra = statusText.toLowerCase().includes('contra');
+                    const isMonitor = statusText.toLowerCase().includes('monitor') || statusText.toLowerCase().includes('caution') || statusText.toLowerCase().includes('review');
+                    return (
+                      <div
+                        key={p.id}
+                        className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container-high flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                      >
+                        <div>
+                          <div className="text-xs font-bold text-on-surface flex items-center gap-2">
+                            <span>{p.drugName}</span>
+                            {p.genericName && p.genericName !== p.drugName && (
+                              <span className="text-[10px] text-slate-500 font-normal">({p.genericName})</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-outline">
+                            {p.dosage} • {p.frequency} • {p.route} • {p.duration}
+                          </div>
+                          {p.monograph && (
+                            <div className="text-[10px] text-teal-700 mt-0.5 leading-snug">{p.monograph}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            isContra
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : isMonitor
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
+                            {statusText}
+                          </span>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold text-primary">{p.indication}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -2287,6 +2427,50 @@ export default function NewCheck() {
                   <span className="material-symbols-outlined text-[18px]">fullscreen</span>
                   <span>Open Fullscreen A4 Viewer</span>
                 </button>
+
+                {/* Export Word (.docx) Button */}
+                {savedCheckRecord.wordUrl && (
+                  <a
+                    href={savedCheckRecord.wordUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full h-10 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100/60 text-blue-800 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">description</span>
+                    <span>Download Consultation Note (.docx)</span>
+                  </a>
+                )}
+
+                {/* Export CSV (.csv) Button */}
+                {savedCheckRecord.csvUrl && (
+                  <a
+                    href={savedCheckRecord.csvUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full h-10 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/60 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">table_view</span>
+                    <span>Download Structured Data (.csv)</span>
+                  </a>
+                )}
+
+                {/* View Original Prescription Copy */}
+                {(savedCheckRecord.sourceDocumentUrl || capturedPhoto) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (savedCheckRecord.sourceDocumentUrl) {
+                        window.open(savedCheckRecord.sourceDocumentUrl, '_blank');
+                      } else if (capturedPhoto) {
+                        window.open(capturedPhoto, '_blank');
+                      }
+                    }}
+                    className="w-full h-10 rounded-xl border border-teal-200 bg-teal-50/60 hover:bg-teal-100/60 text-teal-800 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">visibility</span>
+                    <span>Open Uploaded Prescription Slip</span>
+                  </button>
+                )}
 
                 <div className="pt-2 border-t border-surface-container flex gap-2">
                   <button

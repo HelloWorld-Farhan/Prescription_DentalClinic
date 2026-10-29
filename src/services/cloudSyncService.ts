@@ -432,6 +432,29 @@ export async function deleteCustomQuestionFromCloud(questionId: string): Promise
 }
 
 /**
+ * Dispatches the complete safety dossier to the backend Check engine.
+ * Calls Gemini 3.5 Flash Lite with 14-key pool, uploads PDF/Word/CSV to R2,
+ * and persists to PostgreSQL.
+ */
+export async function executePrescriptionSafetyCheck(payload: any): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/api/prescriptions/safety-check`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Safety check failed: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  pullFromCloud();
+  return result;
+}
+
+/**
  * Initializes the background real-time synchronization loop.
  * - Instantly syncs upon load
  * - Listens for window focus / screen unlocking on mobile devices

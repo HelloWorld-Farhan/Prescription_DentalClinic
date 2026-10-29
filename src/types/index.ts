@@ -52,6 +52,12 @@ export interface PrescriptionItem {
 
   indication: string;
 
+  status?: string;
+
+  monograph?: string;
+
+  dentalGuidance?: string;
+
 }
 
 
@@ -145,6 +151,12 @@ export interface SafetyCheckRecord {
   pdfUrl?: string;
 
   pdfFilename?: string;
+
+  wordUrl?: string;
+
+  csvUrl?: string;
+
+  inquiryAnswers?: { question: string; answer: string }[];
 
   fhirSynced: boolean;
 
