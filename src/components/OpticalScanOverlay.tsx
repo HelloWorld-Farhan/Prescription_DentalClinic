@@ -30,7 +30,7 @@ const AGENT_STAGES: AgentStage[] = [
   },
   {
     step: 2,
-    title: 'PropNexAI Vision Agent',
+    title: 'SmileGuard Multimodal Vision AI',
     subtitle: 'Multimodal vision agent scanning handwritten script & layout...',
     icon: 'neurology',
     minPercent: 25,
