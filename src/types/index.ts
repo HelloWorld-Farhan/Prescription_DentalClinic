@@ -179,6 +179,8 @@ export interface AuditLogEntry {
   sourceDocumentUrl?: string;
   sourceDocumentName?: string;
   sourceType?: 'upload' | 'camera' | 'manual';
+  pdfFilename?: string;
+  pdfUrl?: string;
 
   id: string;
 

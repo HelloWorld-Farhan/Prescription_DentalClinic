@@ -382,26 +382,19 @@ export default function AuditLog() {
 
 
                   // Cross-reference safety check if available
-
-                  const matchedCheck = checks.find(
-
-                    (c) => c.id === log.checkId || c.mrn === log.patientMrn || c.patientKey === log.patientMrn
-
-                  );
+                  const matchedCheck =
+                    checks.find((c) => c.id === log.checkId || c.checkNumber === log.checkId) ||
+                    checks.find((c) => (c.mrn === log.patientMrn || c.patientId === log.patientMrn) && Math.abs((c.timestampMs || 0) - (log.timestampMs || 0)) < 300000) ||
+                    checks.find((c) => c.mrn === log.patientMrn || c.patientId === log.patientMrn);
 
                   const prescriptions = log.prescriptions || matchedCheck?.prescriptions || [];
-
                   const alerts = log.alerts || matchedCheck?.alerts || [];
 
-
-
                   const dateTimeObj = formatISTDateTime(log.timestampMs || log.timestamp);
-
-                  const pdfReportIdentifier = matchedCheck?.checkNumber || matchedCheck?.id || log.checkId || log.id;
-
-                  const pdfFilename = `SmileClinic_CDS_Report_${pdfReportIdentifier.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-
-
+                  const pdfReportIdentifier = log.checkId || matchedCheck?.checkNumber || matchedCheck?.id || log.id;
+                  const pdfFilename =
+                    log.pdfFilename ||
+                    `SmileClinic_CDS_Report_${pdfReportIdentifier.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
 
                   return (
 

@@ -623,8 +623,52 @@ export class ClinicalDecisionSupport {
     }
   }
 
+  static deduplicateAuditLogs(logs: AuditLogEntry[]): AuditLogEntry[] {
+    const hasCompletedForCheck = new Set<string>();
+    const hasCompletedForPatientMinute = new Set<string>();
+
+    for (const log of logs) {
+      if (log.action === 'Safety Screen Completed') {
+        if (log.checkId) hasCompletedForCheck.add(log.checkId);
+        const minKey = `${log.patientMrn || ''}_${Math.floor((log.timestampMs || 0) / 60000)}`;
+        hasCompletedForPatientMinute.add(minKey);
+      }
+    }
+
+    const seenIds = new Set<string>();
+    const seenCheckAction = new Set<string>();
+    const deduped: AuditLogEntry[] = [];
+
+    for (const log of logs) {
+      // Drop redundant 'Safety Screen Initiated' if a completed screen exists for this check or patient/minute
+      if (log.action === 'Safety Screen Initiated') {
+        const minKey = `${log.patientMrn || ''}_${Math.floor((log.timestampMs || 0) / 60000)}`;
+        if ((log.checkId && hasCompletedForCheck.has(log.checkId)) || hasCompletedForPatientMinute.has(minKey)) {
+          continue;
+        }
+      }
+
+      if (log.id && seenIds.has(log.id)) {
+        continue;
+      }
+      if (log.id) seenIds.add(log.id);
+
+      if (log.checkId) {
+        const caKey = `${log.checkId}_${log.action}`;
+        if (seenCheckAction.has(caKey)) {
+          continue;
+        }
+        seenCheckAction.add(caKey);
+      }
+
+      deduped.push(log);
+    }
+    return deduped;
+  }
+
   static setAuditLogs(logs: AuditLogEntry[]) {
-    _cachedAuditLogs = (logs || []).filter(l => l.action !== 'Rule Updated' && !l.action.includes('Rule'));
+    const filtered = (logs || []).filter(l => l.action !== 'Rule Updated' && !l.action.includes('Rule'));
+    _cachedAuditLogs = this.deduplicateAuditLogs(filtered);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_audit_updated'));
     }
@@ -766,25 +810,33 @@ export class ClinicalDecisionSupport {
 
     const auditHash = 'SHA256:' + Math.random().toString(36).substring(2, 10).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    this.addAudit({
-      id: 'aud-' + now,
-      timestamp: istTimeStr,
-      timestampMs: now,
-      createdAt: new Date(now).toISOString(),
-      clinicianName: record.prescriberName,
-      action: 'Safety Screen Initiated',
-      patientMrn: record.mrn,
-      patientName: record.patientName,
-      checkId: record.id,
-      prescriptions: record.prescriptions,
-      alerts: record.alerts,
-      sourceDocumentUrl: record.sourceDocumentUrl,
-      sourceDocumentName: record.sourceDocumentName,
-      sourceType: record.sourceType,
-      details: `Screened ${record.prescriptions.length} items for ${record.patientName}. Result: ${record.overallStatus}.`,
-      severity: record.alerts.length > 0 ? record.alerts[0].severity : 'safe',
-      hash: auditHash
-    });
+    // Only record an audit log if one does not already exist for this check
+    const alreadyLogged = _cachedAuditLogs.some(
+      (a) => a.checkId === record.id || a.checkId === record.checkNumber || (a.patientMrn === record.mrn && Math.abs((a.timestampMs || 0) - now) < 60000)
+    );
+    if (!alreadyLogged) {
+      this.addAudit({
+        id: 'aud-' + now,
+        timestamp: istTimeStr,
+        timestampMs: now,
+        createdAt: new Date(now).toISOString(),
+        clinicianName: record.prescriberName,
+        action: 'Safety Screen Completed',
+        patientMrn: record.mrn,
+        patientName: record.patientName,
+        checkId: record.id,
+        prescriptions: record.prescriptions,
+        alerts: record.alerts,
+        sourceDocumentUrl: record.sourceDocumentUrl,
+        sourceDocumentName: record.sourceDocumentName,
+        sourceType: record.sourceType,
+        pdfFilename: record.pdfFilename || `SmileClinic_CDS_Report_${(record.checkNumber || record.id).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+        pdfUrl: record.pdfUrl,
+        details: `SmileClinic CDS verified ${record.prescriptions.length} items against monograph. Result: ${record.overallStatus}.`,
+        severity: record.alerts.length > 0 ? record.alerts[0].severity : 'safe',
+        hash: auditHash
+      });
+    }
   }
 
   static overrideAlert(checkId: string, alertId: string, reason: string, author: string) {
@@ -834,14 +886,17 @@ export class ClinicalDecisionSupport {
 
   static getAuditLogs(): AuditLogEntry[] {
     const checks = this.getChecks();
-    const safetyOnly = _cachedAuditLogs.filter(
-      (log) => log.action !== 'Rule Updated' && !log.action.includes('Rule')
+    const safetyOnly = this.deduplicateAuditLogs(
+      _cachedAuditLogs.filter((log) => log.action !== 'Rule Updated' && !log.action.includes('Rule'))
     );
 
     // Hydrate missing inner details from safety checks if available
     return safetyOnly.map((log) => {
       if (!log.prescriptions || log.prescriptions.length === 0 || !log.alerts) {
-        const match = checks.find((c) => c.mrn === log.patientMrn || c.id === log.checkId);
+        const match =
+          checks.find((c) => c.id === log.checkId || c.checkNumber === log.checkId) ||
+          checks.find((c) => (c.mrn === log.patientMrn || c.patientId === log.patientMrn) && Math.abs((c.timestampMs || 0) - (log.timestampMs || 0)) < 300000) ||
+          checks.find((c) => c.mrn === log.patientMrn || c.patientId === log.patientMrn);
         if (match) {
           return {
             ...log,
