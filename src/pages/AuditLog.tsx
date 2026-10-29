@@ -738,93 +738,127 @@ export default function AuditLog() {
 
 
                                 {/* Right: Safety Screening Alerts & Overrides */}
-
                                 <div className="p-4 rounded-xl bg-surface-container-lowest border border-surface-container-high space-y-3 shadow-2xs">
-
                                   <div className="flex items-center justify-between">
-
                                     <h4 className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-
                                       <span className="material-symbols-outlined text-[16px] text-amber-600">health_and_safety</span>
-
                                       Clinical CDS Flags &amp; Hazard Screening ({alerts.length})
-
                                     </h4>
-
-                                    <span className="text-[10px] text-outline font-medium">PropNexAI Monograph v3</span>
-
+                                    <span className="text-[10px] text-outline font-medium">SmileGuard CDS Monograph v3</span>
                                   </div>
 
-
-
                                   {alerts.length === 0 ? (
-
                                     <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200/60 flex items-center gap-2.5 text-emerald-800">
-
                                       <span className="material-symbols-outlined text-[20px] text-emerald-600">verified</span>
-
                                       <span className="text-xs font-medium">
-
-                                        All Clear — Safe to Dispense. Zero clinical interactions or renal clearance hazards identified.
-
+                                        All Clear · Safe to Dispense. Zero clinical interactions or renal clearance hazards identified.
                                       </span>
-
                                     </div>
-
                                   ) : (
+                                    <div className="space-y-2.5 max-h-60 overflow-y-auto no-scrollbar">
+                                      {alerts.map((alert: any, aIdx: number) => {
+                                        const alertSeverity = ((alert.severity || 'major') as string).toLowerCase();
+                                        const isContra = alertSeverity === 'contraindicated' || alertSeverity === 'critical';
+                                        const isMaj = alertSeverity === 'major' || alertSeverity === 'high';
 
-                                    <div className="space-y-2 max-h-56 overflow-y-auto no-scrollbar">
+                                        const alertTitle =
+                                          alert.title ||
+                                          (alert.drugA && alert.drugB
+                                            ? `${alert.drugA} ↔ ${alert.drugB} Hazard`
+                                            : alert.name || (alert.category ? `${alert.category} Warning` : 'Clinical Interaction Hazard'));
 
-                                      {alerts.map((alert) => (
+                                        const alertCategory = alert.category || 'Drug-Drug';
+                                        const alertDesc =
+                                          alert.description ||
+                                          alert.mechanism ||
+                                          alert.clinicalImpact ||
+                                          alert.finding ||
+                                          'Clinical decision support flagged potential interaction or clearance concern.';
 
-                                        <div
+                                        const alertRec =
+                                          alert.recommendation ||
+                                          alert.clinicalRecommendation ||
+                                          alert.action ||
+                                          'Review dosage regimen and monitor patient vital signs before administration.';
 
-                                          key={alert.id}
+                                        const drugPair =
+                                          Array.isArray(alert.interactingDrugs) && alert.interactingDrugs.length > 0
+                                            ? alert.interactingDrugs
+                                            : alert.drugA && alert.drugB
+                                            ? [alert.drugA, alert.drugB]
+                                            : alert.drugPair || [];
 
-                                          className={`p-2.5 rounded-lg border flex flex-col gap-1 ${
+                                        return (
+                                          <div
+                                            key={alert.id || `alt-${aIdx}`}
+                                            className={`p-3 rounded-xl border flex flex-col gap-2 transition-all shadow-2xs ${
+                                              isContra
+                                                ? 'bg-rose-50/80 border-rose-200 text-rose-950'
+                                                : isMaj
+                                                ? 'bg-orange-50/80 border-orange-200 text-orange-950'
+                                                : 'bg-amber-50/80 border-amber-200 text-amber-950'
+                                            }`}
+                                          >
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span
+                                                  className={`material-symbols-outlined text-[16px] shrink-0 ${
+                                                    isContra ? 'text-rose-600' : isMaj ? 'text-orange-600' : 'text-amber-600'
+                                                  }`}
+                                                >
+                                                  {isContra ? 'dangerous' : isMaj ? 'warning' : 'info'}
+                                                </span>
+                                                <span className="font-bold text-xs leading-snug">{alertTitle}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1 shrink-0">
+                                                <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-white/80 border border-black/5 text-slate-700">
+                                                  {alertCategory}
+                                                </span>
+                                                <span
+                                                  className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded text-white shadow-2xs ${
+                                                    isContra ? 'bg-rose-600' : isMaj ? 'bg-orange-600' : 'bg-amber-600'
+                                                  }`}
+                                                >
+                                                  {alertSeverity}
+                                                </span>
+                                              </div>
+                                            </div>
 
-                                            alert.severity === 'contraindicated'
+                                            {drugPair.length > 0 && (
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[10px] font-bold text-outline uppercase tracking-wider">Agents:</span>
+                                                {drugPair.map((drug: string, dIdx: number) => (
+                                                  <span
+                                                    key={dIdx}
+                                                    className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/90 border border-black/10 text-slate-800 shadow-2xs"
+                                                  >
+                                                    {drug}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            )}
 
-                                              ? 'bg-rose-50/70 border-rose-200 text-rose-900'
+                                            <p className="text-[11px] leading-relaxed opacity-95 text-slate-800">
+                                              {alertDesc}
+                                            </p>
 
-                                              : alert.severity === 'major'
-
-                                              ? 'bg-orange-50/70 border-orange-200 text-orange-900'
-
-                                              : 'bg-amber-50/70 border-amber-200 text-amber-900'
-
-                                          }`}
-
-                                        >
-
-                                          <div className="flex items-center justify-between">
-
-                                            <span className="font-bold text-xs">{alert.title}</span>
-
-                                            <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-white/70">
-
-                                              {alert.severity}
-
-                                            </span>
-
+                                            {alertRec && (
+                                              <div className="p-2 rounded-lg bg-white/80 border border-black/5 flex items-start gap-1.5 text-[11px] text-slate-800">
+                                                <span className="material-symbols-outlined text-[15px] text-primary shrink-0 mt-0.5">
+                                                  clinical_notes
+                                                </span>
+                                                <span className="leading-snug">
+                                                  <strong className="font-bold text-on-surface">Guidance: </strong>
+                                                  {alertRec}
+                                                </span>
+                                              </div>
+                                            )}
                                           </div>
-
-                                          <p className="text-[11px] opacity-90 line-clamp-2">
-
-                                            {alert.recommendation || alert.mechanism}
-
-                                          </p>
-
-                                        </div>
-
-                                      ))}
-
+                                        );
+                                      })}
                                     </div>
-
                                   )}
-
                                 </div>
-
                               </div>
 
                               {/* Per-Audit Clinical Action Bar: Email Send / Preview, Download PDF, View Uploaded Rx Slip */}
@@ -1003,7 +1037,11 @@ export default function AuditLog() {
         isOpen={!!selectedLogForRx}
         onClose={() => setSelectedLogForRx(null)}
         auditLog={selectedLogForRx}
-        check={checks.find((c) => c.id === selectedLogForRx?.checkId || c.mrn === selectedLogForRx?.patientMrn)}
+        check={
+          checks.find((c) => c.id === selectedLogForRx?.checkId || c.checkNumber === selectedLogForRx?.checkId) ||
+          checks.find((c) => (c.mrn === selectedLogForRx?.patientMrn || c.patientId === selectedLogForRx?.patientMrn) && (c.sourceDocumentUrl || c.prescriptions.length > 0)) ||
+          checks.find((c) => c.mrn === selectedLogForRx?.patientMrn || c.patientId === selectedLogForRx?.patientMrn)
+        }
       />
 
       {/* Individual Email Send / Preview Modal */}
