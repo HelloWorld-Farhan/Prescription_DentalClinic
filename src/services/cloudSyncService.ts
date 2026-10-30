@@ -542,28 +542,82 @@ export function initAutoSync(): () => void {
     if (autoSyncTimer) clearInterval(autoSyncTimer);
   };
 }
+
+
+/**
+
+ * Pushes read notification state to the Supabase PostgreSQL backend.
+
+ * Synchronizes across all devices (mobile, laptop, multiple browsers).
+
+ */
+
+export async function pushNotificationReadState(readAt?: number, notifIds?: string[]): Promise<boolean> {
+
+  const email = getClinicianEmail();
+
+  if (!email || !API_BASE_URL) return false;
+
+
+
+  try {
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/sync/notifications/read`, {
+
+      method: 'POST',
+
+      headers: { 'Content-Type': 'application/json' },
+
+      body: JSON.stringify({
+
+        email,
+
+        readAt: readAt || 0,
+
+        notifIds: notifIds || [],
+
+      }),
+
+    });
+
+    return res.ok;
+
+  } catch (e) {
+
+    console.warn('[CloudSync] Push notification read state failed:', e);
+
+    return false;
+
+  }
+
+}
+
 
 /**
- * Pushes read notification state to the Supabase PostgreSQL backend.
- * Synchronizes across all devices (mobile, laptop, multiple browsers).
+ * Pushes active synchronized clinical knowledge & medical history to PostgreSQL backend.
  */
-export async function pushNotificationReadState(readAt?: number, notifIds?: string[]): Promise<boolean> {
+export async function pushKnowledgeSyncState(syncedKnowledge: {
+  selection?: string[];
+  conditions?: string[];
+  checks?: string[];
+  rules?: string[];
+  docs?: string[];
+}): Promise<boolean> {
   const email = getClinicianEmail();
   if (!email || !API_BASE_URL) return false;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/sync/notifications/read`, {
+    const res = await fetch(`${API_BASE_URL}/api/v1/sync/knowledge-state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
-        readAt: readAt || 0,
-        notifIds: notifIds || [],
+        syncedKnowledge,
       }),
     });
     return res.ok;
   } catch (e) {
-    console.warn('[CloudSync] Push notification read state failed:', e);
+    console.warn('[CloudSync] Push knowledge sync state failed:', e);
     return false;
   }
 }

@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDocumentHistory, UploadedDocumentRecord, isAvatarFile } from '../services/r2StorageService';
-import { VirtualDb } from '../services/prescriptionService';
+import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, SafetyCheckRecord } from '../types';
+import { pushKnowledgeSyncState } from '../services/cloudSyncService';
+import { showConfirmation } from '../services/confirmation';
 
 interface SyncKnowledgeModalProps {
   isOpen: boolean;
@@ -11,15 +13,73 @@ interface SyncKnowledgeModalProps {
   onSyncComplete?: (version?: string, timestamp?: string) => void;
 }
 
-interface SyncableItem {
+export interface SyncableItem {
   id: string;
-  type: 'document' | 'rule' | 'check';
+  type: 'condition' | 'check' | 'rule' | 'document';
   title: string;
   subtitle: string;
   icon: string;
   badge: string;
+  conditionName?: string;
   date?: string;
 }
+
+// Clinical Medical Conditions available in the Patient History knowledge base
+const CLINICAL_HISTORY_CONDITIONS: Array<{
+  id: string;
+  name: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  badge: string;
+  defaultChecked: boolean;
+}> = [
+  {
+    id: 'cond-kidney-ckd',
+    name: 'Chronic Kidney Disease (CKD) / Renal Impairment',
+    title: 'Chronic Kidney Disease (CKD) / Renal Impairment',
+    subtitle: 'Affects renal filtration & NSAID / antibiotic clearance. Evaluates eGFR & nephrotoxicity.',
+    icon: 'water_drop',
+    badge: 'Renal History',
+    defaultChecked: true,
+  },
+  {
+    id: 'cond-hepatic-liver',
+    name: 'Hepatic Impairment / Chronic Liver Disease (Cirrhosis)',
+    title: 'Hepatic Impairment / Chronic Liver Disease (Cirrhosis)',
+    subtitle: 'Alters hepatic CYP450 metabolism & paracetamol / opioid clearance. Hepatotoxicity caution.',
+    icon: 'stethoscope',
+    badge: 'Hepatic History',
+    defaultChecked: false, // Default off as in user example (Kidney ON, Liver OFF)
+  },
+  {
+    id: 'cond-cardiac-htn',
+    name: 'Hypertension & Cardiovascular History',
+    title: 'Hypertension & Cardiovascular History',
+    subtitle: 'Interacts with dental vasoconstrictors (epinephrine) & local anesthetic dosage.',
+    icon: 'favorite',
+    badge: 'Cardiovascular',
+    defaultChecked: true,
+  },
+  {
+    id: 'cond-diabetes-t2',
+    name: 'Type 2 Diabetes Mellitus',
+    title: 'Type 2 Diabetes Mellitus',
+    subtitle: 'Impairs post-surgical wound healing; risk of dental infections & antibiotic choice.',
+    icon: 'bloodtype',
+    badge: 'Endocrine',
+    defaultChecked: true,
+  },
+  {
+    id: 'cond-allergies-rx',
+    name: 'Documented Drug Allergies (Penicillin / NSAIDs)',
+    title: 'Documented Drug Allergies (Penicillin / NSAIDs)',
+    subtitle: 'Triggers anaphylaxis & cross-reactivity warnings for dental operatory antibiotics.',
+    icon: 'warning',
+    badge: 'Allergy History',
+    defaultChecked: true,
+  },
+];
 
 export default function SyncKnowledgeModal({
   isOpen,
@@ -34,7 +94,7 @@ export default function SyncKnowledgeModal({
   // Syncable items list and selection
   const [items, setItems] = useState<SyncableItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'document' | 'rule' | 'check'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'condition' | 'check' | 'rules_docs'>('all');
 
   // Load live data from storage when opened
   useEffect(() => {
@@ -48,35 +108,36 @@ export default function SyncKnowledgeModal({
 
     const loadedItems: SyncableItem[] = [];
 
-    // 1. Vault Documents (Strictly clinical files, never user avatar photos)
-    try {
-      const docs: UploadedDocumentRecord[] = getDocumentHistory();
-      docs
-        .filter((doc) => !isAvatarFile(doc.filename) && !isAvatarFile(doc.storageUrl))
-        .forEach((doc) => {
-        let icon = 'description';
-        const ft = (doc.fileType || '').toLowerCase();
-        const fn = (doc.filename || '').toLowerCase();
-        if (ft.includes('pdf') || fn.endsWith('.pdf')) icon = 'picture_as_pdf';
-        else if (ft.includes('image') || /\.(png|jpg|jpeg|webp)$/.test(fn)) icon = 'image';
-        else if (ft.includes('sheet') || ft.includes('csv') || /\.(xlsx|xls|csv)$/.test(fn)) icon = 'table_view';
+    // 1. Medical Conditions & Clinical History
+    CLINICAL_HISTORY_CONDITIONS.forEach((cond) => {
+      loadedItems.push({
+        id: cond.id,
+        type: 'condition',
+        title: cond.title,
+        subtitle: cond.subtitle,
+        icon: cond.icon,
+        badge: cond.badge,
+        conditionName: cond.name,
+      });
+    });
 
-        const sizeKb = doc.fileSize ? (doc.fileSize / 1024).toFixed(1) : '0';
+    // 2. Clinical Screening Checks (Prior Prescriptions)
+    try {
+      const checks: SafetyCheckRecord[] = VirtualDb.getChecks();
+      checks.forEach((check) => {
         loadedItems.push({
-          id: `doc-${doc.id}`,
-          type: 'document',
-          title: doc.filename || 'Clinical Document',
-          subtitle: `Vault Document • ${sizeKb} KB • ${doc.extractedRulesCount || 0} rules extracted`,
-          icon,
-          badge: 'Vault File',
-          date: doc.uploadedAt,
+          id: `check-${check.id}`,
+          type: 'check',
+          title: `Prescription #${check.checkNumber || check.id} — ${check.patientName || 'Patient'}`,
+          subtitle: `${check.prescriptions?.length || 0} medications • Status: ${check.overallStatus || 'Safe to Dispense'}`,
+          icon: 'fact_check',
+          badge: 'Screening Record',
+          date: check.timestamp,
         });
       });
-    } catch {
-      // Storage access fallback
-    }
+    } catch {}
 
-    // 2. Custom Decision Rules
+    // 3. Custom Decision Rules
     try {
       const rules: InteractionRule[] = VirtualDb.getRules();
       rules.forEach((rule) => {
@@ -90,31 +151,59 @@ export default function SyncKnowledgeModal({
           date: rule.createdAt,
         });
       });
-    } catch {
-      // Storage access fallback
-    }
+    } catch {}
 
-    // 3. Clinical Screening Checks
+    // 4. Vault Documents (Reference clinical monographs)
     try {
-      const checks: SafetyCheckRecord[] = VirtualDb.getChecks();
-      checks.forEach((check) => {
-        loadedItems.push({
-          id: `check-${check.id}`,
-          type: 'check',
-          title: `${check.checkNumber || 'CHK'} - ${check.patientName || 'Anonymous Patient'}`,
-          subtitle: `${check.prescriptions?.length || 0} medications • Status: ${check.overallStatus || 'Safe to Dispense'}`,
-          icon: 'fact_check',
-          badge: 'Screening Record',
-          date: check.timestamp,
+      const docs: UploadedDocumentRecord[] = getDocumentHistory();
+      docs
+        .filter((doc) => !isAvatarFile(doc.filename) && !isAvatarFile(doc.storageUrl))
+        .forEach((doc) => {
+          let icon = 'description';
+          const ft = (doc.fileType || '').toLowerCase();
+          const fn = (doc.filename || '').toLowerCase();
+          if (ft.includes('pdf') || fn.endsWith('.pdf')) icon = 'picture_as_pdf';
+          else if (ft.includes('image') || /\.(png|jpg|jpeg|webp)$/.test(fn)) icon = 'image';
+          else if (ft.includes('sheet') || ft.includes('csv') || /\.(xlsx|xls|csv)$/.test(fn)) icon = 'table_view';
+
+          const sizeKb = doc.fileSize ? (doc.fileSize / 1024).toFixed(1) : '0';
+          loadedItems.push({
+            id: `doc-${doc.id}`,
+            type: 'document',
+            title: doc.filename || 'Clinical Document',
+            subtitle: `Vault Document • ${sizeKb} KB • ${doc.extractedRulesCount || 0} rules extracted`,
+            icon,
+            badge: 'Vault File',
+            date: doc.uploadedAt,
+          });
         });
-      });
-    } catch {
-      // Storage access fallback
-    }
+    } catch {}
 
     setItems(loadedItems);
-    // By default, select all available items
-    setSelectedIds(new Set(loadedItems.map((i) => i.id)));
+
+    // Initialize selection: restore previously saved selection or apply defaults
+    try {
+      const rawSaved = localStorage.getItem('smileclinic_synced_knowledge_selection');
+      if (rawSaved) {
+        const parsed = JSON.parse(rawSaved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSelectedIds(new Set(parsed));
+          return;
+        }
+      }
+    } catch {}
+
+    // Default: Select all checks, all rules/docs, and default checked conditions (e.g. Kidney ON, Liver OFF)
+    const defaultSelection = new Set<string>();
+    loadedItems.forEach((item) => {
+      if (item.type === 'condition') {
+        const found = CLINICAL_HISTORY_CONDITIONS.find((c) => c.id === item.id);
+        if (found?.defaultChecked) defaultSelection.add(item.id);
+      } else {
+        defaultSelection.add(item.id);
+      }
+    });
+    setSelectedIds(defaultSelection);
   }, [isOpen]);
 
   // Lock body scroll on open
@@ -136,6 +225,7 @@ export default function SyncKnowledgeModal({
 
   const filteredItems = useMemo(() => {
     if (categoryFilter === 'all') return items;
+    if (categoryFilter === 'rules_docs') return items.filter((i) => i.type === 'rule' || i.type === 'document');
     return items.filter((i) => i.type === categoryFilter);
   }, [items, categoryFilter]);
 
@@ -164,31 +254,85 @@ export default function SyncKnowledgeModal({
   const handleStartSync = () => {
     if (selectedIds.size === 0) return;
 
+    // Gather specific selected subsets
+    const selectedConditions: string[] = [];
+    const selectedChecks: string[] = [];
+    const selectedRules: string[] = [];
+    const selectedDocs: string[] = [];
+
+    items.forEach((item) => {
+      if (!selectedIds.has(item.id)) return;
+      if (item.type === 'condition' && item.conditionName) {
+        selectedConditions.push(item.conditionName);
+      } else if (item.type === 'check') {
+        selectedChecks.push(item.id.replace('check-', ''));
+      } else if (item.type === 'rule') {
+        selectedRules.push(item.id.replace('rule-', ''));
+      } else if (item.type === 'document') {
+        selectedDocs.push(item.id.replace('doc-', ''));
+      }
+    });
+
     setIsSyncing(true);
-    setSyncProgress(15);
-    setActiveStepText(`Validating ${selectedIds.size} selected clinical knowledge records...`);
+    setSyncProgress(20);
+    setActiveStepText(`Validating ${selectedIds.size} selected clinical history & knowledge items...`);
 
     setTimeout(() => {
-      setSyncProgress(45);
-      setActiveStepText('Re-indexing decision rule contraindication matrices...');
+      setSyncProgress(55);
+      const condText = selectedConditions.length > 0 ? selectedConditions.join(', ') : 'Routine screening';
+      setActiveStepText(`Syncing active medical context (${condText})...`);
     }, 600);
 
     setTimeout(() => {
-      setSyncProgress(80);
-      setActiveStepText('Synchronizing encrypted document vault with cloud hash...');
+      setSyncProgress(85);
+      setActiveStepText('Synchronizing AI decision indices & prior prescription history...');
     }, 1200);
 
     setTimeout(() => {
       setSyncProgress(100);
-      setActiveStepText('All selected items verified and synchronized successfully.');
+      setActiveStepText('Knowledge base & active medical context synchronized successfully.');
       setSyncCompleted(true);
+
       const nowIso = new Date().toISOString();
-      if (typeof window !== 'undefined') {
+      const selectionArray = Array.from(selectedIds);
+
+      // Persist locally
+      try {
+        localStorage.setItem('smileclinic_synced_knowledge_selection', JSON.stringify(selectionArray));
+        localStorage.setItem('smileclinic_synced_active_conditions', JSON.stringify(selectedConditions));
+        localStorage.setItem('smileclinic_synced_active_checks', JSON.stringify(selectedChecks));
+        localStorage.setItem('smileclinic_synced_active_rules', JSON.stringify(selectedRules));
         localStorage.setItem('smileclinic_last_rules_sync', nowIso);
-      }
+      } catch {}
+
+      // Push to backend PostgreSQL
+      pushKnowledgeSyncState({
+        selection: selectionArray,
+        conditions: selectedConditions,
+        checks: selectedChecks,
+        rules: selectedRules,
+        docs: selectedDocs,
+      }).catch(() => {});
+
+      // Dispatch event to reactive listeners across app
+      window.dispatchEvent(
+        new CustomEvent('smileclinic_knowledge_synced', {
+          detail: {
+            selection: selectionArray,
+            conditions: selectedConditions,
+            checks: selectedChecks,
+          },
+        })
+      );
+
+      showConfirmation(
+        `Synchronized ${selectedConditions.length} active conditions and ${selectedChecks.length} prior prescriptions into AI context`,
+        'success'
+      );
+
       setTimeout(() => {
         if (onSyncComplete) {
-          onSyncComplete('v2.4.0', 'Just now');
+          onSyncComplete('v2.5.0', 'Just now');
         }
         onClose();
       }, 700);
@@ -199,6 +343,10 @@ export default function SyncKnowledgeModal({
 
   const hasData = items.length > 0;
   const isAllSelected = items.length > 0 && selectedIds.size === items.length;
+
+  const conditionCount = items.filter((i) => i.type === 'condition').length;
+  const checkCount = items.filter((i) => i.type === 'check').length;
+  const rulesDocsCount = items.filter((i) => i.type === 'rule' || i.type === 'document').length;
 
   return createPortal(
     <AnimatePresence>
@@ -234,7 +382,7 @@ export default function SyncKnowledgeModal({
                     Synchronize Knowledge Base &amp; History
                   </h3>
                   <p className="text-[11px] text-on-surface-variant">
-                    Re-verify active clinical rules and refresh secure clinical vault indices.
+                    Select active medical conditions &amp; prior prescriptions to feed into AI screening.
                   </p>
                 </div>
               </div>
@@ -254,29 +402,24 @@ export default function SyncKnowledgeModal({
             {/* Modal Body */}
             <div className="py-4 overflow-y-auto flex-1 flex flex-col gap-3 min-h-[220px]">
               {!hasData ? (
-                /* Empty State: Nothing to Sync */
                 <div className="my-auto py-10 px-6 flex flex-col items-center justify-center text-center bg-surface-container-low/40 rounded-xl border border-dashed border-outline-variant/40">
                   <div className="w-14 h-14 rounded-2xl bg-surface-container-high text-outline flex items-center justify-center mb-3">
                     <span className="material-symbols-outlined text-[32px]">folder_off</span>
                   </div>
-                  <h4 className="text-sm font-bold text-on-surface">Nothing to Sync</h4>
+                  <h4 className="text-sm font-bold text-on-surface">No Knowledge Items Found</h4>
                   <p className="text-xs text-on-surface-variant max-w-xs mt-1">
-                    No clinical vault documents, custom decision rules, or screening histories were found in your local repository to synchronize.
+                    Upload a prescription or add rules to populate knowledge synchronization.
                   </p>
-                  <div className="mt-4 px-3 py-1.5 rounded-lg bg-surface-container text-[11px] font-medium text-outline">
-                    Upload a prescription or add custom rules to enable synchronization
-                  </div>
                 </div>
               ) : (
-                /* Has Data: Selectable Items List */
                 <>
                   {/* Category Filter Tabs & Select All Header */}
-                  <div className="flex items-center justify-between pb-1 text-xs">
-                    <div className="flex items-center gap-1.5 overflow-x-auto">
+                  <div className="flex items-center justify-between pb-1 text-xs gap-2">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                       <button
                         type="button"
                         onClick={() => setCategoryFilter('all')}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
                           categoryFilter === 'all'
                             ? 'bg-primary text-on-primary'
                             : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
@@ -284,43 +427,39 @@ export default function SyncKnowledgeModal({
                       >
                         All ({items.length})
                       </button>
-                      {items.some((i) => i.type === 'document') && (
+                      <button
+                        type="button"
+                        onClick={() => setCategoryFilter('condition')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
+                          categoryFilter === 'condition'
+                            ? 'bg-primary text-on-primary'
+                            : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                        }`}
+                      >
+                        Medical History ({conditionCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCategoryFilter('check')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
+                          categoryFilter === 'check'
+                            ? 'bg-primary text-on-primary'
+                            : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                        }`}
+                      >
+                        Prior Screenings ({checkCount})
+                      </button>
+                      {rulesDocsCount > 0 && (
                         <button
                           type="button"
-                          onClick={() => setCategoryFilter('document')}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                            categoryFilter === 'document'
+                          onClick={() => setCategoryFilter('rules_docs')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
+                            categoryFilter === 'rules_docs'
                               ? 'bg-primary text-on-primary'
                               : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                           }`}
                         >
-                          Docs ({items.filter((i) => i.type === 'document').length})
-                        </button>
-                      )}
-                      {items.some((i) => i.type === 'rule') && (
-                        <button
-                          type="button"
-                          onClick={() => setCategoryFilter('rule')}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                            categoryFilter === 'rule'
-                              ? 'bg-primary text-on-primary'
-                              : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                          }`}
-                        >
-                          Rules ({items.filter((i) => i.type === 'rule').length})
-                        </button>
-                      )}
-                      {items.some((i) => i.type === 'check') && (
-                        <button
-                          type="button"
-                          onClick={() => setCategoryFilter('check')}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                            categoryFilter === 'check'
-                              ? 'bg-primary text-on-primary'
-                              : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                          }`}
-                        >
-                          Screenings ({items.filter((i) => i.type === 'check').length})
+                          Rules &amp; Vault ({rulesDocsCount})
                         </button>
                       )}
                     </div>
@@ -335,10 +474,17 @@ export default function SyncKnowledgeModal({
                     </button>
                   </div>
 
+                  {/* Informative Guidance Banner */}
+                  <div className="p-2.5 rounded-xl bg-primary/5 border border-primary/15 text-[11px] text-on-surface-variant leading-relaxed">
+                    <strong className="text-primary font-bold">Active AI History Control:</strong> Toggle ON conditions (e.g. Kidney) and turn OFF unneeded history (e.g. Liver). Only checked items will be evaluated during AI Safety Screening.
+                  </div>
+
                   {/* Scrollable Items Checklist */}
                   <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                     {filteredItems.map((item) => {
                       const isSelected = selectedIds.has(item.id);
+                      const isCondition = item.type === 'condition';
+
                       return (
                         <div
                           key={item.id}
@@ -346,7 +492,7 @@ export default function SyncKnowledgeModal({
                           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                             isSelected
                               ? 'bg-primary/5 border-primary/30 shadow-xs'
-                              : 'bg-surface-container-low border-surface-container hover:border-outline-variant'
+                              : 'bg-surface-container-low border-surface-container hover:border-outline-variant opacity-70 hover:opacity-100'
                           } ${isSyncing ? 'pointer-events-none opacity-80' : ''}`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -358,11 +504,32 @@ export default function SyncKnowledgeModal({
                               onClick={(e) => e.stopPropagation()}
                               className="w-4 h-4 rounded text-primary focus:ring-primary/20 cursor-pointer shrink-0"
                             />
-                            <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center shrink-0 text-primary">
+                            <div
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                isCondition
+                                  ? isSelected
+                                    ? 'bg-primary/15 text-primary'
+                                    : 'bg-surface-container text-outline'
+                                  : 'bg-surface-container text-secondary'
+                              }`}
+                            >
                               <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
                             </div>
                             <div className="min-w-0">
-                              <div className="text-xs font-bold text-on-surface truncate">{item.title}</div>
+                              <div className="text-xs font-bold text-on-surface truncate flex items-center gap-1.5">
+                                <span>{item.title}</span>
+                                {isCondition && (
+                                  <span
+                                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                                      isSelected
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-slate-200 text-slate-700'
+                                    }`}
+                                  >
+                                    {isSelected ? 'ACTIVE IN AI' : 'OFF'}
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-on-surface-variant truncate">{item.subtitle}</div>
                             </div>
                           </div>
@@ -377,11 +544,11 @@ export default function SyncKnowledgeModal({
                   {/* Selected count info banner */}
                   <div className="text-[11px] text-on-surface-variant flex items-center justify-between px-1 pt-1">
                     <span>
-                      Selected <strong className="text-on-surface">{selectedIds.size}</strong> of {items.length} items
+                      Selected <strong className="text-on-surface font-bold">{selectedIds.size}</strong> of {items.length} items
                     </span>
                     <span className="text-emerald-700 font-semibold flex items-center gap-1">
                       <span className="material-symbols-outlined text-[14px]">shield_check</span>
-                      Encrypted SHA-256
+                      Enforced in AI Context
                     </span>
                   </div>
                 </>

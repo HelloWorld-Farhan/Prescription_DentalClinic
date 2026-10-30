@@ -7,6 +7,7 @@ import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } fr
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import ClinicalInquiriesModal from '../components/ClinicalInquiriesModal';
+import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
 import { uploadToR2, deleteDocumentRecord } from '../services/r2StorageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
@@ -257,6 +258,39 @@ export default function NewCheck() {
   }, [allergies, userAllergies]);
   const hasDocumentedAllergies = parsedAllergies.length > 0;
   const allergySummary = hasDocumentedAllergies ? parsedAllergies.join(', ') : 'None documented (NKDA)';
+
+  // Knowledge Base Sync State & Active Medical History Conditions
+  const [isSyncKnowledgeModalOpen, setIsSyncKnowledgeModalOpen] = useState(false);
+  const [syncedConditions, setSyncedConditions] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('smileclinic_synced_active_conditions');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return ['Chronic Kidney Disease (CKD) / Renal Impairment'];
+  });
+
+  useEffect(() => {
+    const handleSyncUpdate = (e?: any) => {
+      try {
+        const raw = localStorage.getItem('smileclinic_synced_active_conditions');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setSyncedConditions(parsed);
+          }
+        } else if (e?.detail?.activeConditions) {
+          setSyncedConditions(e.detail.activeConditions);
+        }
+      } catch (err) {
+        console.warn('Failed to parse synced conditions', err);
+      }
+    };
+    window.addEventListener('smileclinic_knowledge_synced', handleSyncUpdate);
+    return () => window.removeEventListener('smileclinic_knowledge_synced', handleSyncUpdate);
+  }, []);
 
   // Modal State for inspecting individual allergy safety details
   const [inspectingAllergy, setInspectingAllergy] = useState<string | null>(null);
@@ -614,7 +648,8 @@ export default function NewCheck() {
           spo2: (selectedPatient as any).spo2 || '98%',
           egfr: `${customEgfr}`,
           allergies: parsedAllergies,
-          conditions: (selectedPatient.conditions || []).map((cond: any) => typeof cond === 'string' ? cond : cond.name),
+          // AI CDS strictly screens ONLY against the synchronized medical conditions selected in Knowledge Base Sync
+          conditions: (syncedConditions && syncedConditions.length > 0) ? syncedConditions : ((selectedPatient.conditions || []).map((cond: any) => typeof cond === 'string' ? cond : cond.name)),
           current_medications: activeMeds,
         },
         prescriptions: prescriptions,
@@ -2000,6 +2035,48 @@ export default function NewCheck() {
                 </div>
               </div>
 
+              {/* SYNCHRONIZED MEDICAL HISTORY CONTEXT CARD */}
+              <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="material-symbols-outlined text-[18px]">sync_saved_locally</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-on-surface">Synchronized Medical History &amp; Safety Knowledge</span>
+                      <span className="text-[10px] font-semibold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
+                        {syncedConditions.length} Condition{syncedConditions.length === 1 ? '' : 's'} Active
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                      {syncedConditions.length > 0 ? (
+                        syncedConditions.map((cond, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-container-lowest border border-primary/25 text-primary shadow-2xs"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                            <span className="truncate max-w-[200px]">{cond}</span>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-outline italic">No past conditions synced (General Dental Care)</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSyncKnowledgeModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg border border-primary/30 text-primary hover:bg-primary/10 font-bold text-[11px] transition-colors flex items-center gap-1.5 shrink-0 self-end sm:self-center cursor-pointer"
+                  title="Configure which historical conditions and screening data the AI incorporates"
+                >
+                  <span className="material-symbols-outlined text-[15px]">tune</span>
+                  Adjust Synced History
+                </button>
+              </div>
+
               {/* PRIMARY START ACTION BUTTON */}
               <div className="pt-2">
                 <motion.button
@@ -2765,6 +2842,18 @@ export default function NewCheck() {
         </AnimatePresence>,
         document.body
       )}
+
+      {/* Synchronize Knowledge Base & History Modal */}
+      <SyncKnowledgeModal
+        isOpen={isSyncKnowledgeModalOpen}
+        onClose={() => setIsSyncKnowledgeModalOpen(false)}
+        onSyncComplete={() => {
+          try {
+            const raw = localStorage.getItem('smileclinic_synced_active_conditions');
+            if (raw) setSyncedConditions(JSON.parse(raw));
+          } catch (e) {}
+        }}
+      />
     </div>
   );
 }
