@@ -8,8 +8,8 @@ import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import EmailScheduleAlertModal from '../components/EmailScheduleAlertModal';
 import { showConfirmation } from '../services/confirmation';
 import {
-  buildUnifiedAlertQueue,
-  UnifiedQueueItem,
+  parseMedicationTiming,
+  computeCourseDates,
   MedicationScheduleItem,
 } from '../services/medicationScheduleService';
 
@@ -18,22 +18,55 @@ export default function Alerts() {
   const [searchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
 
-  const [activeTab, setActiveTab] = useState<'all' | 'entire' | 'safety' | 'intake' | 'expiry' | 'overridden'>('all');
   const [searchTerm, setSearchTerm] = useState(queryParam);
+  const [activeTab, setActiveTab] = useState<'all' | 'safety' | 'cleared' | 'overridden'>('all');
   const [activeDrawerAlert, setActiveDrawerAlert] = useState<DrugInteractionAlert | null>(null);
+  const [activeDrawerCheckId, setActiveDrawerCheckId] = useState<string>('');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailModalCheck, setEmailModalCheck] = useState<SafetyCheckRecord | null>(null);
+
+  // Master Email Alerts Toggle state (persisted)
+  const [masterEmailAlertsEnabled, setMasterEmailAlertsEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('smileclinic_master_email_alerts_enabled') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  // Disabled Medication IDs for email alerts (per-medicine toggle)
+  const [disabledMedAlertIds, setDisabledMedAlertIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('smileclinic_disabled_med_alert_ids');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => {
     const raw = VirtualDb.getChecks();
     return raw && raw.length > 0 ? raw : [];
   });
 
+  // Expandable Accordion per check — default all open so both PDFs are visible
+  const [expandedCheckIds, setExpandedCheckIds] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    (VirtualDb.getChecks() || []).forEach((c) => initial.add(c.id));
+    return initial;
+  });
+
   useEffect(() => {
-    // Proactively pull latest checks & alerts from cloud database on view mount
     pullFromCloud().catch(() => {});
 
     const handleChecksSync = () => {
-      setChecks(VirtualDb.getChecks());
+      const updated = VirtualDb.getChecks();
+      setChecks(updated);
+      setExpandedCheckIds((prev) => {
+        const next = new Set(prev);
+        updated.forEach((c) => next.add(c.id));
+        return next;
+      });
     };
     window.addEventListener('smileclinic_checks_updated', handleChecksSync);
     window.addEventListener('storage', handleChecksSync);
@@ -43,158 +76,241 @@ export default function Alerts() {
     };
   }, []);
 
-  // Build unified alert queue including safety hazards, intake schedules, and course expirations
-  const unifiedQueue = useMemo(() => buildUnifiedAlertQueue(checks), [checks]);
-
-  // Extract all scheduled medications and safety alerts for email dispatch
-  const allMedications: MedicationScheduleItem[] = useMemo(() => {
-    const meds: MedicationScheduleItem[] = [];
-    unifiedQueue.forEach((item) => {
-      if (item.medication && !meds.some((m) => m.id === item.medication?.id)) {
-        meds.push(item.medication);
+  const toggleCheckExpanded = (checkId: string) => {
+    setExpandedCheckIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(checkId)) {
+        next.delete(checkId);
+      } else {
+        next.add(checkId);
       }
+      return next;
     });
-    return meds;
-  }, [unifiedQueue]);
+  };
 
-  const allSafetyAlerts: DrugInteractionAlert[] = useMemo(() => {
-    const alerts: DrugInteractionAlert[] = [];
-    unifiedQueue.forEach((item) => {
-      if (item.alert && !alerts.some((a) => a.id === item.alert?.id)) {
-        alerts.push(item.alert);
+  const toggleMasterEmail = () => {
+    const next = !masterEmailAlertsEnabled;
+    setMasterEmailAlertsEnabled(next);
+    try {
+      localStorage.setItem('smileclinic_master_email_alerts_enabled', String(next));
+    } catch {}
+    showConfirmation(
+      next
+        ? 'Automated Email Alerts are now ACTIVE for all scheduled prescriptions.'
+        : 'Automated Email Alerts PAUSED. No alert emails will be dispatched.',
+      next ? 'success' : 'info'
+    );
+  };
+
+  const toggleMedEmailAlert = (medUniqueKey: string, drugName: string) => {
+    setDisabledMedAlertIds((prev) => {
+      const next = new Set(prev);
+      const isCurrentlyDisabled = next.has(medUniqueKey);
+      if (isCurrentlyDisabled) {
+        next.delete(medUniqueKey);
+        showConfirmation(`Email alerts for ${drugName} turned ON`, 'success');
+      } else {
+        next.add(medUniqueKey);
+        showConfirmation(`Email alerts for ${drugName} turned OFF`, 'info');
       }
+      try {
+        localStorage.setItem('smileclinic_disabled_med_alert_ids', JSON.stringify(Array.from(next)));
+      } catch {}
+      return next;
     });
-    return alerts;
-  }, [unifiedQueue]);
+  };
 
-  const latestCheck = checks[0];
-
-  // Exact counts strictly partitioned between active queue and overridden history
-  const activeSafetyHazards = useMemo(
-    () => unifiedQueue.filter((a) => a.type === 'safety_hazard' && !a.alert?.overridden),
-    [unifiedQueue]
-  );
-  const intakeSchedules = useMemo(
-    () => unifiedQueue.filter((a) => a.type === 'intake_schedule'),
-    [unifiedQueue]
-  );
-  const courseExpiries = useMemo(
-    () => unifiedQueue.filter((a) => a.type === 'course_expiry'),
-    [unifiedQueue]
-  );
-  const overriddenAlerts = useMemo(
-    () => unifiedQueue.filter((a) => !!a.alert?.overridden),
-    [unifiedQueue]
-  );
-
-  const activeQueueCount = activeSafetyHazards.length + intakeSchedules.length + courseExpiries.length;
-
-  // Dynamic Tabs with exact counts matching Dashboard metrics 1:1
-  const availableTabs = [
-    { key: 'all' as const, label: 'Active Alerts', count: activeQueueCount },
-    { key: 'entire' as const, label: 'All Alerts & History', count: unifiedQueue.length },
-    {
-      key: 'safety' as const,
-      label: 'Safety Hazards',
-      count: activeSafetyHazards.length,
-    },
-    {
-      key: 'intake' as const,
-      label: 'Medication Intake (Timing)',
-      count: intakeSchedules.length,
-    },
-    {
-      key: 'expiry' as const,
-      label: 'Course Expiration',
-      count: courseExpiries.length,
-    },
-    {
-      key: 'overridden' as const,
-      label: 'Overridden / Documented',
-      count: overriddenAlerts.length,
-    },
-  ].filter((tab) => tab.key === 'all' || tab.key === 'entire' || tab.key === 'overridden' || tab.count > 0);
-
-  useEffect(() => {
-    if (activeTab !== 'all' && !availableTabs.some((t) => t.key === activeTab)) {
-      setActiveTab('all');
-    }
-  }, [availableTabs, activeTab]);
-
-  // Filter items based on activeTab and searchTerm
-  const filtered = useMemo(() => {
-    return unifiedQueue.filter((item) => {
-      let matchesTab = true;
-      if (activeTab === 'all') matchesTab = !item.alert?.overridden;
-      else if (activeTab === 'entire') matchesTab = true;
-      else if (activeTab === 'safety') matchesTab = item.type === 'safety_hazard' && !item.alert?.overridden;
-      else if (activeTab === 'intake') matchesTab = item.type === 'intake_schedule';
-      else if (activeTab === 'expiry') matchesTab = item.type === 'course_expiry';
-      else if (activeTab === 'overridden') matchesTab = !!item.alert?.overridden;
-
-      const query = searchTerm.toLowerCase();
-      const drugs = Array.isArray(item.interactingDrugs) ? item.interactingDrugs : [];
-      const matchesSearch =
-        !query ||
-        (item.patientName || '').toLowerCase().includes(query) ||
-        (item.mrn || '').toLowerCase().includes(query) ||
-        (item.title || '').toLowerCase().includes(query) ||
-        (item.subtitle || '').toLowerCase().includes(query) ||
-        (item.scheduledTime || '').toLowerCase().includes(query) ||
-        (item.foodInstruction || '').toLowerCase().includes(query) ||
-        (item.drugName || '').toLowerCase().includes(query) ||
-        drugs.some((d) => (d || '').toLowerCase().includes(query));
-
-      return matchesTab && matchesSearch;
-    });
-  }, [unifiedQueue, activeTab, searchTerm]);
-
-  // Pagination (10 items per page)
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab, searchTerm]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginatedItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const handleSmsNotice = () => {
+    showConfirmation('SMS Alert Service: Coming Soon (DLT Telecom Carrier gateway verification in progress)', 'info');
+  };
 
   const handleOverride = (alertId: string, reason: string) => {
-    const target = unifiedQueue.find((a) => a.alert?.id === alertId);
-    if (target) {
-      VirtualDb.overrideAlert(target.checkId, alertId, reason, getActiveClinicianName());
+    if (activeDrawerCheckId) {
+      VirtualDb.overrideAlert(activeDrawerCheckId, alertId, reason, getActiveClinicianName());
       setChecks([...VirtualDb.getChecks()]);
       setActiveDrawerAlert(null);
       showConfirmation('Clinical decision signed & recorded into HIPAA audit trail', 'success');
     }
   };
 
-  const handleSmsNotice = () => {
-    showConfirmation('SMS Alert Service: Coming Soon (DLT Telecom Carrier registration in review)', 'info');
-  };
+  // Grouped analysis: Enrich each check with parsed medications
+  const enrichedChecks = useMemo(() => {
+    return checks.map((c) => {
+      const prescriptions = Array.isArray(c.prescriptions) ? c.prescriptions : [];
+      const alerts = Array.isArray(c.alerts) ? c.alerts : [];
+
+      const activeAlerts = alerts.filter((a) => !a.overridden);
+      const overriddenAlerts = alerts.filter((a) => !!a.overridden);
+
+      const parsedMeds = prescriptions.map((rx, idx) => {
+        const drugName = rx.drugName || (rx as any).name || 'Medication';
+        const dosage = rx.dosage || '';
+        const freq = rx.frequency || 'OD';
+        const duration = rx.duration || '1 Month';
+        const timingInfo = parseMedicationTiming(freq, drugName);
+        const course = computeCourseDates(duration, c.createdAt);
+        const uniqueKey = `med-${c.id}-${drugName}-${idx}`;
+        const isEmailEnabled = masterEmailAlertsEnabled && !disabledMedAlertIds.has(uniqueKey);
+
+        const scheduleItem: MedicationScheduleItem = {
+          id: uniqueKey,
+          checkId: c.id,
+          patientName: c.patientName,
+          patientMrn: c.mrn,
+          drugName,
+          dosage,
+          frequency: freq,
+          route: rx.route || 'Oral (PO)',
+          duration,
+          scheduledTime: timingInfo.scheduledTime,
+          foodInstruction: timingInfo.foodInstruction,
+          timeSlot: timingInfo.timeSlot,
+          startDate: course.startDate,
+          endDate: course.endDate,
+          daysRemaining: course.daysRemaining,
+          isExpired: course.isExpired,
+          timestamp: c.timestamp,
+        };
+
+        return {
+          uniqueKey,
+          drugName,
+          dosage,
+          frequency: freq,
+          route: rx.route || 'Oral (PO)',
+          duration,
+          timingInfo,
+          course,
+          isEmailEnabled,
+          scheduleItem,
+        };
+      });
+
+      return {
+        check: c,
+        prescriptions,
+        alerts,
+        activeAlerts,
+        overriddenAlerts,
+        parsedMeds,
+        hasHazards: activeAlerts.length > 0,
+      };
+    });
+  }, [checks, masterEmailAlertsEnabled, disabledMedAlertIds]);
+
+  // Tab filtering
+  const filteredChecks = useMemo(() => {
+    return enrichedChecks.filter((item) => {
+      let matchesTab = true;
+      if (activeTab === 'safety') matchesTab = item.hasHazards;
+      else if (activeTab === 'cleared') matchesTab = !item.hasHazards;
+      else if (activeTab === 'overridden') matchesTab = item.overriddenAlerts.length > 0;
+
+      const q = searchTerm.trim().toLowerCase();
+      if (!q) return matchesTab;
+
+      const c = item.check;
+      const matchesSearch =
+        (c.patientName || '').toLowerCase().includes(q) ||
+        (c.mrn || '').toLowerCase().includes(q) ||
+        (c.id || '').toLowerCase().includes(q) ||
+        item.parsedMeds.some((m) => m.drugName.toLowerCase().includes(q)) ||
+        item.alerts.some((a) => (a.title || '').toLowerCase().includes(q));
+
+      return matchesTab && matchesSearch;
+    });
+  }, [enrichedChecks, activeTab, searchTerm]);
+
+  // Tab Counts
+  const hazardCount = enrichedChecks.filter((i) => i.hasHazards).length;
+  const clearedCount = enrichedChecks.filter((i) => !i.hasHazards).length;
+  const overriddenCount = enrichedChecks.filter((i) => i.overriddenAlerts.length > 0).length;
+
+  const tabs = [
+    { key: 'all' as const, label: 'All Prescriptions (PDFs)', count: enrichedChecks.length },
+    { key: 'safety' as const, label: 'Safety Hazards', count: hazardCount },
+    { key: 'cleared' as const, label: 'Safe & Cleared', count: clearedCount },
+    { key: 'overridden' as const, label: 'Documented / Overrides', count: overriddenCount },
+  ];
+
+  // All active medications across enabled items for global email modal
+  const allActiveMedications = useMemo(() => {
+    const list: MedicationScheduleItem[] = [];
+    enrichedChecks.forEach((ec) => {
+      ec.parsedMeds.forEach((m) => {
+        if (m.isEmailEnabled) {
+          list.push(m.scheduleItem);
+        }
+      });
+    });
+    return list;
+  }, [enrichedChecks]);
+
+  const allActiveAlerts = useMemo(() => {
+    const list: DrugInteractionAlert[] = [];
+    enrichedChecks.forEach((ec) => {
+      ec.activeAlerts.forEach((a) => list.push(a));
+    });
+    return list;
+  }, [enrichedChecks]);
+
+  const targetModalCheck = emailModalCheck || checks[0];
 
   return (
     <div className="space-y-6">
-      {/* Page Header with Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Page Header with Action Bar & Master Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[26px]">alarm_on</span>
             <h1 className="text-2xl font-black text-on-surface">Medication Regimen & Safety Alert Queue</h1>
           </div>
           <p className="text-xs text-on-surface-variant mt-1">
-            Real-time schedule of medication intake timing, course expiration alerts, and contraindicated drug hazards.
+            Prescription regimens, scheduled intake timing, course durations, and clinical contraindications.
           </p>
         </div>
 
-        {/* Action Buttons: Email and SMS */}
-        <div className="flex items-center gap-2 self-start sm:self-center">
+        {/* Action Controls: Master Email Switch, SMS Alert & Send Email Button */}
+        <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
+          {/* Master Email Alerts Toggle */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest shadow-2xs">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-on-surface flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    masterEmailAlertsEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+                  }`}
+                />
+                Automated Email Alerts
+              </span>
+              <span className="text-[9px] text-outline font-medium">
+                {masterEmailAlertsEnabled ? 'Active (All Prescriptions)' : 'Paused (Sending Off)'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={toggleMasterEmail}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                masterEmailAlertsEnabled ? 'bg-primary' : 'bg-slate-300'
+              }`}
+              role="switch"
+              aria-checked={masterEmailAlertsEnabled}
+              title={`Toggle Automated Email Alerts ${masterEmailAlertsEnabled ? 'OFF' : 'ON'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  masterEmailAlertsEnabled ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* SMS Alert (Coming Soon) */}
           <button
             type="button"
             onClick={handleSmsNotice}
             className="px-3 py-2 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-outline hover:text-on-surface text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="SMS Alerts"
+            title="SMS Alerts (DLT Carrier In Review)"
           >
             <span className="material-symbols-outlined text-[16px]">sms</span>
             <span>SMS Alert</span>
@@ -203,10 +319,21 @@ export default function Alerts() {
             </span>
           </button>
 
+          {/* Send Alert Email Modal Trigger */}
           <button
             type="button"
-            onClick={() => setIsEmailModalOpen(true)}
-            disabled={allMedications.length === 0}
+            onClick={() => {
+              if (!masterEmailAlertsEnabled) {
+                showConfirmation(
+                  'Email sending is currently paused. Please turn ON Automated Email Alerts toggle first.',
+                  'warning'
+                );
+                return;
+              }
+              setEmailModalCheck(checks[0] || null);
+              setIsEmailModalOpen(true);
+            }}
+            disabled={allActiveMedications.length === 0}
             className="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
           >
             <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span>
@@ -215,78 +342,72 @@ export default function Alerts() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="max-w-md w-full">
-        <div className="relative flex items-center bg-surface-container-lowest rounded-xl px-3 py-2 border border-surface-container-high shadow-xs focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-          <span className="material-symbols-outlined text-outline text-[18px] mr-2">search</span>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search medication, intake time, patient, MRN..."
-            className="w-full text-xs text-on-surface bg-transparent outline-none placeholder:text-outline font-medium"
-          />
-          {searchTerm && (
-            <button
+      {/* Search Bar & Filter Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Search Bar */}
+        <div className="max-w-md w-full">
+          <div className="relative flex items-center bg-surface-container-lowest rounded-xl px-3 py-2 border border-surface-container-high shadow-xs focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+            <span className="material-symbols-outlined text-outline text-[18px] mr-2">search</span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search medication, intake time, patient, MRN..."
+              className="w-full text-xs text-on-surface bg-transparent outline-none placeholder:text-outline font-medium"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="text-outline hover:text-on-surface cursor-pointer p-0.5 ml-1"
+                title="Clear search"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          {tabs.map((tab) => (
+            <motion.button
               type="button"
-              onClick={() => setSearchTerm('')}
-              className="text-outline hover:text-on-surface cursor-pointer p-0.5 ml-1"
-              title="Clear search"
+              key={tab.key}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                activeTab === tab.key
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface border border-surface-container-high'
+              }`}
             >
-              <span className="material-symbols-outlined text-[16px]">close</span>
-            </button>
-          )}
+              <span>{tab.label}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-md text-[10px] ${
+                  activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-surface-container-high text-on-surface'
+                }`}
+              >
+                {tab.count}
+              </span>
+            </motion.button>
+          ))}
         </div>
       </div>
 
-      {/* Tabs Filter */}
-      <div className="flex items-center gap-2 border-b border-surface-container-high pb-3 overflow-x-auto no-scrollbar">
-        {availableTabs.map((tab) => (
-          <motion.button
-            type="button"
-            key={tab.key}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-              activeTab === tab.key
-                ? 'bg-primary text-white shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface border border-surface-container-high'
-            }`}
-          >
-            <span>{tab.label}</span>
-            <span
-              className={`px-1.5 py-0.5 rounded-md text-[10px] ${
-                activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-surface-container-high text-on-surface'
-              }`}
-            >
-              {tab.count}
-            </span>
-          </motion.button>
-        ))}
-      </div>
-
-      {/* Unified Queue Cards */}
-      <div className="space-y-3.5">
-        {paginatedItems.length === 0 ? (
+      {/* Prescription-Centric Queue Cards (Showing the 2 Prescription PDFs) */}
+      <div className="space-y-4">
+        {filteredChecks.length === 0 ? (
           <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-surface-container-high shadow-xs flex flex-col items-center justify-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
               <span className="material-symbols-outlined text-[28px]">check_circle</span>
             </div>
             <div>
-              <h4 className="font-bold text-sm text-on-surface">No alerts or schedules match this filter</h4>
+              <h4 className="font-bold text-sm text-on-surface">No prescription dossiers match this filter</h4>
               <p className="text-xs text-on-surface-variant max-w-sm mt-1">
-                All medications are scheduled cleanly or all safety hazards have been documented and overridden.
+                All medications are scheduled cleanly or all safety hazards have been reviewed and documented.
               </p>
             </div>
-            {overriddenAlerts.length > 0 && activeTab !== 'overridden' && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('overridden')}
-                className="mt-1 px-4 py-2 rounded-xl bg-amber-500/10 text-amber-800 border border-amber-300 text-xs font-bold hover:bg-amber-500/20 transition-colors cursor-pointer"
-              >
-                View Documented & Overridden Decisions ({overriddenAlerts.length}) →
-              </button>
-            )}
             <button
               type="button"
               onClick={() => navigate('/check')}
@@ -296,245 +417,280 @@ export default function Alerts() {
             </button>
           </div>
         ) : (
-          paginatedItems.map((item) => {
-            const isHazard = item.type === 'safety_hazard';
-            const isIntake = item.type === 'intake_schedule';
-            const isExpiry = item.type === 'course_expiry';
+          filteredChecks.map((group) => {
+            const { check: c, parsedMeds, activeAlerts, hasHazards } = group;
+            const isExpanded = expandedCheckIds.has(c.id);
 
             return (
               <motion.div
-                key={item.id}
+                key={c.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`p-4 sm:p-5 rounded-2xl bg-surface-container-lowest border shadow-xs transition-all space-y-3 ${
-                  isHazard
-                    ? item.severity === 'contraindicated'
-                      ? 'border-rose-300/80 bg-rose-50/10'
-                      : 'border-amber-300/80 bg-amber-50/10'
-                    : isIntake
-                    ? 'border-primary/30 hover:border-primary/60'
-                    : item.isExpired
-                    ? 'border-rose-400 bg-rose-50/20'
-                    : 'border-amber-400/60 bg-amber-50/10'
+                className={`rounded-2xl bg-surface-container-lowest border shadow-xs overflow-hidden transition-all ${
+                  hasHazards ? 'border-rose-300/80' : 'border-surface-container-high hover:border-primary/40'
                 }`}
               >
-                {/* Header Row */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Category Pill */}
-                    <span
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
-                        isHazard
-                          ? item.severity === 'contraindicated'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-amber-100 text-amber-900'
-                          : isIntake
-                          ? 'bg-primary/10 text-primary'
-                          : item.isExpired
-                          ? 'bg-rose-100 text-rose-900'
-                          : 'bg-amber-100 text-amber-900'
+                {/* Prescription Card Header Bar */}
+                <div
+                  onClick={() => toggleCheckExpanded(c.id)}
+                  className="p-4 sm:p-5 bg-surface-container-lowest hover:bg-surface-container-low/50 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-surface-container-low"
+                >
+                  <div className="flex items-start sm:items-center gap-3 min-w-0">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        hasHazards ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-primary/10 text-primary border border-primary/20'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-[13px]">
-                        {isHazard ? 'warning' : isIntake ? 'alarm' : 'event_busy'}
+                      <span className="material-symbols-outlined text-[22px]">
+                        {hasHazards ? 'warning' : 'description'}
                       </span>
-                      {isHazard
-                        ? item.severity === 'contraindicated'
-                          ? 'Contraindication Hazard'
-                          : 'Major Interaction'
-                        : isIntake
-                        ? 'Scheduled Intake'
-                        : item.isExpired
-                        ? 'Course Ended (Stop Consumption)'
-                        : 'Regimen Duration Notice'}
-                    </span>
+                    </div>
 
-                    {/* Scheduled Time Pill for Intake */}
-                    {isIntake && item.scheduledTime && (
-                      <span className="px-2.5 py-1 rounded-lg bg-sky-100 text-sky-900 text-xs font-bold font-mono flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">schedule</span>
-                        {item.scheduledTime}
-                      </span>
-                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs sm:text-sm font-black text-on-surface">
+                          Prescription #{c.checkNumber || c.id}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            hasHazards ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {c.overallStatus || (hasHazards ? 'Requires Review' : 'Safe to Dispense')}
+                        </span>
+                        <span className="text-[11px] text-outline">• {c.timestamp || 'Recently'}</span>
+                      </div>
 
-                    {/* Expiry Pill */}
-                    {isExpiry && (
-                      <span
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono flex items-center gap-1 ${
-                          item.isExpired ? 'bg-rose-200 text-rose-900' : 'bg-amber-200 text-amber-900'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[14px]">hourglass_bottom</span>
-                        {item.isExpired ? 'EXPIRED — Stop Medicine' : `${item.daysRemaining} Days Left`}
-                      </span>
-                    )}
-
-                    {/* Patient Identification */}
-                    <span className="text-xs text-on-surface font-semibold">
-                      {item.patientName} <span className="text-outline font-normal">({item.mrn})</span>
-                    </span>
-
-                    <span className="text-[11px] text-outline font-mono">• #{item.checkId}</span>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant flex-wrap">
+                        <span className="font-semibold text-on-surface">
+                          {c.patientName} <strong className="text-outline font-normal">({c.mrn})</strong>
+                        </span>
+                        <span className="text-outline">•</span>
+                        <span>{parsedMeds.length} Prescribed Medications</span>
+                        {activeAlerts.length > 0 && (
+                          <>
+                            <span className="text-outline">•</span>
+                            <span className="text-rose-600 font-bold">
+                              {activeAlerts.length} Clinical Safety Hazard{activeAlerts.length === 1 ? '' : 's'}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                  {/* Header Right Actions */}
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto" onClick={(e) => e.stopPropagation()}>
+                    {/* View Respective PDF / Report */}
                     <button
                       type="button"
-                      onClick={() => navigate(`/report?id=${item.checkId}`)}
-                      className="px-3 py-1.5 rounded-xl bg-surface-container text-secondary font-bold text-xs hover:bg-surface-container-high transition-all flex items-center gap-1 border border-surface-container-high shadow-2xs cursor-pointer"
-                      title="View Report"
+                      onClick={() => navigate(`/report?id=${c.id}`)}
+                      className="px-3 py-1.5 rounded-xl bg-surface-container text-secondary font-bold text-xs hover:bg-surface-container-high transition-all flex items-center gap-1.5 border border-surface-container-high shadow-2xs cursor-pointer"
+                      title="Open Respective 2-Page CDS Report & PDF"
                     >
-                      <span className="material-symbols-outlined text-primary text-[15px]">description</span>
-                      <span>Report</span>
+                      <span className="material-symbols-outlined text-primary text-[16px]">picture_as_pdf</span>
+                      <span>PDF Report</span>
                     </button>
 
-                    {item.alert && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveDrawerAlert(item.alert!)}
-                        className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary/90 transition-all flex items-center gap-1 shadow-xs cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[15px]">menu_book</span>
-                        <span>Monograph & Override</span>
-                      </button>
-                    )}
+                    {/* Send Alert Email for this Prescription */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!masterEmailAlertsEnabled) {
+                          showConfirmation(
+                            'Automated email alerts are currently turned OFF. Enable the top toggle first.',
+                            'warning'
+                          );
+                          return;
+                        }
+                        setEmailModalCheck(c);
+                        setIsEmailModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Send Daily Medication Timetable Email"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">send</span>
+                      <span>Send Email</span>
+                    </button>
+
+                    {/* Expand/Collapse Caret */}
+                    <button
+                      type="button"
+                      onClick={() => toggleCheckExpanded(c.id)}
+                      className="p-1.5 rounded-xl hover:bg-surface-container text-outline hover:text-on-surface transition-colors cursor-pointer"
+                      title={isExpanded ? 'Collapse Medication Schedule' : 'Expand Medication Schedule'}
+                    >
+                      <span className="material-symbols-outlined text-[20px] transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                        expand_more
+                      </span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Content Row */}
-                <div>
-                  <h3 className="text-sm font-black text-on-surface flex items-center gap-2">
-                    {item.title}
-                  </h3>
-                  <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">{item.subtitle}</p>
-                </div>
+                {/* Dropdown Body: Medicines Timetable & Dates */}
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="p-4 sm:p-5 bg-surface-container-lowest space-y-4"
+                    >
+                      {/* Active Safety Hazards (if any) */}
+                      {activeAlerts.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-rose-600">warning</span>
+                            Prescription Safety & Interaction Hazards ({activeAlerts.length})
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2.5">
+                            {activeAlerts.map((al, alIdx) => (
+                              <div
+                                key={al.id || `al-${alIdx}`}
+                                className="p-3.5 rounded-xl bg-rose-50/50 border border-rose-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                              >
+                                <div className="space-y-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white">
+                                      {al.severity || 'Contraindicated'}
+                                    </span>
+                                    <h5 className="text-xs font-bold text-rose-950 truncate">{al.title}</h5>
+                                  </div>
+                                  <p className="text-[11px] text-rose-900 leading-relaxed">
+                                    {al.mechanism || al.description || 'Clinical hazard detected.'}
+                                  </p>
+                                  {al.recommendation && (
+                                    <p className="text-[11px] text-rose-800 font-medium">
+                                      Action: {al.recommendation}
+                                    </p>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveDrawerCheckId(c.id);
+                                    setActiveDrawerAlert(al);
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shrink-0 shadow-xs cursor-pointer flex items-center gap-1"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">menu_book</span>
+                                  <span>Monograph & Override</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-                {/* Detailed Medication Pill Bar */}
-                {isIntake && item.medication && (
-                  <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container flex flex-wrap items-center justify-between gap-2.5 text-xs">
-                    <div className="flex items-center gap-2 text-on-surface">
-                      <span className="material-symbols-outlined text-primary text-[18px]">restaurant</span>
-                      <span>
-                        Meal Timing: <strong>{item.medication.foodInstruction}</strong>
-                      </span>
-                    </div>
+                      {/* Prescribed Medications Timetable & Regimen Duration */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-primary">schedule</span>
+                            Medication Schedule & Expiry Timetable ({parsedMeds.length} Items)
+                          </h4>
+                          <span className="text-[11px] text-outline font-medium">
+                            Food & Timing Instructions for {c.patientName}
+                          </span>
+                        </div>
 
-                    <div className="flex items-center gap-3 text-outline text-[11px]">
-                      <span>
-                        Route: <strong>{item.medication.route}</strong>
-                      </span>
-                      <span>
-                        Duration: <strong>{item.medication.duration}</strong>
-                      </span>
-                      <span>
-                        Ends On: <strong>{item.medication.endDate}</strong>
-                      </span>
-                    </div>
-                  </div>
-                )}
+                        <div className="divide-y divide-surface-container-low border border-surface-container-high rounded-xl overflow-hidden bg-surface-container-lowest">
+                          {parsedMeds.map((med) => {
+                            const { uniqueKey, drugName, dosage, frequency, route, duration, timingInfo, course, isEmailEnabled } = med;
 
-                {/* Expiry Stop Consumption Warning */}
-                {isExpiry && (
-                  <div
-                    className={`p-3 rounded-xl border text-xs leading-relaxed font-medium ${
-                      item.isExpired
-                        ? 'bg-rose-100/60 border-rose-200 text-rose-950'
-                        : 'bg-amber-100/60 border-amber-200 text-amber-950'
-                    }`}
-                  >
-                    {item.isExpired ? (
-                      <>
-                        🛑 <strong>Medical Protocol:</strong> The prescribed {item.medication?.duration || 'course'}{' '}
-                        has elapsed. The patient must discontinue taking <strong>{item.drugName}</strong> unless
-                        explicitly examined and re-authorized by the clinician.
-                      </>
-                    ) : (
-                      <>
-                        ⏳ <strong>Scheduled Stop Date: {item.medication?.endDate}</strong> ({item.daysRemaining} days
-                        remaining). Advise patient to complete the exact course duration and not consume leftover
-                        tablets afterwards.
-                      </>
-                    )}
-                  </div>
-                )}
+                            return (
+                              <div
+                                key={uniqueKey}
+                                className="p-3.5 sm:p-4 hover:bg-surface-container-low/30 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3"
+                              >
+                                {/* Left: Drug Name, Timing & Food Instruction */}
+                                <div className="space-y-1.5 min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-xs sm:text-sm text-on-surface">
+                                      {drugName} {dosage}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded-md bg-surface-container text-on-surface text-[10px] font-bold">
+                                      {frequency}
+                                    </span>
+                                    <span className="text-[10px] text-outline font-medium">
+                                      Route: {route}
+                                    </span>
+                                  </div>
 
-                {/* Safety Hazard Details */}
-                {isHazard && item.interactingDrugs && item.interactingDrugs.length > 0 && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-surface-container-low text-xs">
-                    <div className="flex items-center gap-2 text-on-surface-variant font-medium">
-                      <span className="material-symbols-outlined text-primary text-[16px]">medication</span>
-                      <span>
-                        Interacting Agents:{' '}
-                        <strong>
-                          {Array.isArray(item.interactingDrugs)
-                            ? item.interactingDrugs.join(' ↔ ')
-                            : String(item.interactingDrugs)}
-                        </strong>
-                      </span>
-                    </div>
+                                  {/* Intake Timing & Meal Guidelines */}
+                                  <div className="flex items-center gap-2 text-xs text-on-surface-variant flex-wrap">
+                                    <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-900 font-bold font-mono text-[11px] flex items-center gap-1">
+                                      <span className="material-symbols-outlined text-[13px]">alarm</span>
+                                      {timingInfo.scheduledTime}
+                                    </span>
+                                    <span className="text-outline font-medium">
+                                      • {timingInfo.foodInstruction}
+                                    </span>
+                                  </div>
 
-                    <span className="text-[11px] text-outline font-medium">
-                      Evidence Grade: <strong>{item.alert?.evidenceGrade || 'Level A (Direct CDS)'}</strong>
-                    </span>
-                  </div>
-                )}
+                                  {/* Regimen Duration & Date Till Consumption */}
+                                  <div className="flex items-center gap-2 text-[11px] text-outline flex-wrap pt-0.5">
+                                    <span className="flex items-center gap-1 text-secondary font-semibold">
+                                      <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                                      Prescribed: {duration}
+                                    </span>
+                                    <span>•</span>
+                                    <span
+                                      className={`font-semibold ${
+                                        course.isExpired ? 'text-rose-600' : 'text-emerald-700'
+                                      }`}
+                                    >
+                                      {course.isExpired
+                                        ? 'Expired — Course Completed'
+                                        : `Consume Until: ${course.endDate} (${course.daysRemaining} Days Left)`}
+                                    </span>
+                                  </div>
+                                </div>
 
-                {/* Overridden Justification Badge */}
-                {item.alert?.overridden && (
-                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed">
-                    <strong>Documented Justification:</strong> {item.alert.overrideReason} (Signed by{' '}
-                    {item.alert.overrideAuthor})
-                  </div>
-                )}
+                                {/* Right: Per-Medicine Email Toggle & SMS Notice */}
+                                <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
+                                  {/* Individual Medicine Email Alert Toggle */}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleMedEmailAlert(uniqueKey, drugName)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                                      isEmailEnabled
+                                        ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                                        : 'bg-surface-container-low border-surface-container-high text-outline hover:text-on-surface'
+                                    }`}
+                                    title={`Click to turn ${isEmailEnabled ? 'OFF' : 'ON'} email alerts for ${drugName}`}
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">
+                                      {isEmailEnabled ? 'mail' : 'mail_off'}
+                                    </span>
+                                    <span>{isEmailEnabled ? 'Email: ON' : 'Email: OFF'}</span>
+                                  </button>
 
-                {/* Timestamp Footer */}
-                <div className="text-[10px] text-outline pt-1 flex items-center justify-between">
-                  <span>Mark of Date & Time: {item.timestamp}</span>
-                  <span>SmileGuard Clinical CDS Engine</span>
-                </div>
+                                  {/* Per-Medicine SMS Alert Indicator (Coming Soon) */}
+                                  <button
+                                    type="button"
+                                    onClick={handleSmsNotice}
+                                    className="px-2.5 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-outline hover:text-on-surface text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="SMS Alert Service (Coming Soon)"
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">sms</span>
+                                    <span className="px-1 py-0.2 bg-amber-100 text-amber-900 rounded text-[9px] font-extrabold uppercase">
+                                      Soon
+                                    </span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             );
           })
-        )}
-
-        {/* Pagination Bar */}
-        {filtered.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-surface-container-lowest rounded-2xl border border-surface-container-high shadow-xs gap-3">
-            <span className="text-xs text-on-surface-variant font-medium">
-              Showing <strong className="text-on-surface font-semibold">{(currentPage - 1) * pageSize + 1}</strong>–
-              <strong className="text-on-surface font-semibold">
-                {Math.min(currentPage * pageSize, filtered.length)}
-              </strong>{' '}
-              of <strong className="text-on-surface font-semibold">{filtered.length}</strong> items in queue
-            </span>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                <span>Previous</span>
-              </button>
-
-              <span className="text-xs font-bold text-outline px-2">
-                Page {currentPage} of {totalPages}
-              </span>
-
-              <button
-                type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-surface-container-high text-xs font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-              >
-                <span>Next</span>
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-              </button>
-            </div>
-          </div>
         )}
       </div>
 
@@ -547,17 +703,20 @@ export default function Alerts() {
       />
 
       {/* Email Schedule Alert Modal */}
-      {latestCheck && (
+      {targetModalCheck && (
         <EmailScheduleAlertModal
           isOpen={isEmailModalOpen}
-          onClose={() => setIsEmailModalOpen(false)}
-          patientName={latestCheck.patientName || 'Karuna Chouhan'}
-          patientMrn={latestCheck.mrn || 'PT-1102'}
-          checkNumber={latestCheck.checkNumber || latestCheck.id || 'CHK-CURRENT'}
-          medications={allMedications}
-          safetyAlerts={allSafetyAlerts}
-          courseEndDate={allMedications[0]?.endDate || 'In 30 Days'}
-          regimenDuration={allMedications[0]?.duration || '1 Month'}
+          onClose={() => {
+            setIsEmailModalOpen(false);
+            setEmailModalCheck(null);
+          }}
+          patientName={targetModalCheck.patientName || 'Authorized Patient'}
+          patientMrn={targetModalCheck.mrn || 'PT-1102'}
+          checkNumber={targetModalCheck.checkNumber || targetModalCheck.id || 'CHK-CURRENT'}
+          medications={allActiveMedications.filter((m) => m.checkId === targetModalCheck.id)}
+          safetyAlerts={allActiveAlerts.filter((a) => (a as any).checkId === targetModalCheck.id || allActiveAlerts.length <= 2)}
+          courseEndDate={allActiveMedications[0]?.endDate || 'In 30 Days'}
+          regimenDuration={allActiveMedications[0]?.duration || '1 Month'}
         />
       )}
     </div>
