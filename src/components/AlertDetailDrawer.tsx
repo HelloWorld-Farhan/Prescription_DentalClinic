@@ -50,6 +50,7 @@ export default function AlertDetailDrawer({
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSentSuccess, setEmailSentSuccess] = useState(false);
+  const [sendUserCopy, setSendUserCopy] = useState(true);
   const [sentEventInfo, setSentEventInfo] = useState<{ doctor: string; email: string; time: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -235,6 +236,7 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
         rationale: aiClinicalDirective,
         clinician_name: loggedClinician,
         clinician_email: loggedEmail,
+        cc_user_email: sendUserCopy ? loggedEmail : undefined,
       });
 
       // Save doctor contact in local directory for future 1-click suggestions
@@ -244,7 +246,7 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setSentEventInfo({ doctor: cleanDocName, email: cleanDocEmail, time: timeStr });
       setEmailSentSuccess(true);
-      showConfirmation(`Medication change alert successfully sent to Dr. ${cleanDocName} (${cleanDocEmail})`, 'success');
+      showConfirmation(`Medication change alert dispatched to Dr. ${cleanDocName} (${cleanDocEmail})${sendUserCopy && cleanDocEmail.toLowerCase() !== loggedEmail.toLowerCase() ? ' and copy sent to ' + loggedEmail : ''}`, 'success');
       setTimeout(() => setEmailSentSuccess(false), 5000);
     } catch (err: any) {
       showConfirmation(err?.message || 'Failed to dispatch email to doctor. Please check connection.', 'error');
@@ -505,12 +507,29 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
                   {/* Doctor Input Box */}
                   <div className="p-4 rounded-xl bg-surface-container-low border border-primary/25 space-y-3.5">
                     
-                    {/* Header with Saved Doctors Suggestions */}
-                    <div className="flex items-center justify-between pb-2 border-b border-surface-container">
+                    {/* Header with Saved Doctors Suggestions & Quick Autofill */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-surface-container">
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-[18px]">forward_to_inbox</span>
                         <span className="text-xs font-bold text-on-surface">Prescribing Doctor Contact Details</span>
                       </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDoctorName(loggedClinician);
+                            setDoctorEmail(loggedEmail);
+                            setDoctorNameError('');
+                            setDoctorEmailError('');
+                            showConfirmation(`Autofilled with your clinician details (${loggedEmail})`, 'info');
+                          }}
+                          className="text-[11px] text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer bg-primary/10 px-2 py-0.5 rounded-md transition-colors"
+                          title="Click to quickly fill with your logged-in clinician details"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">person</span>
+                          <span>Use My Email</span>
+                        </button>
                       
                       {savedDoctors.length > 0 && (
                         <div className="relative">
@@ -544,6 +563,7 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
                           )}
                         </div>
                       )}
+                      </div>
                     </div>
 
                     {/* Doctor Name and Email inputs (Starts blank, validates on send/submit) */}
@@ -590,6 +610,17 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
                         )}
                       </div>
                     </div>
+
+                    {/* CC User Checkbox */}
+                    <label className="flex items-center gap-2 text-xs text-on-surface cursor-pointer select-none pt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={sendUserCopy}
+                        onChange={(e) => setSendUserCopy(e.target.checked)}
+                        className="w-4 h-4 text-primary accent-primary rounded"
+                      />
+                      <span>Also send a verified confirmation copy to my email (<strong className="font-mono text-primary">{loggedEmail}</strong>)</span>
+                    </label>
 
                     {/* Substituted / New Medication */}
                     <div>
