@@ -54,6 +54,7 @@ export function purgeAllClinicalLocalStorage(): void {
       'smileclinic_persistent_audit_v2',
       'smileclinic_persistent_rules_v2',
       'smileclinic_persistent_patients_v2',
+      'smileclinic_persistent_documents_v2',
     ]);
 
     const keysToRemove: string[] = [];
@@ -261,6 +262,11 @@ export async function pullFromCloud(): Promise<boolean> {
         uploadedAt: d.uploadedAt || new Date().toISOString(),
       }));
       setDocumentHistory(mappedDocs);
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('smileclinic_persistent_documents_v2', JSON.stringify(mappedDocs));
+        }
+      } catch {}
     }
 
     // 4. Reconcile Clinical Rules

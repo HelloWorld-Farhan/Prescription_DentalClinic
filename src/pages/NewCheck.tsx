@@ -9,7 +9,7 @@ import CameraCaptureModal from '../components/CameraCaptureModal';
 import ClinicalInquiriesModal from '../components/ClinicalInquiriesModal';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
-import { uploadToR2, deleteDocumentRecord } from '../services/r2StorageService';
+import { uploadToR2, deleteDocumentRecord, saveDocumentRecord } from '../services/r2StorageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
 import { executePrescriptionSafetyCheck } from '../services/cloudSyncService';
@@ -163,6 +163,8 @@ export default function NewCheck() {
   const [extractedMeta, setExtractedMeta] = useState<{
     filename: string;
     fileSize: string;
+    rawSize?: number;
+    fileType?: string;
     storageUrl: string;
     storageKey: string;
     format: string;
@@ -535,6 +537,8 @@ export default function NewCheck() {
       setExtractedMeta({
         filename: r2Result.filename,
         fileSize: sizeStr,
+        rawSize: file.size,
+        fileType: file.type || 'application/pdf',
         storageUrl: r2Result.url,
         storageKey: r2Result.key,
         format: ext,
@@ -754,6 +758,20 @@ export default function NewCheck() {
       };
 
       VirtualDb.addCheck(newRecord);
+      if (extractedMeta?.storageUrl && extractedMeta?.filename) {
+        saveDocumentRecord({
+          id: 'doc-' + Date.now(),
+          filename: extractedMeta.filename,
+          fileType: extractedMeta.format?.toLowerCase() === 'pdf' ? 'application/pdf' : (extractedMeta.fileType || 'image/jpeg'),
+          fileSize: extractedMeta.rawSize || 1024 * 50,
+          uploadedAt: new Date().toLocaleString(),
+          storageUrl: extractedMeta.storageUrl,
+          userId: storedUser?.email || storedUser?.id || 'clinician-user',
+          authorName: prescriberDisplayName,
+          extractedRulesCount: extractedMedicines.length || newRecord.prescriptions.length,
+          status: 'analyzed'
+        });
+      }
       setSavedCheckRecord(newRecord);
       showConfirmation(`Prescription safety check ${newRecord.checkNumber} verified & recorded`, 'success');
 
@@ -807,6 +825,20 @@ export default function NewCheck() {
       };
 
       VirtualDb.addCheck(newRecord);
+      if (extractedMeta?.storageUrl && extractedMeta?.filename) {
+        saveDocumentRecord({
+          id: 'doc-' + Date.now(),
+          filename: extractedMeta.filename,
+          fileType: extractedMeta.format?.toLowerCase() === 'pdf' ? 'application/pdf' : (extractedMeta.fileType || 'image/jpeg'),
+          fileSize: extractedMeta.rawSize || 1024 * 50,
+          uploadedAt: new Date().toLocaleString(),
+          storageUrl: extractedMeta.storageUrl,
+          userId: storedUser?.email || storedUser?.id || 'clinician-user',
+          authorName: prescriberDisplayName,
+          extractedRulesCount: extractedMedicines.length || newRecord.prescriptions.length,
+          status: 'analyzed'
+        });
+      }
       setSavedCheckRecord(newRecord);
       showConfirmation(`Prescription safety check ${newRecord.checkNumber} completed`, 'info');
 

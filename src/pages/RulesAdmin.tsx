@@ -54,6 +54,38 @@ function getRelativeSyncText(): string {
   }
 }
 
+function getReconciledDocumentHistory(userId?: string): UploadedDocumentRecord[] {
+  const docs = getDocumentHistory(userId);
+  const existingUrls = new Set(docs.map((d) => d.storageUrl).filter(Boolean));
+  try {
+    const checks = VirtualDb.getChecks();
+    const synthesized: UploadedDocumentRecord[] = [];
+    for (const c of checks) {
+      if (c.sourceDocumentUrl && !existingUrls.has(c.sourceDocumentUrl)) {
+        existingUrls.add(c.sourceDocumentUrl);
+        const filename = c.sourceDocumentName || (c.sourceType === 'camera' ? 'Prescription Photo Captured' : 'Prescription Document');
+        const isPdf = filename.toLowerCase().endsWith('.pdf') || c.sourceDocumentUrl.toLowerCase().includes('.pdf');
+        const isCamera = c.sourceType === 'camera' || filename.toLowerCase().includes('camera');
+        synthesized.push({
+          id: `doc-chk-${c.id || c.checkNumber}`,
+          filename,
+          fileType: isPdf ? 'application/pdf' : (isCamera ? 'image/jpeg' : 'image/png'),
+          fileSize: 1024 * 85,
+          uploadedAt: c.timestamp || c.createdAt || new Date().toLocaleString(),
+          storageUrl: c.sourceDocumentUrl,
+          userId: userId || 'clinician-user',
+          authorName: c.prescriberName || c.reviewerName || 'Authorized Clinician',
+          extractedRulesCount: c.prescriptions?.length || 0,
+          status: 'analyzed',
+        });
+      }
+    }
+    return [...docs, ...synthesized];
+  } catch {
+    return docs;
+  }
+}
+
 export default function RulesAdmin() {
   // Read active logged-in user profile
   let storedUser: any = null;
@@ -71,7 +103,7 @@ export default function RulesAdmin() {
   const [activeTab, setActiveTab] = useState<'rules' | 'history' | 'knowledge'>('rules');
   const [rules, setRules] = useState<InteractionRule[]>(() => VirtualDb.getRules(currentUserId));
   const [documentHistory, setDocumentHistory] = useState<UploadedDocumentRecord[]>(() =>
-    getDocumentHistory(currentUserId)
+    getReconciledDocumentHistory(currentUserId)
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -138,14 +170,16 @@ export default function RulesAdmin() {
   useEffect(() => {
     const handleSync = () => {
       setRules(VirtualDb.getRules(currentUserId));
-      setDocumentHistory(getDocumentHistory(currentUserId));
+      setDocumentHistory(getReconciledDocumentHistory(currentUserId));
     };
     window.addEventListener('smileclinic_rules_updated', handleSync);
     window.addEventListener('smileclinic_documents_updated', handleSync);
+    window.addEventListener('smileclinic_checks_updated', handleSync);
     window.addEventListener('storage', handleSync);
     return () => {
       window.removeEventListener('smileclinic_rules_updated', handleSync);
       window.removeEventListener('smileclinic_documents_updated', handleSync);
+      window.removeEventListener('smileclinic_checks_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
   }, [currentUserId]);
@@ -249,7 +283,7 @@ export default function RulesAdmin() {
       extractedRulesCount: newRules.length,
       status: 'analyzed',
     });
-    setDocumentHistory(getDocumentHistory(currentUserId));
+    setDocumentHistory(getReconciledDocumentHistory(currentUserId));
 
     setIsAddModalOpen(false);
     showConfirmation(`Successfully saved ${newRules.length} clinical rule${newRules.length > 1 ? 's' : ''} to History & Data.`, 'success');
@@ -337,7 +371,7 @@ export default function RulesAdmin() {
 
       // 3. Update extracted count and refresh Document History table
       updateDocumentExtractedCount(r2Result.url, finalizedRules.length);
-      setDocumentHistory(getDocumentHistory(currentUserId));
+      setDocumentHistory(getReconciledDocumentHistory(currentUserId));
 
       setIsAddModalOpen(false);
       setUploadedFile(null);
@@ -381,9 +415,17 @@ export default function RulesAdmin() {
         deleteDocumentRecord(docToDelete.id, docToDelete.storageUrl),
         new Promise((resolve) => setTimeout(resolve, 850))
       ]);
+      if (docToDelete.id.startsWith('doc-chk-')) {
+        const checkId = docToDelete.id.replace('doc-chk-', '');
+        const check = VirtualDb.getCheckById(checkId);
+        if (check) {
+          check.sourceDocumentUrl = undefined;
+          check.sourceDocumentName = undefined;
+        }
+      }
       VirtualDb.deleteRulesBySource(docToDelete.filename);
       setRules(VirtualDb.getRules(currentUserId));
-      setDocumentHistory(getDocumentHistory(currentUserId));
+      setDocumentHistory(getReconciledDocumentHistory(currentUserId));
       showConfirmation(`Document "${docToDelete.filename}" and extracted rules vanished from database & secure vault.`, 'success');
       setDocToDelete(null);
     } catch {
