@@ -843,6 +843,18 @@ export class ClinicalDecisionSupport {
     }
   }
 
+  static updateCheck(id: string, updates: Partial<SafetyCheckRecord>) {
+    const idx = _cachedChecks.findIndex((c) => c.id === id || c.checkNumber === id);
+    if (idx !== -1) {
+      _cachedChecks[idx] = { ..._cachedChecks[idx], ...updates };
+      saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
+      }
+      syncCheckToCloud(_cachedChecks[idx]);
+    }
+  }
+
   static addCheck(record: SafetyCheckRecord) {
     const now = Date.now();
     const istTimeStr = formatISTTime(now, true);

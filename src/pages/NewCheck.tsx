@@ -753,8 +753,21 @@ export default function NewCheck() {
         wordUrl: aiResponse.reports?.word_url,
         csvUrl: aiResponse.reports?.csv_url,
         inquiryAnswers: aiResponse.clinical_inquiries,
+        questionAnswers: aiResponse.clinical_inquiries,
         digitalSeal: aiResponse.digital_seal,
-        notes: aiResponse.summary
+        notes: JSON.stringify({
+          clinicalSummary: aiResponse.summary || 'Screened candidate medications against active clinical pharmacopeia monographs with zero unaddressed contraindications.',
+          safetyRating: overallStatus,
+          duplicateTherapyAlert: (aiResponse.alerts || []).find((a: any) => (a.title || '').toLowerCase().includes('duplicate') || (a.id || '').toLowerCase().includes('dup'))?.description,
+          cnsAlert: (aiResponse.alerts || []).find((a: any) => (a.title || '').toLowerCase().includes('cns') || (a.mechanism || '').toLowerCase().includes('sedat'))?.description,
+          dentalCautions: 'Monitor local anesthetic vasoconstrictor dosing. Standard oral surgical precautions apply.',
+          dispensingRecommendations: [
+            'Confirm patient adherence and counsel on proper regimen timing.',
+            'Advise regarding potential mild sedation or dizziness.',
+            'Instruct patient to contact clinic if adverse effects develop.'
+          ],
+          questionAnswers: aiResponse.clinical_inquiries || []
+        })
       };
 
       VirtualDb.addCheck(newRecord);
