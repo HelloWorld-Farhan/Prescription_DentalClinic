@@ -1270,8 +1270,8 @@ export default function Layout() {
                 </button>
               </div>
 
-              {/* Results List */}
-              <div className="overflow-y-auto divide-y divide-surface-container-low/60 flex-1 max-h-[55vh]">
+              {/* Results List - Guaranteed Zero Horizontal Scrollbar */}
+              <div className="overflow-y-auto overflow-x-hidden divide-y divide-surface-container-low/60 flex-1 max-h-[55vh] w-full">
                 {filteredSearchItems.length === 0 ? (
                   <div className="p-8 text-center text-xs text-outline flex flex-col items-center justify-center gap-2">
                     <span className="material-symbols-outlined text-3xl text-outline/40">
@@ -1289,16 +1289,16 @@ export default function Layout() {
                     <motion.button
                       key={item.id}
                       type="button"
-                      whileHover={{ scale: 1.005 }}
+                      whileHover={{ x: 2 }}
                       whileTap={{ scale: 0.99 }}
                       onClick={() => {
                         navigate(item.path);
                         setIsSearchOpen(false);
                         setSearchQuery('');
                       }}
-                      className="w-full p-3 text-left hover:bg-surface-container-low flex items-center justify-between gap-3 transition-colors duration-150 cursor-pointer"
+                      className="w-full max-w-full p-3 text-left hover:bg-surface-container-low flex items-center justify-between gap-3 transition-all duration-150 cursor-pointer overflow-hidden"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                           item.type === 'action'
                             ? 'bg-primary/10 text-primary'
@@ -1308,11 +1308,11 @@ export default function Layout() {
                         }`}>
                           <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <span className="text-xs sm:text-sm font-bold text-on-surface block truncate">
                             {item.name}
                           </span>
-                          <span className="text-[11px] text-outline block truncate">
+                          <span className="text-[11px] text-outline block truncate" title={item.subtitle || item.category}>
                             {item.subtitle || item.category}
                           </span>
                         </div>

@@ -748,7 +748,7 @@ export default function AuditLog() {
                                       </span>
                                     </div>
                                   ) : (
-                                    <div className="space-y-2.5 max-h-60 overflow-y-auto no-scrollbar">
+                                    <div className="space-y-2.5">
                                       {alerts.map((alert: any, aIdx: number) => {
                                         const alertSeverity = ((alert.severity || 'major') as string).toLowerCase();
                                         const isContra = alertSeverity === 'contraindicated' || alertSeverity === 'critical';

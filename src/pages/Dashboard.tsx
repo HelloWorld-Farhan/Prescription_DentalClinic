@@ -1642,7 +1642,7 @@ export default function Dashboard() {
                         </span>
                       </div>
 
-                      <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
+                      <div className="space-y-2">
                         {selectedCheck.alerts.map((alert: any, aIdx: number) => {
                           const alertSeverity = ((alert.severity || 'major') as string).toLowerCase();
                           const isContra = alertSeverity === 'contraindicated' || alertSeverity === 'critical';
