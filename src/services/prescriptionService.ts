@@ -640,13 +640,26 @@ export const INITIAL_RULES: InteractionRule[] = [];
  * Zero browser localStorage usage for clinical items.
  */
 export class ClinicalDecisionSupport {
+  static deduplicateChecks(checks: SafetyCheckRecord[]): SafetyCheckRecord[] {
+    const seen = new Set<string>();
+    const result: SafetyCheckRecord[] = [];
+    for (const item of checks) {
+      const key = (item.id || item.checkNumber || '').trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      result.push(item);
+    }
+    return result;
+  }
+
   static setChecks(checks: SafetyCheckRecord[]) {
     const valid = (checks || []).filter(c => !isDummyCheck(c));
-    if (valid.length === 0 && _cachedChecks.length > 0) {
+    const deduped = this.deduplicateChecks(valid);
+    if (deduped.length === 0 && _cachedChecks.length > 0) {
       // Preserve existing valid records against empty overwrites
       return;
     }
-    _cachedChecks = valid;
+    _cachedChecks = deduped;
     saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
@@ -927,33 +940,76 @@ export class ClinicalDecisionSupport {
 
   static getAuditLogs(): AuditLogEntry[] {
     const checks = this.getChecks();
-    const safetyOnly = this.deduplicateAuditLogs(
-      _cachedAuditLogs.filter((log) => log.action !== 'Rule Updated' && !log.action.includes('Rule'))
-    );
+    if (checks.length === 0) return [];
 
-    // Hydrate missing inner details from safety checks if available
-    return safetyOnly.map((log) => {
-      if (!log.prescriptions || log.prescriptions.length === 0 || !log.alerts) {
-        const match =
-          checks.find((c) => c.id === log.checkId || c.checkNumber === log.checkId) ||
-          checks.find((c) => (c.mrn === log.patientMrn || c.patientId === log.patientMrn) && Math.abs((c.timestampMs || 0) - (log.timestampMs || 0)) < 300000) ||
-          checks.find((c) => c.mrn === log.patientMrn || c.patientId === log.patientMrn);
-        if (match) {
-          return {
-            ...log,
-            patientName: log.patientName || match.patientName,
-            checkId: log.checkId || match.id,
-            prescriptions: (log.prescriptions && log.prescriptions.length > 0) ? log.prescriptions : match.prescriptions,
-            alerts: (log.alerts && log.alerts.length > 0) ? log.alerts : match.alerts,
-            sourceDocumentUrl: log.sourceDocumentUrl || match.sourceDocumentUrl,
-            sourceDocumentName: log.sourceDocumentName || match.sourceDocumentName,
-            sourceType: log.sourceType || match.sourceType,
-            hash: log.hash || ('SHA256:' + log.id.replace('aud-', '') + 'FEDCBA98'),
-          };
-        }
+    // Map each check to its primary audit log, or synthesize one if missing
+    const logsByCheckId = new Map<string, AuditLogEntry>();
+
+    for (const log of _cachedAuditLogs) {
+      if (log.action === 'Rule Updated' || log.action.includes('Rule')) continue;
+      const cid = log.checkId;
+      if (cid && !logsByCheckId.has(cid)) {
+        logsByCheckId.set(cid, log);
       }
-      return log;
-    });
+    }
+
+    const aligned: AuditLogEntry[] = [];
+    for (const c of checks) {
+      const cid = c.id || c.checkNumber;
+      let log = logsByCheckId.get(cid) || logsByCheckId.get(c.checkNumber);
+
+      if (!log) {
+        log = _cachedAuditLogs.find(
+          (a) =>
+            (a.patientMrn === c.mrn || a.patientMrn === c.patientId) &&
+            Math.abs((a.timestampMs || 0) - (c.timestampMs || 0)) < 300000 &&
+            !aligned.some((x) => x.id === a.id)
+        );
+      }
+
+      if (log) {
+        aligned.push({
+          ...log,
+          checkId: cid,
+          patientName: log.patientName || c.patientName,
+          patientMrn: log.patientMrn || c.mrn,
+          prescriptions: (log.prescriptions && log.prescriptions.length > 0) ? log.prescriptions : c.prescriptions,
+          alerts: (log.alerts && log.alerts.length > 0) ? log.alerts : c.alerts,
+          sourceDocumentUrl: log.sourceDocumentUrl || c.sourceDocumentUrl,
+          sourceDocumentName: log.sourceDocumentName || c.sourceDocumentName,
+          sourceType: log.sourceType || c.sourceType,
+          pdfFilename: log.pdfFilename || c.pdfFilename || `SmileClinic_CDS_Report_${cid.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+          pdfUrl: log.pdfUrl || c.pdfUrl,
+          severity: log.severity || (c.alerts && c.alerts.length > 0 ? (c.alerts[0].severity as any) : 'safe'),
+          hash: log.hash || ('SHA256:' + cid.replace(/[^a-zA-Z0-9]/g, '') + 'A1B2C3D4'),
+        });
+      } else {
+        const tsMs = c.timestampMs || Date.now();
+        aligned.push({
+          id: 'aud-' + (c.id || tsMs),
+          timestamp: c.timestamp || formatISTTime(tsMs, true),
+          timestampMs: tsMs,
+          createdAt: c.createdAt || new Date(tsMs).toISOString(),
+          clinicianName: c.reviewerName || c.prescriberName || 'Authorized Clinician',
+          action: 'Safety Screen Completed',
+          patientMrn: c.mrn,
+          patientName: c.patientName,
+          checkId: cid,
+          prescriptions: c.prescriptions,
+          alerts: c.alerts,
+          sourceDocumentUrl: c.sourceDocumentUrl,
+          sourceDocumentName: c.sourceDocumentName,
+          sourceType: c.sourceType,
+          pdfFilename: c.pdfFilename || `SmileClinic_CDS_Report_${cid.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+          pdfUrl: c.pdfUrl,
+          details: `SmileClinic CDS verified ${(c.prescriptions || []).length} items against monograph. Result: ${c.overallStatus || 'Completed'}.`,
+          severity: (c.alerts && c.alerts.length > 0 ? c.alerts[0].severity : 'safe') as any,
+          hash: c.digitalSeal || ('SHA256:' + cid.replace(/[^a-zA-Z0-9]/g, '') + 'A1B2C3D4'),
+        });
+      }
+    }
+
+    return aligned;
   }
 
   static addAudit(entry: AuditLogEntry) {

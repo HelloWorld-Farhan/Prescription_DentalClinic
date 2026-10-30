@@ -56,15 +56,14 @@ export default function AuditLog() {
     };
 
     window.addEventListener('smileclinic_audit_updated', handleAuditSync);
-
+    window.addEventListener('smileclinic_checks_updated', handleAuditSync);
     window.addEventListener('storage', handleAuditSync);
 
     return () => {
       isMounted = false;
       window.removeEventListener('smileclinic_audit_updated', handleAuditSync);
-
+      window.removeEventListener('smileclinic_checks_updated', handleAuditSync);
       window.removeEventListener('storage', handleAuditSync);
-
     };
 
   }, []);
