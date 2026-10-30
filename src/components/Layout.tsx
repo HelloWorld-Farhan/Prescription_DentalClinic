@@ -367,13 +367,28 @@ export default function Layout() {
     }
   });
 
+  const markNotificationAsRead = (id: string) => {
+    setReadNotifIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(Array.from(next)));
+      } catch {}
+      return next;
+    });
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+  };
+
   const markAllAsRead = () => {
-    const allIds = new Set(notifications.map(n => n.id));
-    setReadNotifIds(allIds);
-    try {
-      localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(Array.from(allIds)));
-    } catch {}
-    setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+    const allIds = new Set(notifications.map((n) => n.id));
+    setReadNotifIds((prev) => {
+      const next = new Set([...prev, ...allIds]);
+      try {
+        localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(Array.from(next)));
+      } catch {}
+      return next;
+    });
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
     showConfirmation('All clinical notifications marked as read.', 'success');
   };
 
@@ -432,20 +447,22 @@ export default function Layout() {
     };
   }, []);
 
-  // Compute live clinical notifications from recent checks
+  // Compute live clinical notifications from recent checks with persistent read tracking
   useEffect(() => {
     const list: NotificationItem[] = [];
     (realChecks || []).slice(0, 4).forEach((check) => {
       // 1. Safety hazard alerts
       (check.alerts || []).forEach((al, idx) => {
+        const notifId = `notif-al-${check.id}-${idx}`;
+        const isRead = readNotifIds.has(notifId);
         list.push({
-          id: `notif-al-${check.id}-${idx}`,
+          id: notifId,
           title: al.title || 'Pharmacological Interaction Alert',
           desc: `${check.patientName} (${check.mrn}): ${al.mechanism || al.description || 'Clinical hazard detected.'}`,
           time: check.timestamp || 'Recently',
           category: 'Safety Alert',
           icon: 'warning',
-          unread: !al.overridden,
+          unread: !al.overridden && !isRead,
           bgClass: al.severity === 'contraindicated' ? 'bg-rose-500/10' : 'bg-amber-500/10',
           textClass: al.severity === 'contraindicated' ? 'text-rose-600' : 'text-amber-600',
         });
@@ -455,14 +472,16 @@ export default function Layout() {
       (check.prescriptions || []).forEach((rx, idx) => {
         const drugName = rx.drugName || (rx as any).name || 'Medication';
         const timing = parseMedicationTiming(rx.frequency || '', drugName);
+        const notifId = `notif-rx-${check.id}-${idx}`;
+        const isRead = readNotifIds.has(notifId);
         list.push({
-          id: `notif-rx-${check.id}-${idx}`,
+          id: notifId,
           title: `${drugName} ${rx.dosage || ''} • Intake Due`,
           desc: `⏰ ${timing.scheduledTime} (${timing.foodInstruction}) for ${check.patientName}`,
           time: timing.scheduledTime,
           category: 'Medication Timing',
           icon: 'alarm',
-          unread: true,
+          unread: !isRead,
           bgClass: 'bg-sky-500/10',
           textClass: 'text-sky-600',
         });
@@ -470,7 +489,7 @@ export default function Layout() {
     });
 
     setNotifications(list);
-  }, [realChecks]);
+  }, [realChecks, readNotifIds]);
 
   const filteredSearchItems: SearchResultItem[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -927,11 +946,15 @@ export default function Layout() {
                       <div className="p-4 border-b border-surface-container-low flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-sm text-on-surface">Clinical Notifications</h4>
-                          {unreadCount > 0 && (
+                          {unreadCount > 0 ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
                               {unreadCount} new
                             </span>
-                          )}
+                          ) : notifications.length > 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700">
+                              All caught up
+                            </span>
+                          ) : null}
                         </div>
                         {unreadCount > 0 && (
                           <button
@@ -954,18 +977,28 @@ export default function Layout() {
                         ) : (
                           notifications.map((n) => (
                             <div
-  key={n.id}
-  onClick={() => {
-    setNotificationsOpen(false);
-    navigate('/alerts');
-  }}
-  className="p-3.5 hover:bg-surface-container-low transition-colors flex items-start gap-3 cursor-pointer"
->
+                              key={n.id}
+                              onClick={() => {
+                                markNotificationAsRead(n.id);
+                                setNotificationsOpen(false);
+                                navigate('/alerts');
+                              }}
+                              className={`p-3.5 hover:bg-surface-container-low transition-colors flex items-start gap-3 cursor-pointer ${
+                                n.unread ? 'bg-primary/5' : 'opacity-70 hover:opacity-100'
+                              }`}
+                            >
                               <div className={`p-2 rounded-xl shrink-0 ${n.bgClass} ${n.textClass}`}>
                                 <span className="material-symbols-outlined text-[18px]">{n.icon}</span>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h5 className="font-bold text-xs text-on-surface">{n.title}</h5>
+                                <div className="flex items-center justify-between gap-1">
+                                  <h5 className={`text-xs text-on-surface truncate ${n.unread ? 'font-bold text-primary' : 'font-medium'}`}>
+                                    {n.title}
+                                  </h5>
+                                  {n.unread && (
+                                    <span className="w-2 h-2 rounded-full bg-primary shrink-0" title="Unread Notification" />
+                                  )}
+                                </div>
                                 <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">{n.desc}</p>
                                 <span className="text-[10px] text-outline mt-1 block">{n.time}</span>
                               </div>
