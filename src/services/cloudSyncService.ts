@@ -86,18 +86,17 @@ export function getClinicianEmail(): string {
       try {
         const u = JSON.parse(rawUser);
         if (u?.email) return u.email.trim().toLowerCase();
-      } catch {}
+      } catch { }
     }
-    const fallback = (
+    return (
       sessionStorage.getItem('rxguard_prescriber_email') ||
       localStorage.getItem('rxguard_prescriber_email') ||
       sessionStorage.getItem('smileclinic_user_email') ||
       localStorage.getItem('smileclinic_user_email') ||
       ''
     ).trim().toLowerCase();
-    return fallback || 'farhankhalid17968@gmail.com';
   } catch {
-    return 'farhankhalid17968@gmail.com';
+    return '';
   }
 }
 
@@ -116,8 +115,8 @@ export function getCachedCustomQuestions(): Array<{ id: string; text: string; cr
  * Deduplicates in-flight requests so concurrent callers share the same promise.
  */
 export async function pullFromCloud(): Promise<boolean> {
-  const email = getClinicianEmail() || 'farhankhalid17968@gmail.com';
-  if (!API_BASE_URL) return false;
+  const email = getClinicianEmail();
+  if (!email || !API_BASE_URL) return false;
   if (activePullPromise) return activePullPromise;
 
   activePullPromise = (async () => {
@@ -129,219 +128,219 @@ export async function pullFromCloud(): Promise<boolean> {
       const data = await res.json();
       if (data.status !== 'success') return false;
 
-    // 1. Reconcile Checks
-    if (Array.isArray(data.checks)) {
-      const mappedChecks: SafetyCheckRecord[] = data.checks.map((c: any) => {
-        const tsMs = c.timestampMs || (c.createdAt ? new Date(c.createdAt).getTime() : Date.now());
-        const timeFormatted = formatISTTime(tsMs, true);
-        return {
-          id: c.id || c.checkNumber,
-          checkNumber: c.checkNumber || c.id,
-          timestamp: c.timestamp || timeFormatted,
-          timestampMs: tsMs,
-          createdAt: c.createdAt || new Date(tsMs).toISOString(),
-          patientId: c.patientId || c.patientMrn || 'PT-UNKNOWN',
-          patientName: c.patientName || c.patientMrn || 'Patient',
-          mrn: c.patientMrn || c.patientId || 'PT-UNKNOWN',
-          unit: c.unit || 'Dental Operatory',
-          prescriptions: (Array.isArray(c.prescriptions) ? c.prescriptions : []).map((rx: any) => ({
-            ...rx,
-            drugName: rx.drugName || rx.name || 'Rx Medication',
-          })),
-          alerts: (Array.isArray(c.alerts) ? c.alerts : []).map((al: any, idx: number) => {
-            const interacting = Array.isArray(al.interactingDrugs)
-              ? al.interactingDrugs
-              : Array.isArray(al.interacting_drugs)
-              ? al.interacting_drugs
-              : al.drugA && al.drugB
-              ? [al.drugA, al.drugB]
-              : al.drugName
-              ? [al.drugName]
-              : [];
+      // 1. Reconcile Checks
+      if (Array.isArray(data.checks)) {
+        const mappedChecks: SafetyCheckRecord[] = data.checks.map((c: any) => {
+          const tsMs = c.timestampMs || (c.createdAt ? new Date(c.createdAt).getTime() : Date.now());
+          const timeFormatted = formatISTTime(tsMs, true);
+          return {
+            id: c.id || c.checkNumber,
+            checkNumber: c.checkNumber || c.id,
+            timestamp: c.timestamp || timeFormatted,
+            timestampMs: tsMs,
+            createdAt: c.createdAt || new Date(tsMs).toISOString(),
+            patientId: c.patientId || c.patientMrn || 'PT-UNKNOWN',
+            patientName: c.patientName || c.patientMrn || 'Patient',
+            mrn: c.patientMrn || c.patientId || 'PT-UNKNOWN',
+            unit: c.unit || 'Dental Operatory',
+            prescriptions: (Array.isArray(c.prescriptions) ? c.prescriptions : []).map((rx: any) => ({
+              ...rx,
+              drugName: rx.drugName || rx.name || 'Rx Medication',
+            })),
+            alerts: (Array.isArray(c.alerts) ? c.alerts : []).map((al: any, idx: number) => {
+              const interacting = Array.isArray(al.interactingDrugs)
+                ? al.interactingDrugs
+                : Array.isArray(al.interacting_drugs)
+                  ? al.interacting_drugs
+                  : al.drugA && al.drugB
+                    ? [al.drugA, al.drugB]
+                    : al.drugName
+                      ? [al.drugName]
+                      : [];
 
-            const title =
-              al.title ||
-              (al.drugA && al.drugB
-                ? `${al.drugA} ↔ ${al.drugB} Hazard`
-                : al.name || (al.category ? `${al.category} Warning` : 'Clinical Interaction Hazard'));
+              const title =
+                al.title ||
+                (al.drugA && al.drugB
+                  ? `${al.drugA} ↔ ${al.drugB} Hazard`
+                  : al.name || (al.category ? `${al.category} Warning` : 'Clinical Interaction Hazard'));
 
-            return {
-              ...al,
-              id: al.id || `alt-${c.id || c.checkNumber || 'chk'}-${idx + 1}`,
-              title,
-              severity: (al.severity || 'major').toLowerCase(),
-              interactingDrugs: interacting,
-              overridden: !!al.overridden,
-              description: al.description || al.mechanism || al.clinicalImpact || al.finding || '',
-              recommendation: al.recommendation || al.clinicalRecommendation || al.action || 'Review dosage regimen.',
-            };
-          }),
-          overallStatus:
-            c.status === 'safe' || c.highestSeverity === 'clear' || c.highestSeverity === 'safe'
-              ? 'Safe to Dispense'
-              : (c.status || 'Requires Review'),
-          prescriberName: c.reviewerName || 'Authorized Clinician',
-          prescriberNpi: c.prescriberNpi || 'DENT-CLINIC',
-          reviewerName: c.reviewerName,
-          status: c.status,
-          highestSeverity: c.highestSeverity,
-          pdfFilename: c.pdfFilename,
-          pdfUrl: c.pdfUrl,
-          notes: c.notes,
-          sourceDocumentUrl: c.sourceDocumentUrl || c.source_document_url,
-          sourceDocumentName: c.sourceDocumentName || c.source_document_name,
-          sourceType: c.sourceType || c.source_type,
-          digitalSeal: c.digitalSeal,
-          fhirSynced: !!c.fhirSynced,
-          questions: c.questions || [],
-          questionAnswers: c.questionAnswers || [],
-        };
-      });
-      PrescriptionStorage.setChecks(mappedChecks);
-    }
-
-    // 2. Reconcile Audit Logs
-    if (Array.isArray(data.auditLogs)) {
-      const mappedAuditLogs: AuditLogEntry[] = data.auditLogs.map((a: any) => {
-        const tsMs = a.timestampMs || (a.createdAt ? new Date(a.createdAt).getTime() : Date.now());
-        const timeFormatted = formatISTTime(tsMs, true);
-        return {
-          id: a.id,
-          timestamp: a.timestamp || timeFormatted,
-          timestampMs: tsMs,
-          createdAt: a.createdAt || new Date(tsMs).toISOString(),
-          clinicianName: a.clinicianName || 'Authorized Clinician',
-          action: a.action || 'Safety Screen Initiated',
-          patientMrn: a.patientMrn || 'PT-GENERAL',
-          patientName: a.patientName || a.innerData?.patientName || a.patientMrn,
-          checkId: a.checkId || a.innerData?.checkId,
-          prescriptions: a.prescriptions || a.innerData?.prescriptions || [],
-          alerts: (Array.isArray(a.alerts || a.innerData?.alerts) ? (a.alerts || a.innerData?.alerts) : []).map((al: any, idx: number) => {
-            const interacting = Array.isArray(al.interactingDrugs)
-              ? al.interactingDrugs
-              : Array.isArray(al.interacting_drugs)
-              ? al.interacting_drugs
-              : al.drugA && al.drugB
-              ? [al.drugA, al.drugB]
-              : al.drugName
-              ? [al.drugName]
-              : [];
-            return {
-              ...al,
-              id: al.id || `alt-aud-${idx + 1}`,
-              title: al.title || (al.drugA && al.drugB ? `${al.drugA} ↔ ${al.drugB} Hazard` : 'Clinical CDS Alert'),
-              severity: (al.severity || 'major').toLowerCase(),
-              interactingDrugs: interacting,
-              description: al.description || al.mechanism || al.clinicalImpact || '',
-            };
-          }),
-          details: a.eventDetails || a.details || '',
-          severity: (a.severity || 'safe').toLowerCase(),
-          hash: a.hash || 'SHA256:AUTHENTICATED',
-          pdfFilename: a.pdfFilename,
-          pdfUrl: a.pdfUrl,
-          sourceDocumentUrl: a.sourceDocumentUrl || a.innerData?.sourceDocumentUrl,
-          sourceDocumentName: a.sourceDocumentName || a.innerData?.sourceDocumentName,
-          sourceType: a.sourceType || a.innerData?.sourceType,
-        };
-      });
-      PrescriptionStorage.setAuditLogs(mappedAuditLogs);
-    }
-
-    // 3. Reconcile Uploaded Documents
-    if (Array.isArray(data.documents)) {
-      const mappedDocs: UploadedDocumentRecord[] = data.documents.map((d: any) => ({
-        id: d.id,
-        userId: email,
-        filename: d.filename,
-        fileType: d.fileType || 'pdf',
-        fileSize: d.fileSize || 0,
-        storageUrl: d.storageUrl,
-        authorName: d.authorName || 'Authorized Clinician',
-        extractedRulesCount: d.extractedRulesCount || 0,
-        status: d.status || 'stored',
-        uploadedAt: d.uploadedAt || new Date().toISOString(),
-      }));
-      setDocumentHistory(mappedDocs);
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('smileclinic_persistent_documents_v2', JSON.stringify(mappedDocs));
-        }
-      } catch {}
-    }
-
-    // 4. Reconcile Clinical Rules
-    if (Array.isArray(data.rules)) {
-      const mappedRules: InteractionRule[] = data.rules.map((r: any) => ({
-        id: r.id,
-        drugA: r.drugA,
-        drugB: r.drugB,
-        category: r.category || 'Clinical Alert',
-        severity: r.severity || 'moderate',
-        mechanism: r.mechanism || '',
-        evidence: r.evidence || 'Established',
-        sourceFile: r.sourceFile,
-        active: r.active !== false,
-      }));
-      PrescriptionStorage.setRules(mappedRules);
-    }
-
-    // 6. Reconcile Custom Clinical Questions
-    if (Array.isArray(data.customQuestions)) {
-      _cachedCustomQuestions = data.customQuestions;
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('smileclinic_questions_updated', { detail: _cachedCustomQuestions }));
+              return {
+                ...al,
+                id: al.id || `alt-${c.id || c.checkNumber || 'chk'}-${idx + 1}`,
+                title,
+                severity: (al.severity || 'major').toLowerCase(),
+                interactingDrugs: interacting,
+                overridden: !!al.overridden,
+                description: al.description || al.mechanism || al.clinicalImpact || al.finding || '',
+                recommendation: al.recommendation || al.clinicalRecommendation || al.action || 'Review dosage regimen.',
+              };
+            }),
+            overallStatus:
+              c.status === 'safe' || c.highestSeverity === 'clear' || c.highestSeverity === 'safe'
+                ? 'Safe to Dispense'
+                : (c.status || 'Requires Review'),
+            prescriberName: c.reviewerName || 'Authorized Clinician',
+            prescriberNpi: c.prescriberNpi || 'DENT-CLINIC',
+            reviewerName: c.reviewerName,
+            status: c.status,
+            highestSeverity: c.highestSeverity,
+            pdfFilename: c.pdfFilename,
+            pdfUrl: c.pdfUrl,
+            notes: c.notes,
+            sourceDocumentUrl: c.sourceDocumentUrl || c.source_document_url,
+            sourceDocumentName: c.sourceDocumentName || c.source_document_name,
+            sourceType: c.sourceType || c.source_type,
+            digitalSeal: c.digitalSeal,
+            fhirSynced: !!c.fhirSynced,
+            questions: c.questions || [],
+            questionAnswers: c.questionAnswers || [],
+          };
+        });
+        PrescriptionStorage.setChecks(mappedChecks);
       }
-    }
 
-    // 5. Reconcile Patients
-    if (Array.isArray(data.patients)) {
-      const mappedPatients: Patient[] = data.patients.map((p: any) => ({
-        id: p.id,
-        mrn: p.mrn || p.id,
-        name: p.name || 'Patient',
-        age: p.age || 30,
-        gender: p.gender || 'Male',
-        weightKg: p.weightKg || 70,
-        egfr: p.egfr || 90,
-        pregnancyStatus: p.pregnancyStatus || 'No',
-        conditions: p.conditions || [],
-        allergies: p.allergies || [],
-        activeMedications: p.activeMedications || p.currentMedications || [],
-      }));
-      PrescriptionStorage.setPatients(mappedPatients);
-    }
-
-    // 7. Reconcile Notification Read State from Backend PostgreSQL
-    if (Array.isArray(data.readNotificationIds) || typeof data.notificationsReadAt === 'number') {
-      try {
-        const localReadRaw = localStorage.getItem('smileclinic_read_notif_ids');
-        const localReadSet = new Set<string>(localReadRaw ? JSON.parse(localReadRaw) : []);
-        if (Array.isArray(data.readNotificationIds)) {
-          data.readNotificationIds.forEach((id: string) => localReadSet.add(id));
-        }
-        const mergedArray = Array.from(localReadSet);
-        localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(mergedArray));
-        const localReadAt = parseInt(localStorage.getItem('smileclinic_notifications_read_at') || '0', 10);
-        const serverReadAt = typeof data.notificationsReadAt === 'number' ? data.notificationsReadAt : 0;
-        const maxReadAt = Math.max(localReadAt, serverReadAt);
-        if (maxReadAt > 0) {
-          localStorage.setItem('smileclinic_notifications_read_at', String(maxReadAt));
-        }
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('smileclinic_notifications_read_synced', {
-            detail: {
-              readNotificationIds: mergedArray,
-              notificationsReadAt: maxReadAt,
-            }
-          }));
-        }
-      } catch (e) {
-        console.warn('[CloudSync] Failed to reconcile notification read state', e);
+      // 2. Reconcile Audit Logs
+      if (Array.isArray(data.auditLogs)) {
+        const mappedAuditLogs: AuditLogEntry[] = data.auditLogs.map((a: any) => {
+          const tsMs = a.timestampMs || (a.createdAt ? new Date(a.createdAt).getTime() : Date.now());
+          const timeFormatted = formatISTTime(tsMs, true);
+          return {
+            id: a.id,
+            timestamp: a.timestamp || timeFormatted,
+            timestampMs: tsMs,
+            createdAt: a.createdAt || new Date(tsMs).toISOString(),
+            clinicianName: a.clinicianName || 'Authorized Clinician',
+            action: a.action || 'Safety Screen Initiated',
+            patientMrn: a.patientMrn || 'PT-GENERAL',
+            patientName: a.patientName || a.innerData?.patientName || a.patientMrn,
+            checkId: a.checkId || a.innerData?.checkId,
+            prescriptions: a.prescriptions || a.innerData?.prescriptions || [],
+            alerts: (Array.isArray(a.alerts || a.innerData?.alerts) ? (a.alerts || a.innerData?.alerts) : []).map((al: any, idx: number) => {
+              const interacting = Array.isArray(al.interactingDrugs)
+                ? al.interactingDrugs
+                : Array.isArray(al.interacting_drugs)
+                  ? al.interacting_drugs
+                  : al.drugA && al.drugB
+                    ? [al.drugA, al.drugB]
+                    : al.drugName
+                      ? [al.drugName]
+                      : [];
+              return {
+                ...al,
+                id: al.id || `alt-aud-${idx + 1}`,
+                title: al.title || (al.drugA && al.drugB ? `${al.drugA} ↔ ${al.drugB} Hazard` : 'Clinical CDS Alert'),
+                severity: (al.severity || 'major').toLowerCase(),
+                interactingDrugs: interacting,
+                description: al.description || al.mechanism || al.clinicalImpact || '',
+              };
+            }),
+            details: a.eventDetails || a.details || '',
+            severity: (a.severity || 'safe').toLowerCase(),
+            hash: a.hash || 'SHA256:AUTHENTICATED',
+            pdfFilename: a.pdfFilename,
+            pdfUrl: a.pdfUrl,
+            sourceDocumentUrl: a.sourceDocumentUrl || a.innerData?.sourceDocumentUrl,
+            sourceDocumentName: a.sourceDocumentName || a.innerData?.sourceDocumentName,
+            sourceType: a.sourceType || a.innerData?.sourceType,
+          };
+        });
+        PrescriptionStorage.setAuditLogs(mappedAuditLogs);
       }
-    }
 
-    return true;
+      // 3. Reconcile Uploaded Documents
+      if (Array.isArray(data.documents)) {
+        const mappedDocs: UploadedDocumentRecord[] = data.documents.map((d: any) => ({
+          id: d.id,
+          userId: email,
+          filename: d.filename,
+          fileType: d.fileType || 'pdf',
+          fileSize: d.fileSize || 0,
+          storageUrl: d.storageUrl,
+          authorName: d.authorName || 'Authorized Clinician',
+          extractedRulesCount: d.extractedRulesCount || 0,
+          status: d.status || 'stored',
+          uploadedAt: d.uploadedAt || new Date().toISOString(),
+        }));
+        setDocumentHistory(mappedDocs);
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('smileclinic_persistent_documents_v2', JSON.stringify(mappedDocs));
+          }
+        } catch { }
+      }
+
+      // 4. Reconcile Clinical Rules
+      if (Array.isArray(data.rules)) {
+        const mappedRules: InteractionRule[] = data.rules.map((r: any) => ({
+          id: r.id,
+          drugA: r.drugA,
+          drugB: r.drugB,
+          category: r.category || 'Clinical Alert',
+          severity: r.severity || 'moderate',
+          mechanism: r.mechanism || '',
+          evidence: r.evidence || 'Established',
+          sourceFile: r.sourceFile,
+          active: r.active !== false,
+        }));
+        PrescriptionStorage.setRules(mappedRules);
+      }
+
+      // 6. Reconcile Custom Clinical Questions
+      if (Array.isArray(data.customQuestions)) {
+        _cachedCustomQuestions = data.customQuestions;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('smileclinic_questions_updated', { detail: _cachedCustomQuestions }));
+        }
+      }
+
+      // 5. Reconcile Patients
+      if (Array.isArray(data.patients)) {
+        const mappedPatients: Patient[] = data.patients.map((p: any) => ({
+          id: p.id,
+          mrn: p.mrn || p.id,
+          name: p.name || 'Patient',
+          age: p.age || 30,
+          gender: p.gender || 'Male',
+          weightKg: p.weightKg || 70,
+          egfr: p.egfr || 90,
+          pregnancyStatus: p.pregnancyStatus || 'No',
+          conditions: p.conditions || [],
+          allergies: p.allergies || [],
+          activeMedications: p.activeMedications || p.currentMedications || [],
+        }));
+        PrescriptionStorage.setPatients(mappedPatients);
+      }
+
+      // 7. Reconcile Notification Read State from Backend PostgreSQL
+      if (Array.isArray(data.readNotificationIds) || typeof data.notificationsReadAt === 'number') {
+        try {
+          const localReadRaw = localStorage.getItem('smileclinic_read_notif_ids');
+          const localReadSet = new Set<string>(localReadRaw ? JSON.parse(localReadRaw) : []);
+          if (Array.isArray(data.readNotificationIds)) {
+            data.readNotificationIds.forEach((id: string) => localReadSet.add(id));
+          }
+          const mergedArray = Array.from(localReadSet);
+          localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(mergedArray));
+          const localReadAt = parseInt(localStorage.getItem('smileclinic_notifications_read_at') || '0', 10);
+          const serverReadAt = typeof data.notificationsReadAt === 'number' ? data.notificationsReadAt : 0;
+          const maxReadAt = Math.max(localReadAt, serverReadAt);
+          if (maxReadAt > 0) {
+            localStorage.setItem('smileclinic_notifications_read_at', String(maxReadAt));
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('smileclinic_notifications_read_synced', {
+              detail: {
+                readNotificationIds: mergedArray,
+                notificationsReadAt: maxReadAt,
+              }
+            }));
+          }
+        } catch (e) {
+          console.warn('[CloudSync] Failed to reconcile notification read state', e);
+        }
+      }
+
+      return true;
     } catch (err) {
       console.warn('[CloudSync] Pull error (will retry):', err);
       return false;
@@ -568,7 +567,7 @@ export async function executePrescriptionSafetyCheck(payload: any): Promise<any>
  * - Polls every 8 seconds silently for multi-device parity
  */
 export function initAutoSync(): () => void {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => { };
 
   purgeAllClinicalLocalStorage();
 

@@ -248,13 +248,13 @@ export default function Dashboard() {
         const raw = localStorage.getItem('smileclinic_synced_knowledge_selection');
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             setSyncedKnowledgeCount(parsed.length);
             return;
           }
         }
       } catch {}
-      setSyncedKnowledgeCount((rules.filter((r) => r.active).length || rules.length) + checks.length);
+      setSyncedKnowledgeCount(0);
     };
 
     window.addEventListener('smileclinic_rules_updated', handleRulesSync);
@@ -294,10 +294,10 @@ export default function Dashboard() {
       const raw = localStorage.getItem('smileclinic_synced_knowledge_selection');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed.length;
+        if (Array.isArray(parsed)) return parsed.length;
       }
     } catch {}
-    return (rules.filter(r => r.active).length || rules.length) + checks.length;
+    return 0;
   });
 
 
