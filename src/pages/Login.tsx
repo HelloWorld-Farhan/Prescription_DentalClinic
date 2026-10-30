@@ -16,6 +16,30 @@ export default function Login() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, []);
 
+  // Trap back-button so user cannot re-enter protected routes without logging in
+  useEffect(() => {
+    const isAuth =
+      sessionStorage.getItem('rxguard_authenticated') === 'true' ||
+      localStorage.getItem('rxguard_authenticated') === 'true';
+    if (isAuth) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+
+    const handlePopState = () => {
+      const authNow =
+        sessionStorage.getItem('rxguard_authenticated') === 'true' ||
+        localStorage.getItem('rxguard_authenticated') === 'true';
+      if (!authNow) {
+        window.history.pushState(null, '', '/login');
+      }
+    };
+
+    window.history.pushState(null, '', '/login');
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
+
   const [clinicalId, setClinicalId] = useState(() => {
     return localStorage.getItem('smileclinic_remembered_email') || '';
   });

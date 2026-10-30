@@ -75,7 +75,8 @@ function AppRoutes() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Fullscreen Printable Report */}
-          <Route path="/report" element={<Report />} />
+          <Route path="/report" element={<Report />} />
+          <Route path="/report/:id" element={<Report />} />
 
           {/* Legal & Support */}
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -104,7 +105,8 @@ function AppRoutes() {
             <Route path="/dashboard/audit-log" element={<AuditLog />} />
             <Route path="/dashboard/rules" element={<RulesAdmin />} />
             <Route path="/dashboard/settings" element={<Settings />} />
-            <Route path="/dashboard/report" element={<Report />} />
+            <Route path="/dashboard/report" element={<Report />} />
+            <Route path="/dashboard/report/:id" element={<Report />} />
           </Route>
 
           {/* Fallback */}

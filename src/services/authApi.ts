@@ -1282,33 +1282,27 @@ export const authApi = {
    */
 
   clearSession(): void {
-
     if (typeof window === 'undefined') return;
-
-    sessionStorage.removeItem('rxguard_authenticated');
-
-    sessionStorage.removeItem('rxguard_jwt_token');
-
-    sessionStorage.removeItem('rxguard_prescriber_name');
-
-    sessionStorage.removeItem('rxguard_prescriber_email');
-
-    sessionStorage.removeItem('rxguard_prescriber_role');
-
-    sessionStorage.removeItem('rxguard_prescriber_id');
-
-    sessionStorage.removeItem('rxguard_prescriber_npi');
-
-    sessionStorage.removeItem('rxguard_auth_provider');
-
-    sessionStorage.removeItem('rxguard_two_factor_enabled');
-
-    localStorage.removeItem('rxguard_auth_provider');
-
-    localStorage.removeItem('smileclinic_jwt_token');
-
-    localStorage.removeItem('smileclinic_auth_user');
-
+    const authKeys = [
+      'rxguard_authenticated',
+      'rxguard_jwt_token',
+      'rxguard_prescriber_name',
+      'rxguard_prescriber_email',
+      'rxguard_prescriber_role',
+      'rxguard_prescriber_id',
+      'rxguard_prescriber_npi',
+      'rxguard_auth_provider',
+      'rxguard_two_factor_enabled',
+      'smileclinic_jwt_token',
+      'smileclinic_auth_user',
+      'smileclinic_user_email'
+    ];
+    authKeys.forEach((k) => {
+      try {
+        sessionStorage.removeItem(k);
+        localStorage.removeItem(k);
+      } catch {}
+    });
   }
 
 };

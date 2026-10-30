@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, formatISTDateTime } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
@@ -35,7 +35,8 @@ export default function Report() {
   const [geminiAnalysis, setGeminiAnalysis] = useState<GeminiClinicalAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const checkId = searchParams.get('id') || searchParams.get('checkId');
+  const { id: routeId } = useParams();
+  const checkId = routeId || searchParams.get('id') || searchParams.get('checkId');
   const checks = VirtualDb.getChecks();
   const currentCheck: SafetyCheckRecord | undefined =
     checks.find((c) => c.id === checkId || c.checkNumber === checkId) ||

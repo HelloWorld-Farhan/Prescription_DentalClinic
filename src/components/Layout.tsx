@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet, Link, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ErrorBoundary from './ErrorBoundary';
 import FirstTimeOnboardingModal from './FirstTimeOnboardingModal';
@@ -8,7 +8,8 @@ import { getDeviceId } from '../services/sessionAudit';
 import { PrescriptionStorage } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
 import { ConfirmationEventDetail, showConfirmation } from '../services/confirmation';
-import { parseMedicationTiming } from '../services/medicationScheduleService';
+import { parseMedicationTiming } from '../services/medicationScheduleService';
+
 import { pushNotificationReadState } from '../services/cloudSyncService';
 
 interface NotificationItem {
@@ -503,7 +504,7 @@ export default function Layout() {
           name: `${check.patientName || 'Patient'} (${check.mrn || 'MRN'})`,
           category: `Safety Check #${check.id}`,
           icon: 'assignment',
-          path: `/report/${check.id}`,
+          path: `/report?id=${check.id}`,
           type: 'record' as const,
           badge: check.overallStatus || (alertList.length > 0 ? 'Flagged' : 'Cleared'),
           badgeStyle: alertList.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800',
@@ -533,7 +534,7 @@ export default function Layout() {
           name: `${check.patientName || 'Patient'} (${check.mrn || 'MRN'})`,
           category: `Safety Check #${check.id}`,
           icon: 'assignment',
-          path: `/report/${check.id}`,
+          path: `/report?id=${check.id}`,
           type: 'record' as const,
           badge: check.overallStatus || (alertList.length > 0 ? 'Flagged' : 'Cleared'),
           badgeStyle: alertList.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800',
