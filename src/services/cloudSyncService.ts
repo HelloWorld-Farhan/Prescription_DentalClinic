@@ -41,13 +41,24 @@ export function purgeAllClinicalLocalStorage(): void {
       'dental_clinic_logo',
     ]);
 
+    const ALLOWED_EXTENDED = new Set([
+      'smileclinic_read_notif_ids',
+      'smileclinic_notifications_read_at',
+      'smileclinic_master_email_alerts_enabled',
+      'smileclinic_disabled_med_alert_ids',
+      'smileclinic_synced_knowledge_selection',
+      'smileclinic_synced_active_conditions',
+      'smileclinic_synced_active_checks',
+      'smileclinic_synced_active_rules',
+    ]);
+
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key) continue;
-      if (ALLOWED_EXACT.has(key)) continue;
+      if (ALLOWED_EXACT.has(key) || ALLOWED_EXTENDED.has(key)) continue;
       if (key.startsWith('firebase:')) continue;
-      if (key.startsWith('smileclinic_avatar_') || key.startsWith('user_avatar_')) continue;
+      if (key.startsWith('smileclinic_') || key.startsWith('user_avatar_')) continue;
       if (key.startsWith('profile_completed_') || key.startsWith('google_linked_')) continue;
       keysToRemove.push(key);
     }
@@ -284,6 +295,32 @@ export async function pullFromCloud(): Promise<boolean> {
         activeMedications: p.activeMedications || p.currentMedications || [],
       }));
       PrescriptionStorage.setPatients(mappedPatients);
+    }
+
+    // 7. Reconcile Notification Read State from Backend PostgreSQL
+    if (Array.isArray(data.readNotificationIds) || typeof data.notificationsReadAt === 'number') {
+      try {
+        const localReadRaw = localStorage.getItem('smileclinic_read_notif_ids');
+        const localReadSet = new Set<string>(localReadRaw ? JSON.parse(localReadRaw) : []);
+        if (Array.isArray(data.readNotificationIds)) {
+          data.readNotificationIds.forEach((id: string) => localReadSet.add(id));
+        }
+        const mergedArray = Array.from(localReadSet);
+        localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(mergedArray));
+        if (typeof data.notificationsReadAt === 'number') {
+          localStorage.setItem('smileclinic_notifications_read_at', String(data.notificationsReadAt));
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('smileclinic_notifications_read_synced', {
+            detail: {
+              readNotificationIds: mergedArray,
+              notificationsReadAt: data.notificationsReadAt || 0,
+            }
+          }));
+        }
+      } catch (e) {
+        console.warn('[CloudSync] Failed to reconcile notification read state', e);
+      }
     }
 
     return true;
@@ -592,32 +629,61 @@ export async function pushNotificationReadState(readAt?: number, notifIds?: stri
 
 }
 
-
-/**
- * Pushes active synchronized clinical knowledge & medical history to PostgreSQL backend.
- */
-export async function pushKnowledgeSyncState(syncedKnowledge: {
-  selection?: string[];
-  conditions?: string[];
-  checks?: string[];
-  rules?: string[];
-  docs?: string[];
-}): Promise<boolean> {
-  const email = getClinicianEmail();
-  if (!email || !API_BASE_URL) return false;
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/sync/knowledge-state`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        syncedKnowledge,
-      }),
-    });
-    return res.ok;
-  } catch (e) {
-    console.warn('[CloudSync] Push knowledge sync state failed:', e);
-    return false;
-  }
-}
+
+
+/**
+
+ * Pushes active synchronized clinical knowledge & medical history to PostgreSQL backend.
+
+ */
+
+export async function pushKnowledgeSyncState(syncedKnowledge: {
+
+  selection?: string[];
+
+  conditions?: string[];
+
+  checks?: string[];
+
+  rules?: string[];
+
+  docs?: string[];
+
+}): Promise<boolean> {
+
+  const email = getClinicianEmail();
+
+  if (!email || !API_BASE_URL) return false;
+
+
+
+  try {
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/sync/knowledge-state`, {
+
+      method: 'POST',
+
+      headers: { 'Content-Type': 'application/json' },
+
+      body: JSON.stringify({
+
+        email,
+
+        syncedKnowledge,
+
+      }),
+
+    });
+
+    return res.ok;
+
+  } catch (e) {
+
+    console.warn('[CloudSync] Push knowledge sync state failed:', e);
+
+    return false;
+
+  }
+
+}
+

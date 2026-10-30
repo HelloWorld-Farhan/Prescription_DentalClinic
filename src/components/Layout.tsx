@@ -360,6 +360,15 @@ export default function Layout() {
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
+  const [notificationsReadAt, setNotificationsReadAt] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem('smileclinic_notifications_read_at');
+      return raw ? parseInt(raw, 10) || 0 : 0;
+    } catch {
+      return 0;
+    }
+  });
+
   const [readNotifIds, setReadNotifIds] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem('smileclinic_read_notif_ids');
@@ -368,6 +377,20 @@ export default function Layout() {
       return new Set();
     }
   });
+
+  // Listen for real-time cloud sync reconciliation of read notifications
+  useEffect(() => {
+    const handleReadSync = (e: any) => {
+      if (e?.detail?.readNotificationIds && Array.isArray(e.detail.readNotificationIds)) {
+        setReadNotifIds(new Set(e.detail.readNotificationIds));
+      }
+      if (typeof e?.detail?.notificationsReadAt === 'number') {
+        setNotificationsReadAt(e.detail.notificationsReadAt);
+      }
+    };
+    window.addEventListener('smileclinic_notifications_read_synced', handleReadSync);
+    return () => window.removeEventListener('smileclinic_notifications_read_synced', handleReadSync);
+  }, []);
 
   const markNotificationAsRead = (id: string) => {
     setReadNotifIds((prev) => {
@@ -379,18 +402,25 @@ export default function Layout() {
       return next;
     });
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+    // Persist to PostgreSQL cloud database for parity across all devices
+    pushNotificationReadState(0, [id]).catch((err) => console.warn('Failed to push read notif to DB:', err));
   };
 
   const markAllAsRead = () => {
-    const allIds = new Set(notifications.map((n) => n.id));
+    const allIds = notifications.map((n) => n.id);
+    const now = Date.now();
+    setNotificationsReadAt(now);
     setReadNotifIds((prev) => {
       const next = new Set([...prev, ...allIds]);
       try {
         localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(Array.from(next)));
+        localStorage.setItem('smileclinic_notifications_read_at', String(now));
       } catch {}
       return next;
     });
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    // Persist to PostgreSQL cloud database for parity across all devices
+    pushNotificationReadState(now, allIds).catch((err) => console.warn('Failed to push all read notifs to DB:', err));
     showConfirmation('All clinical notifications marked as read.', 'success');
   };
 
@@ -453,10 +483,13 @@ export default function Layout() {
   useEffect(() => {
     const list: NotificationItem[] = [];
     (realChecks || []).slice(0, 4).forEach((check) => {
+      const checkCreatedMs = check.timestampMs || (check.createdAt ? new Date(check.createdAt).getTime() : 0);
+      const isPastBulkRead = notificationsReadAt > 0 && checkCreatedMs > 0 && checkCreatedMs <= notificationsReadAt;
+
       // 1. Safety hazard alerts
       (check.alerts || []).forEach((al, idx) => {
         const notifId = `notif-al-${check.id}-${idx}`;
-        const isRead = readNotifIds.has(notifId);
+        const isRead = readNotifIds.has(notifId) || isPastBulkRead;
         list.push({
           id: notifId,
           title: al.title || 'Pharmacological Interaction Alert',
@@ -475,7 +508,7 @@ export default function Layout() {
         const drugName = rx.drugName || (rx as any).name || 'Medication';
         const timing = parseMedicationTiming(rx.frequency || '', drugName);
         const notifId = `notif-rx-${check.id}-${idx}`;
-        const isRead = readNotifIds.has(notifId);
+        const isRead = readNotifIds.has(notifId) || isPastBulkRead;
         list.push({
           id: notifId,
           title: `${drugName} ${rx.dosage || ''} • Intake Due`,
@@ -491,7 +524,7 @@ export default function Layout() {
     });
 
     setNotifications(list);
-  }, [realChecks, readNotifIds]);
+  }, [realChecks, readNotifIds, notificationsReadAt]);
 
   const filteredSearchItems: SearchResultItem[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
