@@ -18,7 +18,7 @@ export default function Alerts() {
   const [searchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
 
-  const [activeTab, setActiveTab] = useState<'all' | 'safety' | 'intake' | 'expiry' | 'overridden'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'entire' | 'safety' | 'intake' | 'expiry' | 'overridden'>('all');
   const [searchTerm, setSearchTerm] = useState(queryParam);
   const [activeDrawerAlert, setActiveDrawerAlert] = useState<DrugInteractionAlert | null>(null);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -91,7 +91,8 @@ export default function Alerts() {
 
   // Dynamic Tabs with exact counts matching Dashboard metrics 1:1
   const availableTabs = [
-    { key: 'all' as const, label: 'All Active Queue', count: activeQueueCount },
+    { key: 'all' as const, label: 'Active Alerts', count: activeQueueCount },
+    { key: 'entire' as const, label: 'All Alerts & History', count: unifiedQueue.length },
     {
       key: 'safety' as const,
       label: 'Safety Hazards',
@@ -109,10 +110,10 @@ export default function Alerts() {
     },
     {
       key: 'overridden' as const,
-      label: 'Overridden History',
+      label: 'Overridden / Documented',
       count: overriddenAlerts.length,
     },
-  ].filter((tab) => tab.key === 'all' || tab.count > 0);
+  ].filter((tab) => tab.key === 'all' || tab.key === 'entire' || tab.key === 'overridden' || tab.count > 0);
 
   useEffect(() => {
     if (activeTab !== 'all' && !availableTabs.some((t) => t.key === activeTab)) {
@@ -125,6 +126,7 @@ export default function Alerts() {
     return unifiedQueue.filter((item) => {
       let matchesTab = true;
       if (activeTab === 'all') matchesTab = !item.alert?.overridden;
+      else if (activeTab === 'entire') matchesTab = true;
       else if (activeTab === 'safety') matchesTab = item.type === 'safety_hazard' && !item.alert?.overridden;
       else if (activeTab === 'intake') matchesTab = item.type === 'intake_schedule';
       else if (activeTab === 'expiry') matchesTab = item.type === 'course_expiry';
@@ -276,6 +278,15 @@ export default function Alerts() {
                 All medications are scheduled cleanly or all safety hazards have been documented and overridden.
               </p>
             </div>
+            {overriddenAlerts.length > 0 && activeTab !== 'overridden' && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('overridden')}
+                className="mt-1 px-4 py-2 rounded-xl bg-amber-500/10 text-amber-800 border border-amber-300 text-xs font-bold hover:bg-amber-500/20 transition-colors cursor-pointer"
+              >
+                View Documented & Overridden Decisions ({overriddenAlerts.length}) →
+              </button>
+            )}
             <button
               type="button"
               onClick={() => navigate('/check')}

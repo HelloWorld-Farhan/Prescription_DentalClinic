@@ -358,7 +358,21 @@ export default function Layout() {
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
+  const [readNotifIds, setReadNotifIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('smileclinic_read_notif_ids');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
   const markAllAsRead = () => {
+    const allIds = new Set(notifications.map(n => n.id));
+    setReadNotifIds(allIds);
+    try {
+      localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(Array.from(allIds)));
+    } catch {}
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
     showConfirmation('All clinical notifications marked as read.', 'success');
   };
@@ -405,6 +419,18 @@ export default function Layout() {
       setRealChecks(PrescriptionStorage.getChecks());
     }
   }, [isSearchOpen]);
+
+  useEffect(() => {
+    const handleChecksSync = () => {
+      setRealChecks(PrescriptionStorage.getChecks());
+    };
+    window.addEventListener('smileclinic_checks_updated', handleChecksSync);
+    window.addEventListener('storage', handleChecksSync);
+    return () => {
+      window.removeEventListener('smileclinic_checks_updated', handleChecksSync);
+      window.removeEventListener('storage', handleChecksSync);
+    };
+  }, []);
 
   // Compute live clinical notifications from recent checks
   useEffect(() => {

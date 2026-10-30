@@ -534,11 +534,35 @@ export const isDummyCheck = (c: any): boolean => {
 
 
 
-// Zero LocalStorage clinical data caches
-let _cachedChecks: SafetyCheckRecord[] = [];
-let _cachedAuditLogs: AuditLogEntry[] = [];
-let _cachedRules: InteractionRule[] = [];
-let _cachedPatients: Patient[] = [];
+// Two-tier resilience: In-memory store with persistent local storage backup
+const CHECKS_BACKUP_KEY = 'smileclinic_persistent_checks_v2';
+const AUDIT_BACKUP_KEY = 'smileclinic_persistent_audit_v2';
+const RULES_BACKUP_KEY = 'smileclinic_persistent_rules_v2';
+const PATIENTS_BACKUP_KEY = 'smileclinic_persistent_patients_v2';
+
+function loadLocalBackup<T>(key: string): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalBackup<T>(key: string, data: T[]) {
+  try {
+    if (Array.isArray(data) && data.length > 0) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch {}
+}
+
+let _cachedChecks: SafetyCheckRecord[] = loadLocalBackup<SafetyCheckRecord>(CHECKS_BACKUP_KEY);
+let _cachedAuditLogs: AuditLogEntry[] = loadLocalBackup<AuditLogEntry>(AUDIT_BACKUP_KEY);
+let _cachedRules: InteractionRule[] = loadLocalBackup<InteractionRule>(RULES_BACKUP_KEY);
+let _cachedPatients: Patient[] = loadLocalBackup<Patient>(PATIENTS_BACKUP_KEY);
 
 export const getActiveClinicianName = () => {
 
@@ -617,7 +641,13 @@ export const INITIAL_RULES: InteractionRule[] = [];
  */
 export class ClinicalDecisionSupport {
   static setChecks(checks: SafetyCheckRecord[]) {
-    _cachedChecks = (checks || []).filter(c => !isDummyCheck(c));
+    const valid = (checks || []).filter(c => !isDummyCheck(c));
+    if (valid.length === 0 && _cachedChecks.length > 0) {
+      // Preserve existing valid records against empty overwrites
+      return;
+    }
+    _cachedChecks = valid;
+    saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
     }
@@ -668,14 +698,23 @@ export class ClinicalDecisionSupport {
 
   static setAuditLogs(logs: AuditLogEntry[]) {
     const filtered = (logs || []).filter(l => l.action !== 'Rule Updated' && !l.action.includes('Rule'));
-    _cachedAuditLogs = this.deduplicateAuditLogs(filtered);
+    const deduped = this.deduplicateAuditLogs(filtered);
+    if (deduped.length === 0 && _cachedAuditLogs.length > 0) {
+      return;
+    }
+    _cachedAuditLogs = deduped;
+    saveLocalBackup(AUDIT_BACKUP_KEY, _cachedAuditLogs);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_audit_updated'));
     }
   }
 
   static setRules(rules: InteractionRule[]) {
+    if ((!rules || rules.length === 0) && _cachedRules.length > 0) {
+      return;
+    }
     _cachedRules = rules || [];
+    saveLocalBackup(RULES_BACKUP_KEY, _cachedRules);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
     }
@@ -803,6 +842,7 @@ export class ClinicalDecisionSupport {
     };
 
     _cachedChecks.unshift(enrichedRecord);
+    saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
     }
@@ -855,6 +895,7 @@ export class ClinicalDecisionSupport {
       check.overallStatus = 'Overridden';
     }
 
+    saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
     }
