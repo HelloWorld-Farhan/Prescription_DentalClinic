@@ -50,6 +50,10 @@ export function purgeAllClinicalLocalStorage(): void {
       'smileclinic_synced_active_conditions',
       'smileclinic_synced_active_checks',
       'smileclinic_synced_active_rules',
+      'smileclinic_persistent_checks_v2',
+      'smileclinic_persistent_audit_v2',
+      'smileclinic_persistent_rules_v2',
+      'smileclinic_persistent_patients_v2',
     ]);
 
     const keysToRemove: string[] = [];
@@ -97,6 +101,7 @@ export function getClinicianEmail(): string {
 
 let isSyncing = false;
 let autoSyncTimer: any = null;
+let activePullPromise: Promise<boolean> | null = null;
 let _cachedCustomQuestions: Array<{ id: string; text: string; createdAt?: string }> = [];
 
 export function getCachedCustomQuestions(): Array<{ id: string; text: string; createdAt?: string }> {
@@ -105,19 +110,22 @@ export function getCachedCustomQuestions(): Array<{ id: string; text: string; cr
 
 /**
  * Pulls all persistent data from Supabase PostgreSQL for the authenticated clinician.
- * Directly populates reactive memory stores. Never touches localStorage for clinical items.
+ * Directly populates reactive memory stores and persists local resilient backups.
+ * Deduplicates in-flight requests so concurrent callers share the same promise.
  */
 export async function pullFromCloud(): Promise<boolean> {
   const email = getClinicianEmail();
-  if (!email || !API_BASE_URL || isSyncing) return false;
+  if (!email || !API_BASE_URL) return false;
+  if (activePullPromise) return activePullPromise;
 
-  try {
-    isSyncing = true;
-    const res = await fetch(`${API_BASE_URL}/api/v1/sync/all?email=${encodeURIComponent(email)}`);
-    if (!res.ok) return false;
+  activePullPromise = (async () => {
+    try {
+      isSyncing = true;
+      const res = await fetch(`${API_BASE_URL}/api/v1/sync/all?email=${encodeURIComponent(email)}`);
+      if (!res.ok) return false;
 
-    const data = await res.json();
-    if (data.status !== 'success') return false;
+      const data = await res.json();
+      if (data.status !== 'success') return false;
 
     // 1. Reconcile Checks
     if (Array.isArray(data.checks)) {
@@ -327,12 +335,16 @@ export async function pullFromCloud(): Promise<boolean> {
     }
 
     return true;
-  } catch (err) {
-    console.warn('[CloudSync] Pull error (will retry):', err);
-    return false;
-  } finally {
-    isSyncing = false;
-  }
+    } catch (err) {
+      console.warn('[CloudSync] Pull error (will retry):', err);
+      return false;
+    } finally {
+      isSyncing = false;
+      activePullPromise = null;
+    }
+  })();
+
+  return activePullPromise;
 }
 
 /**

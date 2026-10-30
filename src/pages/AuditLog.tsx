@@ -1,3 +1,4 @@
+import { pullFromCloud } from '../services/cloudSyncService';
 import React, { useState, useEffect } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -42,6 +43,11 @@ export default function AuditLog() {
   const checks: SafetyCheckRecord[] = VirtualDb.getChecks();
 
   useEffect(() => {
+    let isMounted = true;
+    pullFromCloud().then(() => {
+      if (!isMounted) return;
+      setLogs(VirtualDb.getAuditLogs());
+    }).catch(() => {});
 
     const handleAuditSync = () => {
 
@@ -54,7 +60,7 @@ export default function AuditLog() {
     window.addEventListener('storage', handleAuditSync);
 
     return () => {
-
+      isMounted = false;
       window.removeEventListener('smileclinic_audit_updated', handleAuditSync);
 
       window.removeEventListener('storage', handleAuditSync);

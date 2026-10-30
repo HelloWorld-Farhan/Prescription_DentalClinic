@@ -221,50 +221,42 @@ export default function Dashboard() {
   const [rules, setRules] = useState<InteractionRule[]>(() => VirtualDb.getRules());
 
   useEffect(() => {
-    // Proactively refresh live cloud state from PostgreSQL on mount
-    pullFromCloud().catch(() => {});
+    let isMounted = true;
+    pullFromCloud().then(() => {
+      if (!isMounted) return;
+      setChecks(VirtualDb.getChecks());
+      setRules(VirtualDb.getRules());
+      setAuditLogs(VirtualDb.getAuditLogs());
+    }).catch(() => {});
 
     const handleRulesSync = () => {
-
       setRules(VirtualDb.getRules());
-
     };
 
     const handleChecksSync = () => {
-
       const updated = VirtualDb.getChecks();
-
       setChecks(updated);
-
       setSelectedCheckId(prev => prev || updated[0]?.id || null);
-
     };
 
-    window.addEventListener('smileclinic_rules_updated', handleRulesSync);
-
-    window.addEventListener('smileclinic_checks_updated', handleChecksSync);
     const handleAuditSync = () => {
       setAuditLogs(VirtualDb.getAuditLogs());
     };
+
+    window.addEventListener('smileclinic_rules_updated', handleRulesSync);
+    window.addEventListener('smileclinic_checks_updated', handleChecksSync);
     window.addEventListener('smileclinic_audit_updated', handleAuditSync);
-
     window.addEventListener('storage', handleRulesSync);
-
     window.addEventListener('storage', handleChecksSync);
 
     return () => {
-
+      isMounted = false;
       window.removeEventListener('smileclinic_rules_updated', handleRulesSync);
-
       window.removeEventListener('smileclinic_checks_updated', handleChecksSync);
       window.removeEventListener('smileclinic_audit_updated', handleAuditSync);
-
       window.removeEventListener('storage', handleRulesSync);
-
       window.removeEventListener('storage', handleChecksSync);
-
     };
-
   }, []);
 
 
@@ -382,22 +374,13 @@ export default function Dashboard() {
 
 
 
-  // Stable sync handler: only trigger re-render if data actually changed
-
-  const handleAutoSync = useCallback(() => {
-
+  // Stable sync handler: refresh live cloud state from PostgreSQL and update memory stores
+  const handleAutoSync = useCallback(async () => {
+    await pullFromCloud().catch(() => {});
     const fresh = VirtualDb.getChecks();
-
-    setChecks(prev => {
-
-      if (prev.length !== fresh.length) return fresh;
-
-      if (prev.length > 0 && fresh.length > 0 && prev[0].id !== fresh[0].id) return fresh;
-
-      return prev;
-
-    });
-
+    setChecks(fresh);
+    setRules(VirtualDb.getRules());
+    setAuditLogs(VirtualDb.getAuditLogs());
   }, []);
 
 

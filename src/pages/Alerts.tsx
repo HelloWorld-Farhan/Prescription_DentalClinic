@@ -53,7 +53,12 @@ export default function Alerts() {
   const [expandedCheckIds, setExpandedCheckIds] = useState<Set<string>>(() => new Set<string>());
 
   useEffect(() => {
-    pullFromCloud().catch(() => {});
+    let isMounted = true;
+    pullFromCloud().then(() => {
+      if (!isMounted) return;
+      const updated = VirtualDb.getChecks();
+      setChecks(updated);
+    }).catch(() => {});
 
     const handleChecksSync = () => {
       const updated = VirtualDb.getChecks();
@@ -70,6 +75,7 @@ export default function Alerts() {
     window.addEventListener('smileclinic_checks_updated', handleChecksSync);
     window.addEventListener('storage', handleChecksSync);
     return () => {
+      isMounted = false;
       window.removeEventListener('smileclinic_checks_updated', handleChecksSync);
       window.removeEventListener('storage', handleChecksSync);
     };
@@ -269,41 +275,8 @@ export default function Alerts() {
           </p>
         </div>
 
-        {/* Action Controls: Master Email Switch, SMS Alert & Send Email Button */}
+        {/* Action Controls: Merged Send/Toggle Alert Email & SMS Alert */}
         <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
-          {/* Master Email Alerts Toggle */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest shadow-2xs">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-on-surface flex items-center gap-1.5">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    masterEmailAlertsEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
-                  }`}
-                />
-                Automated Email Alerts
-              </span>
-              <span className="text-[9px] text-outline font-medium">
-                {masterEmailAlertsEnabled ? 'Active (All Prescriptions)' : 'Paused (Sending Off)'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={toggleMasterEmail}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                masterEmailAlertsEnabled ? 'bg-primary' : 'bg-slate-300'
-              }`}
-              role="switch"
-              aria-checked={masterEmailAlertsEnabled}
-              title={`Toggle Automated Email Alerts ${masterEmailAlertsEnabled ? 'OFF' : 'ON'}`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  masterEmailAlertsEnabled ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-
           {/* SMS Alert (Blocked for Now) */}
           <button
             type="button"
@@ -318,28 +291,64 @@ export default function Alerts() {
             </span>
           </button>
 
-          {/* Send Alert Email Modal Trigger (Combines All Active Prescriptions & Medications) */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!masterEmailAlertsEnabled) {
-                showConfirmation(
-                  'Email sending is currently paused. Please turn ON Automated Email Alerts toggle first.',
-                  'warning'
-                );
-                return;
+          {/* Merged Unified Email Alert Control (Action Button + ON/OFF Master Toggle in One) */}
+          <div className="inline-flex items-center rounded-xl border border-surface-container-high bg-surface-container-lowest shadow-xs overflow-hidden">
+            {/* Click to send/preview alert email */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!masterEmailAlertsEnabled) {
+                  showConfirmation(
+                    'Email alerts are currently turned OFF. Turn the toggle ON to dispatch emails.',
+                    'warning'
+                  );
+                  return;
+                }
+                setEmailModalCheck(null);
+                setIsEmailModalOpen(true);
+              }}
+              disabled={allActiveMedications.length === 0}
+              className={`px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${
+                masterEmailAlertsEnabled
+                  ? 'bg-primary text-white hover:bg-primary-hover'
+                  : 'bg-surface-container text-outline hover:text-on-surface'
+              }`}
+              title={
+                masterEmailAlertsEnabled
+                  ? 'Dispatch unified medication alert email for all active prescriptions'
+                  : 'Email alerts are paused. Toggle switch to turn ON.'
               }
-              // Set to null to signal combined all-prescription mix
-              setEmailModalCheck(null);
-              setIsEmailModalOpen(true);
-            }}
-            disabled={allActiveMedications.length === 0}
-            className="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-            title="Dispatch unified email alert containing properly mixed medications across all prescriptions"
-          >
-            <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span>
-            <span>Send Alert Email</span>
-          </button>
+            >
+              <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span>
+              <span>{masterEmailAlertsEnabled ? 'Send Alert Email' : 'Email Alerts: OFF'}</span>
+            </button>
+
+            {/* Integrated Master ON/OFF Switch */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-container-low border-l border-surface-container-high">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  masterEmailAlertsEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+                }`}
+                title={masterEmailAlertsEnabled ? 'Email sending active' : 'Email sending paused'}
+              />
+              <button
+                type="button"
+                onClick={toggleMasterEmail}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  masterEmailAlertsEnabled ? 'bg-primary' : 'bg-slate-300'
+                }`}
+                role="switch"
+                aria-checked={masterEmailAlertsEnabled}
+                title={`Click to turn email alerts ${masterEmailAlertsEnabled ? 'OFF' : 'ON'}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    masterEmailAlertsEnabled ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
