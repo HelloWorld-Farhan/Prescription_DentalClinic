@@ -144,24 +144,31 @@ export default function EmailScheduleAlertModal({
             </div>
           )}
 
-          {/* Email Recipient Input */}
+          {/* Email Recipient Input (Preview-Only Locked) */}
           <div>
-            <label className="block text-xs font-bold text-on-surface mb-1.5">
-              Recipient Email Address (Patient or Clinician):
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-on-surface">
+                Recipient Email Address:
+              </label>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md">
+                <span className="material-symbols-outlined text-[12px] text-teal-700">verified_user</span>
+                Verified Recipient (Preview Only)
+              </span>
+            </div>
             <div className="relative flex items-center">
-              <span className="material-symbols-outlined text-outline text-[18px] absolute left-3">mail</span>
+              <span className="material-symbols-outlined text-outline text-[18px] absolute left-3 pointer-events-none">lock</span>
               <input
                 type="email"
                 value={recipientEmail}
-                onChange={(e) => setRecipientEmail(e.target.value)}
-                disabled={isSending}
-                placeholder="patient.email@example.com"
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                readOnly
+                className="w-full pl-9 pr-20 py-2.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs text-on-surface font-semibold outline-none cursor-default select-all shadow-2xs"
               />
+              <span className="absolute right-2.5 top-2.5 text-[10px] font-bold text-slate-500 bg-surface-container-high px-2 py-0.5 rounded pointer-events-none">
+                Locked
+              </span>
             </div>
             <span className="text-[11px] text-outline mt-1 block">
-              Dispatches the formatted clinical daily schedule and food instructions.
+              Locked to authenticated clinical prescriber for safe delivery.
             </span>
           </div>
 
@@ -175,12 +182,13 @@ export default function EmailScheduleAlertModal({
               <button
                 type="button"
                 onClick={handleSmsNotice}
-                className="px-2.5 py-1 rounded-lg bg-surface-container-high text-outline text-[11px] font-bold flex items-center gap-1 hover:text-on-surface transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-surface-container-high text-outline text-[11px] font-bold flex items-center gap-1 hover:text-on-surface transition-colors cursor-pointer opacity-85"
+                title="SMS Gateway: Blocked for now"
               >
-                <span className="material-symbols-outlined text-[14px]">sms</span>
+                <span className="material-symbols-outlined text-[14px] text-amber-600">block</span>
                 SMS Alert
-                <span className="px-1.5 py-0.2 bg-amber-200 text-amber-900 rounded text-[9px] font-extrabold uppercase">
-                  Coming Soon
+                <span className="px-1.5 py-0.5 bg-amber-200 text-amber-900 border border-amber-300 rounded text-[9px] font-extrabold uppercase tracking-wide">
+                  Blocked for now
                 </span>
               </button>
             </div>

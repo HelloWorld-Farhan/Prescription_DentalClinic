@@ -49,12 +49,8 @@ export default function Alerts() {
     return raw && raw.length > 0 ? raw : [];
   });
 
-  // Expandable Accordion per check — default all open so both PDFs are visible
-  const [expandedCheckIds, setExpandedCheckIds] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    (VirtualDb.getChecks() || []).forEach((c) => initial.add(c.id));
-    return initial;
-  });
+  // Expandable Accordion per check — default CLOSED (collapsed) so user opens on demand
+  const [expandedCheckIds, setExpandedCheckIds] = useState<Set<string>>(() => new Set<string>());
 
   useEffect(() => {
     pullFromCloud().catch(() => {});
@@ -63,8 +59,11 @@ export default function Alerts() {
       const updated = VirtualDb.getChecks();
       setChecks(updated);
       setExpandedCheckIds((prev) => {
-        const next = new Set(prev);
-        updated.forEach((c) => next.add(c.id));
+        // preserve only checks already opened by the user
+        const next = new Set<string>();
+        prev.forEach((id) => {
+          if (updated.some((c) => c.id === id)) next.add(id);
+        });
         return next;
       });
     };
@@ -305,21 +304,21 @@ export default function Alerts() {
             </button>
           </div>
 
-          {/* SMS Alert (Coming Soon) */}
+          {/* SMS Alert (Blocked for Now) */}
           <button
             type="button"
             onClick={handleSmsNotice}
-            className="px-3 py-2 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-outline hover:text-on-surface text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="SMS Alerts (DLT Carrier In Review)"
+            className="px-3 py-2 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-outline hover:text-on-surface text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer opacity-85"
+            title="SMS Alerts: Blocked for now (Carrier DLT Registration in Progress)"
           >
-            <span className="material-symbols-outlined text-[16px]">sms</span>
+            <span className="material-symbols-outlined text-[16px] text-amber-600">block</span>
             <span>SMS Alert</span>
-            <span className="px-1.5 py-0.2 bg-amber-100 text-amber-900 rounded text-[9px] font-extrabold uppercase">
-              Coming Soon
+            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300/70 rounded text-[9px] font-extrabold uppercase tracking-wide">
+              Blocked for now
             </span>
           </button>
 
-          {/* Send Alert Email Modal Trigger */}
+          {/* Send Alert Email Modal Trigger (Combines All Active Prescriptions & Medications) */}
           <button
             type="button"
             onClick={() => {
@@ -330,11 +329,13 @@ export default function Alerts() {
                 );
                 return;
               }
-              setEmailModalCheck(checks[0] || null);
+              // Set to null to signal combined all-prescription mix
+              setEmailModalCheck(null);
               setIsEmailModalOpen(true);
             }}
             disabled={allActiveMedications.length === 0}
             className="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+            title="Dispatch unified email alert containing properly mixed medications across all prescriptions"
           >
             <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span>
             <span>Send Alert Email</span>
@@ -702,19 +703,19 @@ export default function Alerts() {
         onOverride={handleOverride}
       />
 
-      {/* Email Schedule Alert Modal */}
-      {targetModalCheck && (
+      {/* Email Schedule Alert Modal - Mixes all active medications when triggered globally */}
+      {isEmailModalOpen && (
         <EmailScheduleAlertModal
           isOpen={isEmailModalOpen}
           onClose={() => {
             setIsEmailModalOpen(false);
             setEmailModalCheck(null);
           }}
-          patientName={targetModalCheck.patientName || 'Authorized Patient'}
-          patientMrn={targetModalCheck.mrn || 'PT-1102'}
-          checkNumber={targetModalCheck.checkNumber || targetModalCheck.id || 'CHK-CURRENT'}
-          medications={allActiveMedications.filter((m) => m.checkId === targetModalCheck.id)}
-          safetyAlerts={allActiveAlerts.filter((a) => (a as any).checkId === targetModalCheck.id || allActiveAlerts.length <= 2)}
+          patientName={emailModalCheck?.patientName || checks[0]?.patientName || 'Farhan khalid'}
+          patientMrn={emailModalCheck?.mrn || (checks.length > 1 ? `${checks.length} Prescriptions Combined` : (checks[0]?.mrn || 'PT-NEW-001'))}
+          checkNumber={emailModalCheck ? (emailModalCheck.checkNumber || emailModalCheck.id) : (checks.length > 1 ? `Combined (${checks.map(c => c.checkNumber || c.id).join(' + ')})` : (checks[0]?.checkNumber || checks[0]?.id || 'CHK-CURRENT'))}
+          medications={emailModalCheck ? allActiveMedications.filter((m) => m.checkId === emailModalCheck.id) : allActiveMedications}
+          safetyAlerts={emailModalCheck ? allActiveAlerts.filter((a) => (a as any).checkId === emailModalCheck.id) : allActiveAlerts}
           courseEndDate={allActiveMedications[0]?.endDate || 'In 30 Days'}
           regimenDuration={allActiveMedications[0]?.duration || '1 Month'}
         />
