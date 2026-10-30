@@ -8,7 +8,8 @@ import { getDeviceId } from '../services/sessionAudit';
 import { PrescriptionStorage } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
 import { ConfirmationEventDetail, showConfirmation } from '../services/confirmation';
-import { parseMedicationTiming } from '../services/medicationScheduleService';
+import { parseMedicationTiming } from '../services/medicationScheduleService';
+import { pushNotificationReadState } from '../services/cloudSyncService';
 
 interface NotificationItem {
   id: string;
