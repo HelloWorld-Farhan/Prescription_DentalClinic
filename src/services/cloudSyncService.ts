@@ -307,14 +307,17 @@ export async function pullFromCloud(): Promise<boolean> {
         }
         const mergedArray = Array.from(localReadSet);
         localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(mergedArray));
-        if (typeof data.notificationsReadAt === 'number') {
-          localStorage.setItem('smileclinic_notifications_read_at', String(data.notificationsReadAt));
+        const localReadAt = parseInt(localStorage.getItem('smileclinic_notifications_read_at') || '0', 10);
+        const serverReadAt = typeof data.notificationsReadAt === 'number' ? data.notificationsReadAt : 0;
+        const maxReadAt = Math.max(localReadAt, serverReadAt);
+        if (maxReadAt > 0) {
+          localStorage.setItem('smileclinic_notifications_read_at', String(maxReadAt));
         }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('smileclinic_notifications_read_synced', {
             detail: {
               readNotificationIds: mergedArray,
-              notificationsReadAt: data.notificationsReadAt || 0,
+              notificationsReadAt: maxReadAt,
             }
           }));
         }

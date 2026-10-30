@@ -261,6 +261,20 @@ export default function NewCheck() {
 
   // Knowledge Base Sync State & Active Medical History Conditions
   const [isSyncKnowledgeModalOpen, setIsSyncKnowledgeModalOpen] = useState(false);
+  const [syncedDocs, setSyncedDocs] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('smileclinic_synced_active_docs');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  });
+  const [syncedChecks, setSyncedChecks] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('smileclinic_synced_active_checks');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  });
   const [syncedConditions, setSyncedConditions] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('smileclinic_synced_active_conditions');
@@ -269,23 +283,20 @@ export default function NewCheck() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
-    return ['Chronic Kidney Disease (CKD) / Renal Impairment'];
+    return [];
   });
 
   useEffect(() => {
     const handleSyncUpdate = (e?: any) => {
       try {
-        const raw = localStorage.getItem('smileclinic_synced_active_conditions');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            setSyncedConditions(parsed);
-          }
-        } else if (e?.detail?.activeConditions) {
-          setSyncedConditions(e.detail.activeConditions);
-        }
+        const rawDocs = localStorage.getItem('smileclinic_synced_active_docs');
+        if (rawDocs) setSyncedDocs(JSON.parse(rawDocs));
+        const rawChecks = localStorage.getItem('smileclinic_synced_active_checks');
+        if (rawChecks) setSyncedChecks(JSON.parse(rawChecks));
+        const rawConds = localStorage.getItem('smileclinic_synced_active_conditions');
+        if (rawConds) setSyncedConditions(JSON.parse(rawConds));
       } catch (err) {
-        console.warn('Failed to parse synced conditions', err);
+        console.warn('Failed to parse synced knowledge sources', err);
       }
     };
     window.addEventListener('smileclinic_knowledge_synced', handleSyncUpdate);
@@ -655,6 +666,11 @@ export default function NewCheck() {
         prescriptions: prescriptions,
         rules: VirtualDb.getRules(),
         clinical_inquiries: questionsToEvaluate,
+        knowledge_sources: {
+          synced_documents: syncedDocs,
+          synced_checks: syncedChecks,
+          synced_conditions: syncedConditions,
+        },
         source_document_url: extractedMeta?.storageUrl,
         source_document_name: extractedMeta?.filename || (inputMethod === 'camera' ? 'Camera Captured Photo' : undefined),
         source_type: inputMethod,
@@ -2045,11 +2061,22 @@ export default function NewCheck() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-bold text-on-surface">Synchronized Medical History &amp; Safety Knowledge</span>
                       <span className="text-[10px] font-semibold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
-                        {syncedConditions.length} Condition{syncedConditions.length === 1 ? '' : 's'} Active
+                        {syncedDocs.length > 0 ? `${syncedDocs.length} History Doc${syncedDocs.length === 1 ? '' : 's'}` : `${syncedConditions.length} Active`}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-                      {syncedConditions.length > 0 ? (
+                      {syncedDocs.length > 0 ? (
+                        syncedDocs.map((doc, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-container-lowest border border-primary/25 text-primary shadow-2xs"
+                            title={doc}
+                          >
+                            <span className="material-symbols-outlined text-[13px] text-primary">description</span>
+                            <span className="truncate max-w-[180px] font-semibold">{doc}</span>
+                          </span>
+                        ))
+                      ) : syncedConditions.length > 0 ? (
                         syncedConditions.map((cond, idx) => (
                           <span
                             key={idx}
@@ -2060,7 +2087,12 @@ export default function NewCheck() {
                           </span>
                         ))
                       ) : (
-                        <span className="text-[11px] text-outline italic">No past conditions synced (General Dental Care)</span>
+                        <span className="text-[11px] text-outline italic">No history documents synced (General Dental Care)</span>
+                      )}
+                      {syncedChecks.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20">
+                          +{syncedChecks.length} prior check{syncedChecks.length === 1 ? '' : 's'}
+                        </span>
                       )}
                     </div>
                   </div>

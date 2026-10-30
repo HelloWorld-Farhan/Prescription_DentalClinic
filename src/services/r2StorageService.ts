@@ -75,27 +75,9 @@ export function isAvatarFile(filenameOrUrl: string = ''): boolean {
 
 
 export function isPrescriptionCheckFile(filenameOrUrl: string = ''): boolean {
-
   const lower = (filenameOrUrl || '').toLowerCase();
-
-  return (
-
-    lower.includes('rx_slip') ||
-
-    lower.includes('prescription_') ||
-
-    lower.includes('prescription-') ||
-
-    lower.includes('camera_captured_rx') ||
-
-    lower.startsWith('rx-') ||
-
-    lower.includes('_rx_') ||
-
-    lower.includes('cds_report')
-
-  );
-
+  // Only exclude internal CDS-generated audit reports; preserve all user-uploaded clinical history documents & prescriptions
+  return lower.includes('cds_report') || lower.includes('smileclinic_cds_report');
 }
 
 

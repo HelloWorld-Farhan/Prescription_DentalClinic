@@ -15,71 +15,14 @@ interface SyncKnowledgeModalProps {
 
 export interface SyncableItem {
   id: string;
-  type: 'condition' | 'check' | 'rule' | 'document';
+  type: 'document' | 'check' | 'rule';
   title: string;
   subtitle: string;
   icon: string;
   badge: string;
-  conditionName?: string;
+  filename?: string;
   date?: string;
 }
-
-// Clinical Medical Conditions available in the Patient History knowledge base
-const CLINICAL_HISTORY_CONDITIONS: Array<{
-  id: string;
-  name: string;
-  title: string;
-  subtitle: string;
-  icon: string;
-  badge: string;
-  defaultChecked: boolean;
-}> = [
-  {
-    id: 'cond-kidney-ckd',
-    name: 'Chronic Kidney Disease (CKD) / Renal Impairment',
-    title: 'Chronic Kidney Disease (CKD) / Renal Impairment',
-    subtitle: 'Affects renal filtration & NSAID / antibiotic clearance. Evaluates eGFR & nephrotoxicity.',
-    icon: 'water_drop',
-    badge: 'Renal History',
-    defaultChecked: true,
-  },
-  {
-    id: 'cond-hepatic-liver',
-    name: 'Hepatic Impairment / Chronic Liver Disease (Cirrhosis)',
-    title: 'Hepatic Impairment / Chronic Liver Disease (Cirrhosis)',
-    subtitle: 'Alters hepatic CYP450 metabolism & paracetamol / opioid clearance. Hepatotoxicity caution.',
-    icon: 'stethoscope',
-    badge: 'Hepatic History',
-    defaultChecked: false, // Default off as in user example (Kidney ON, Liver OFF)
-  },
-  {
-    id: 'cond-cardiac-htn',
-    name: 'Hypertension & Cardiovascular History',
-    title: 'Hypertension & Cardiovascular History',
-    subtitle: 'Interacts with dental vasoconstrictors (epinephrine) & local anesthetic dosage.',
-    icon: 'favorite',
-    badge: 'Cardiovascular',
-    defaultChecked: true,
-  },
-  {
-    id: 'cond-diabetes-t2',
-    name: 'Type 2 Diabetes Mellitus',
-    title: 'Type 2 Diabetes Mellitus',
-    subtitle: 'Impairs post-surgical wound healing; risk of dental infections & antibiotic choice.',
-    icon: 'bloodtype',
-    badge: 'Endocrine',
-    defaultChecked: true,
-  },
-  {
-    id: 'cond-allergies-rx',
-    name: 'Documented Drug Allergies (Penicillin / NSAIDs)',
-    title: 'Documented Drug Allergies (Penicillin / NSAIDs)',
-    subtitle: 'Triggers anaphylaxis & cross-reactivity warnings for dental operatory antibiotics.',
-    icon: 'warning',
-    badge: 'Allergy History',
-    defaultChecked: true,
-  },
-];
 
 export default function SyncKnowledgeModal({
   isOpen,
@@ -94,9 +37,9 @@ export default function SyncKnowledgeModal({
   // Syncable items list and selection
   const [items, setItems] = useState<SyncableItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'condition' | 'check' | 'rules_docs'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'document' | 'check' | 'rule'>('all');
 
-  // Load live data from storage when opened
+  // Load real data from storage when opened (NO dummy static conditions)
   useEffect(() => {
     if (!isOpen) {
       setIsSyncing(false);
@@ -108,18 +51,32 @@ export default function SyncKnowledgeModal({
 
     const loadedItems: SyncableItem[] = [];
 
-    // 1. Medical Conditions & Clinical History
-    CLINICAL_HISTORY_CONDITIONS.forEach((cond) => {
-      loadedItems.push({
-        id: cond.id,
-        type: 'condition',
-        title: cond.title,
-        subtitle: cond.subtitle,
-        icon: cond.icon,
-        badge: cond.badge,
-        conditionName: cond.name,
-      });
-    });
+    // 1. Uploaded Clinical History Documents (e.g. Kidney_History.pdf, Liver_History.pdf)
+    try {
+      const docs: UploadedDocumentRecord[] = getDocumentHistory();
+      docs
+        .filter((doc) => !isAvatarFile(doc.filename) && !isAvatarFile(doc.storageUrl))
+        .forEach((doc) => {
+          let icon = 'description';
+          const ft = (doc.fileType || '').toLowerCase();
+          const fn = (doc.filename || '').toLowerCase();
+          if (ft.includes('pdf') || fn.endsWith('.pdf')) icon = 'picture_as_pdf';
+          else if (ft.includes('image') || /\.(png|jpg|jpeg|webp)$/.test(fn)) icon = 'image';
+          else if (ft.includes('sheet') || ft.includes('csv') || /\.(xlsx|xls|csv)$/.test(fn)) icon = 'table_view';
+
+          const sizeKb = doc.fileSize ? (doc.fileSize / 1024).toFixed(1) : '0';
+          loadedItems.push({
+            id: `doc-${doc.id || doc.filename}`,
+            type: 'document',
+            title: doc.filename || 'Uploaded History Document',
+            subtitle: `Uploaded Clinical History • ${sizeKb} KB • ${doc.extractedRulesCount || 0} extracted rules`,
+            icon,
+            badge: 'Uploaded History',
+            filename: doc.filename,
+            date: doc.uploadedAt,
+          });
+        });
+    } catch {}
 
     // 2. Clinical Screening Checks (Prior Prescriptions)
     try {
@@ -131,7 +88,7 @@ export default function SyncKnowledgeModal({
           title: `Prescription #${check.checkNumber || check.id} — ${check.patientName || 'Patient'}`,
           subtitle: `${check.prescriptions?.length || 0} medications • Status: ${check.overallStatus || 'Safe to Dispense'}`,
           icon: 'fact_check',
-          badge: 'Screening Record',
+          badge: 'Prior Regimen',
           date: check.timestamp,
         });
       });
@@ -147,63 +104,32 @@ export default function SyncKnowledgeModal({
           title: `${rule.drugA} ↔ ${rule.drugB}`,
           subtitle: `${rule.category} • ${(rule.severity || 'moderate').toUpperCase()} severity`,
           icon: 'rule',
-          badge: 'Decision Rule',
+          badge: 'Clinical Rule',
           date: rule.createdAt,
         });
       });
     } catch {}
 
-    // 4. Vault Documents (Reference clinical monographs)
-    try {
-      const docs: UploadedDocumentRecord[] = getDocumentHistory();
-      docs
-        .filter((doc) => !isAvatarFile(doc.filename) && !isAvatarFile(doc.storageUrl))
-        .forEach((doc) => {
-          let icon = 'description';
-          const ft = (doc.fileType || '').toLowerCase();
-          const fn = (doc.filename || '').toLowerCase();
-          if (ft.includes('pdf') || fn.endsWith('.pdf')) icon = 'picture_as_pdf';
-          else if (ft.includes('image') || /\.(png|jpg|jpeg|webp)$/.test(fn)) icon = 'image';
-          else if (ft.includes('sheet') || ft.includes('csv') || /\.(xlsx|xls|csv)$/.test(fn)) icon = 'table_view';
-
-          const sizeKb = doc.fileSize ? (doc.fileSize / 1024).toFixed(1) : '0';
-          loadedItems.push({
-            id: `doc-${doc.id}`,
-            type: 'document',
-            title: doc.filename || 'Clinical Document',
-            subtitle: `Vault Document • ${sizeKb} KB • ${doc.extractedRulesCount || 0} rules extracted`,
-            icon,
-            badge: 'Vault File',
-            date: doc.uploadedAt,
-          });
-        });
-    } catch {}
-
     setItems(loadedItems);
 
-    // Initialize selection: restore previously saved selection or apply defaults
+    // Initialize selection: restore previously saved selection or select all by default
     try {
       const rawSaved = localStorage.getItem('smileclinic_synced_knowledge_selection');
       if (rawSaved) {
         const parsed = JSON.parse(rawSaved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setSelectedIds(new Set(parsed));
-          return;
+          // Verify that parsed items exist in loadedItems
+          const validSet = new Set(parsed.filter((id) => loadedItems.some((i) => i.id === id)));
+          if (validSet.size > 0) {
+            setSelectedIds(validSet);
+            return;
+          }
         }
       }
     } catch {}
 
-    // Default: Select all checks, all rules/docs, and default checked conditions (e.g. Kidney ON, Liver OFF)
-    const defaultSelection = new Set<string>();
-    loadedItems.forEach((item) => {
-      if (item.type === 'condition') {
-        const found = CLINICAL_HISTORY_CONDITIONS.find((c) => c.id === item.id);
-        if (found?.defaultChecked) defaultSelection.add(item.id);
-      } else {
-        defaultSelection.add(item.id);
-      }
-    });
-    setSelectedIds(defaultSelection);
+    // Default: Select all loaded real items
+    setSelectedIds(new Set(loadedItems.map((i) => i.id)));
   }, [isOpen]);
 
   // Lock body scroll on open
@@ -225,7 +151,6 @@ export default function SyncKnowledgeModal({
 
   const filteredItems = useMemo(() => {
     if (categoryFilter === 'all') return items;
-    if (categoryFilter === 'rules_docs') return items.filter((i) => i.type === 'rule' || i.type === 'document');
     return items.filter((i) => i.type === categoryFilter);
   }, [items, categoryFilter]);
 
@@ -255,78 +180,83 @@ export default function SyncKnowledgeModal({
     if (selectedIds.size === 0) return;
 
     // Gather specific selected subsets
-    const selectedConditions: string[] = [];
+    const selectedDocs: string[] = [];
     const selectedChecks: string[] = [];
     const selectedRules: string[] = [];
-    const selectedDocs: string[] = [];
 
     items.forEach((item) => {
       if (!selectedIds.has(item.id)) return;
-      if (item.type === 'condition' && item.conditionName) {
-        selectedConditions.push(item.conditionName);
+      if (item.type === 'document' && item.filename) {
+        selectedDocs.push(item.filename);
       } else if (item.type === 'check') {
         selectedChecks.push(item.id.replace('check-', ''));
       } else if (item.type === 'rule') {
         selectedRules.push(item.id.replace('rule-', ''));
-      } else if (item.type === 'document') {
-        selectedDocs.push(item.id.replace('doc-', ''));
       }
     });
 
+    // Derive active condition summaries from selected clinical history documents
+    const derivedConditions = selectedDocs.map((docName) => {
+      return docName.replace(/\.[^/.]+$/, '').replace(/[_\\-]/g, ' ');
+    });
+
     setIsSyncing(true);
-    setSyncProgress(20);
-    setActiveStepText(`Validating ${selectedIds.size} selected clinical history & knowledge items...`);
+    setSyncProgress(25);
+    setActiveStepText(`Validating ${selectedIds.size} selected clinical history & regimen records...`);
 
     setTimeout(() => {
-      setSyncProgress(55);
-      const condText = selectedConditions.length > 0 ? selectedConditions.join(', ') : 'Routine screening';
-      setActiveStepText(`Syncing active medical context (${condText})...`);
+      setSyncProgress(60);
+      const docsSummary = selectedDocs.length > 0 ? selectedDocs.join(', ') : 'No document history';
+      setActiveStepText(`Syncing active history documents (${docsSummary})...`);
     }, 600);
 
     setTimeout(() => {
       setSyncProgress(85);
-      setActiveStepText('Synchronizing AI decision indices & prior prescription history...');
+      setActiveStepText('Injecting active knowledge sources into Prescription AI context...');
     }, 1200);
 
     setTimeout(() => {
       setSyncProgress(100);
-      setActiveStepText('Knowledge base & active medical context synchronized successfully.');
+      setActiveStepText('Prescription AI knowledge source successfully synchronized.');
       setSyncCompleted(true);
 
       const nowIso = new Date().toISOString();
       const selectionArray = Array.from(selectedIds);
 
-      // Persist locally
+      // Persist locally for immediate AI inspection
       try {
         localStorage.setItem('smileclinic_synced_knowledge_selection', JSON.stringify(selectionArray));
-        localStorage.setItem('smileclinic_synced_active_conditions', JSON.stringify(selectedConditions));
+        localStorage.setItem('smileclinic_synced_active_docs', JSON.stringify(selectedDocs));
         localStorage.setItem('smileclinic_synced_active_checks', JSON.stringify(selectedChecks));
         localStorage.setItem('smileclinic_synced_active_rules', JSON.stringify(selectedRules));
+        localStorage.setItem('smileclinic_synced_active_conditions', JSON.stringify(derivedConditions));
         localStorage.setItem('smileclinic_last_rules_sync', nowIso);
       } catch {}
 
-      // Push to backend PostgreSQL
+      // Push to PostgreSQL cloud backend
       pushKnowledgeSyncState({
         selection: selectionArray,
-        conditions: selectedConditions,
+        conditions: derivedConditions,
         checks: selectedChecks,
         rules: selectedRules,
         docs: selectedDocs,
       }).catch(() => {});
 
-      // Dispatch event to reactive listeners across app
+      // Dispatch event to reactive listeners across app (NewCheck.tsx, etc.)
       window.dispatchEvent(
         new CustomEvent('smileclinic_knowledge_synced', {
           detail: {
             selection: selectionArray,
-            conditions: selectedConditions,
+            docs: selectedDocs,
             checks: selectedChecks,
+            rules: selectedRules,
+            conditions: derivedConditions,
           },
         })
       );
 
       showConfirmation(
-        `Synchronized ${selectedConditions.length} active conditions and ${selectedChecks.length} prior prescriptions into AI context`,
+        `Synchronized ${selectedDocs.length} active history documents and ${selectedChecks.length} prior prescriptions into AI context`,
         'success'
       );
 
@@ -344,9 +274,9 @@ export default function SyncKnowledgeModal({
   const hasData = items.length > 0;
   const isAllSelected = items.length > 0 && selectedIds.size === items.length;
 
-  const conditionCount = items.filter((i) => i.type === 'condition').length;
+  const docCount = items.filter((i) => i.type === 'document').length;
   const checkCount = items.filter((i) => i.type === 'check').length;
-  const rulesDocsCount = items.filter((i) => i.type === 'rule' || i.type === 'document').length;
+  const ruleCount = items.filter((i) => i.type === 'rule').length;
 
   return createPortal(
     <AnimatePresence>
@@ -382,7 +312,7 @@ export default function SyncKnowledgeModal({
                     Synchronize Knowledge Base &amp; History
                   </h3>
                   <p className="text-[11px] text-on-surface-variant">
-                    Select active medical conditions &amp; prior prescriptions to feed into AI screening.
+                    Select active clinical history documents &amp; prior prescriptions to feed into AI screening.
                   </p>
                 </div>
               </div>
@@ -404,11 +334,11 @@ export default function SyncKnowledgeModal({
               {!hasData ? (
                 <div className="my-auto py-10 px-6 flex flex-col items-center justify-center text-center bg-surface-container-low/40 rounded-xl border border-dashed border-outline-variant/40">
                   <div className="w-14 h-14 rounded-2xl bg-surface-container-high text-outline flex items-center justify-center mb-3">
-                    <span className="material-symbols-outlined text-[32px]">folder_off</span>
+                    <span className="material-symbols-outlined text-[32px]">folder_open</span>
                   </div>
-                  <h4 className="text-sm font-bold text-on-surface">No Knowledge Items Found</h4>
+                  <h4 className="text-sm font-bold text-on-surface">No Clinical History or Prescriptions Found</h4>
                   <p className="text-xs text-on-surface-variant max-w-xs mt-1">
-                    Upload a prescription or add rules to populate knowledge synchronization.
+                    Upload clinical history documents or run prescriptions to populate synchronized knowledge sources.
                   </p>
                 </div>
               ) : (
@@ -429,14 +359,14 @@ export default function SyncKnowledgeModal({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setCategoryFilter('condition')}
+                        onClick={() => setCategoryFilter('document')}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
-                          categoryFilter === 'condition'
+                          categoryFilter === 'document'
                             ? 'bg-primary text-on-primary'
                             : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                         }`}
                       >
-                        Medical History ({conditionCount})
+                        Uploaded History ({docCount})
                       </button>
                       <button
                         type="button"
@@ -447,19 +377,19 @@ export default function SyncKnowledgeModal({
                             : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                         }`}
                       >
-                        Prior Screenings ({checkCount})
+                        Prior Regimens ({checkCount})
                       </button>
-                      {rulesDocsCount > 0 && (
+                      {ruleCount > 0 && (
                         <button
                           type="button"
-                          onClick={() => setCategoryFilter('rules_docs')}
+                          onClick={() => setCategoryFilter('rule')}
                           className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
-                            categoryFilter === 'rules_docs'
+                            categoryFilter === 'rule'
                               ? 'bg-primary text-on-primary'
                               : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                           }`}
                         >
-                          Rules &amp; Vault ({rulesDocsCount})
+                          Rules ({ruleCount})
                         </button>
                       )}
                     </div>
@@ -476,14 +406,13 @@ export default function SyncKnowledgeModal({
 
                   {/* Informative Guidance Banner */}
                   <div className="p-2.5 rounded-xl bg-primary/5 border border-primary/15 text-[11px] text-on-surface-variant leading-relaxed">
-                    <strong className="text-primary font-bold">Active AI History Control:</strong> Toggle ON conditions (e.g. Kidney) and turn OFF unneeded history (e.g. Liver). Only checked items will be evaluated during AI Safety Screening.
+                    <strong className="text-primary font-bold">Active AI History Control:</strong> Toggle ON documents (e.g. Kidney) and turn OFF unneeded history (e.g. Liver). Only checked items will be evaluated during AI Safety Screening.
                   </div>
 
                   {/* Scrollable Items Checklist */}
                   <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                     {filteredItems.map((item) => {
                       const isSelected = selectedIds.has(item.id);
-                      const isCondition = item.type === 'condition';
 
                       return (
                         <div
@@ -506,11 +435,7 @@ export default function SyncKnowledgeModal({
                             />
                             <div
                               className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                isCondition
-                                  ? isSelected
-                                    ? 'bg-primary/15 text-primary'
-                                    : 'bg-surface-container text-outline'
-                                  : 'bg-surface-container text-secondary'
+                                isSelected ? 'bg-primary/15 text-primary' : 'bg-surface-container text-outline'
                               }`}
                             >
                               <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
@@ -518,17 +443,15 @@ export default function SyncKnowledgeModal({
                             <div className="min-w-0">
                               <div className="text-xs font-bold text-on-surface truncate flex items-center gap-1.5">
                                 <span>{item.title}</span>
-                                {isCondition && (
-                                  <span
-                                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                                      isSelected
-                                        ? 'bg-emerald-100 text-emerald-800'
-                                        : 'bg-slate-200 text-slate-700'
-                                    }`}
-                                  >
-                                    {isSelected ? 'ACTIVE IN AI' : 'OFF'}
-                                  </span>
-                                )}
+                                <span
+                                  className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                                    isSelected
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {isSelected ? 'ACTIVE IN AI' : 'OFF'}
+                                </span>
                               </div>
                               <div className="text-[10px] text-on-surface-variant truncate">{item.subtitle}</div>
                             </div>
@@ -554,25 +477,24 @@ export default function SyncKnowledgeModal({
                 </>
               )}
 
-              {/* Progress Bar (when actively syncing) */}
+              {/* In-Flight Synchronization Progress */}
               {isSyncing && (
-                <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 flex flex-col gap-2 mt-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-primary">
-                    <span className="flex items-center gap-1.5 truncate">
-                      <svg className="saving-spinner w-3.5 h-3.5 text-primary shrink-0 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                        <path className="opacity-95" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      <span className="truncate">{activeStepText}</span>
+                <div className="p-3.5 bg-surface-container-low rounded-xl border border-surface-container flex flex-col gap-2 mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] animate-spin text-primary">
+                        progress_activity
+                      </span>
+                      {activeStepText || 'Synchronizing with Clinical Engine...'}
                     </span>
-                    <span className="font-mono shrink-0 ml-2">{syncProgress}%</span>
+                    <span className="font-bold text-primary">{syncProgress}%</span>
                   </div>
-                  <div className="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+
+                  <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
                     <motion.div
-                      className="h-full bg-primary rounded-full"
+                      className="bg-primary h-full rounded-full transition-all duration-300"
                       initial={{ width: 0 }}
                       animate={{ width: `${syncProgress}%` }}
-                      transition={{ duration: 0.3 }}
                     />
                   </div>
                 </div>
@@ -580,59 +502,31 @@ export default function SyncKnowledgeModal({
             </div>
 
             {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-between border-t border-surface-container pt-3.5 shrink-0">
+            <div className="flex items-center justify-between pt-3 border-t border-surface-container shrink-0 gap-3">
               <button
                 type="button"
                 disabled={isSyncing}
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl border border-surface-container-high text-xs font-semibold text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
 
-              {!hasData ? (
-                <button
-                  type="button"
-                  disabled={true}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-surface-container-highest text-outline cursor-not-allowed flex items-center gap-2 shadow-none opacity-60"
-                >
-                  <span className="material-symbols-outlined text-[16px]">sync_disabled</span>
-                  <span>Nothing to Sync</span>
-                </button>
-              ) : selectedIds.size === 0 ? (
-                <button
-                  type="button"
-                  disabled={true}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-surface-container-highest text-outline cursor-not-allowed flex items-center gap-2 shadow-none opacity-60"
-                >
-                  <span className="material-symbols-outlined text-[16px]">check_box_outline_blank</span>
-                  <span>Select Items to Sync</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isSyncing || syncCompleted}
-                  onClick={handleStartSync}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary text-on-primary hover:bg-primary-container transition-all cursor-pointer shadow-sm flex items-center gap-2 disabled:opacity-70"
-                >
-                  {isSyncing ? (
-                    <>
-                      <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
-                      <span>Synchronizing ({selectedIds.size})...</span>
-                    </>
-                  ) : syncCompleted ? (
-                    <>
-                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                      <span>Synchronized!</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[16px]">sync</span>
-                      <span>Synchronize Selected ({selectedIds.size})</span>
-                    </>
-                  )}
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={isSyncing || selectedIds.size === 0}
+                onClick={handleStartSync}
+                className="px-4 py-2 text-xs font-bold bg-primary text-on-primary hover:bg-primary-hover rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined text-[16px]">sync</span>
+                <span>
+                  {isSyncing
+                    ? 'Synchronizing...'
+                    : syncCompleted
+                    ? 'Synchronized!'
+                    : `Synchronize Selected (${selectedIds.size})`}
+                </span>
+              </button>
             </div>
           </motion.div>
         </div>

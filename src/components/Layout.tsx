@@ -484,7 +484,7 @@ export default function Layout() {
     const list: NotificationItem[] = [];
     (realChecks || []).slice(0, 4).forEach((check) => {
       const checkCreatedMs = check.timestampMs || (check.createdAt ? new Date(check.createdAt).getTime() : 0);
-      const isPastBulkRead = notificationsReadAt > 0 && checkCreatedMs > 0 && checkCreatedMs <= notificationsReadAt;
+      const isPastBulkRead = notificationsReadAt > 0 && (checkCreatedMs === 0 || checkCreatedMs <= notificationsReadAt);
 
       // 1. Safety hazard alerts
       (check.alerts || []).forEach((al, idx) => {
