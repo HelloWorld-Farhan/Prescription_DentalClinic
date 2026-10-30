@@ -81,6 +81,38 @@ export default function Alerts() {
     };
   }, []);
 
+  // Auto-open specific alert drawer when redirected with ?checkId=...&alertId=...
+  useEffect(() => {
+    const checkIdParam = searchParams.get('checkId');
+    const alertIdParam = searchParams.get('alertId');
+    if (!checkIdParam && !alertIdParam) return;
+    if (!checks || checks.length === 0) return;
+
+    const targetCheck = checks.find(
+      (chk) => chk.id === checkIdParam || chk.checkNumber === checkIdParam
+    ) || checks[0];
+
+    if (!targetCheck) return;
+
+    // Expand accordion for this check
+    setExpandedCheckIds((prev) => new Set([...prev, targetCheck.id]));
+    setActiveDrawerCheckId(targetCheck.id);
+
+    // Locate the matching alert
+    const alertsList = targetCheck.alerts || [];
+    const targetAlert = alertsList.find(
+      (a) =>
+        a.id === alertIdParam ||
+        a.title === alertIdParam ||
+        (alertIdParam && a.title.toLowerCase().includes(alertIdParam.toLowerCase())) ||
+        (alertIdParam && alertIdParam.toLowerCase().includes(a.title.toLowerCase()))
+    ) || alertsList[0] || null;
+
+    if (targetAlert) {
+      setActiveDrawerAlert(targetAlert);
+    }
+  }, [checks, searchParams]);
+
   const toggleCheckExpanded = (checkId: string) => {
     setExpandedCheckIds((prev) => {
       const next = new Set(prev);

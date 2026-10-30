@@ -1685,7 +1685,11 @@ export default function Dashboard() {
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => setReviewCopyModal(selectedCheck)}
+                                  onClick={() => {
+                                    navigate(
+                                      `/alerts?checkId=${encodeURIComponent(selectedCheck.id || selectedCheck.checkNumber)}&alertId=${encodeURIComponent(alert.id || alert.title || '')}`
+                                    );
+                                  }}
                                   className="text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-0.5"
                                 >
                                   <span>Review &amp; Override</span>
