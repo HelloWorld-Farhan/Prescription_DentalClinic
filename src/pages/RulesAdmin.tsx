@@ -618,26 +618,32 @@ export default function RulesAdmin() {
               <span className="material-symbols-outlined text-[20px]">cloud_sync</span>
             </div>
             <div>
-              <span className="text-xs font-bold text-on-surface block">Clinical Document Vault &amp; Decision Engine</span>
+              <span className="text-xs font-bold text-on-surface block">Prescription AI Clinical Knowledge Base</span>
               <span className="text-[11px] text-on-surface-variant">
-                Uploaded clinical documents and prescription scans are safely preserved in your encrypted vault and parsed into active clinical decision rules.
+                Active clinical conditions, pharmacopeia rules, and prescription history that directly guide AI safety screening.
               </span>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 shrink-0">
             <div className="flex items-center gap-2">
               <span className="flex h-2.5 w-2.5 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
               <span className="text-xs font-bold text-emerald-700">
-                Vault &amp; Engine: Synced ({lastSyncText || 'Just now'})
+                Knowledge Base: Synced ({lastSyncText || 'Just now'})
               </span>
             </div>
             <span className="hidden sm:inline text-xs text-outline">•</span>
-            <span className="text-[11px] font-medium text-on-surface-variant">
-              {rules.filter((r) => r.active).length} Rules Active • {documentHistory.length} Vault Records
-            </span>
+            <button
+              type="button"
+              onClick={() => setActiveTab('knowledge')}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-[11px] font-bold cursor-pointer shadow-2xs"
+              title="Click to view and configure active Knowledge Sources"
+            >
+              <span className="material-symbols-outlined text-[14px]">account_tree</span>
+              <span>{totalSyncedKnowledgeCount} Active Knowledge Sources Enforced</span>
+            </button>
           </div>
         </div>
       </div>

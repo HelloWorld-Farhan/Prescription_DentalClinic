@@ -243,9 +243,24 @@ export default function Dashboard() {
       setAuditLogs(VirtualDb.getAuditLogs());
     };
 
+    const handleKnowledgeSync = () => {
+      try {
+        const raw = localStorage.getItem('smileclinic_synced_knowledge_selection');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSyncedKnowledgeCount(parsed.length);
+            return;
+          }
+        }
+      } catch {}
+      setSyncedKnowledgeCount((rules.filter((r) => r.active).length || rules.length) + checks.length);
+    };
+
     window.addEventListener('smileclinic_rules_updated', handleRulesSync);
     window.addEventListener('smileclinic_checks_updated', handleChecksSync);
     window.addEventListener('smileclinic_audit_updated', handleAuditSync);
+    window.addEventListener('smileclinic_knowledge_synced', handleKnowledgeSync);
     window.addEventListener('storage', handleRulesSync);
     window.addEventListener('storage', handleChecksSync);
 
@@ -254,6 +269,7 @@ export default function Dashboard() {
       window.removeEventListener('smileclinic_rules_updated', handleRulesSync);
       window.removeEventListener('smileclinic_checks_updated', handleChecksSync);
       window.removeEventListener('smileclinic_audit_updated', handleAuditSync);
+      window.removeEventListener('smileclinic_knowledge_synced', handleKnowledgeSync);
       window.removeEventListener('storage', handleRulesSync);
       window.removeEventListener('storage', handleChecksSync);
     };
@@ -273,6 +289,16 @@ export default function Dashboard() {
   // Real-time Audit Log Entries for Metric Card
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => VirtualDb.getAuditLogs());
   const rulesCount = useMemo(() => rules.filter(r => r.active).length || rules.length, [rules]);
+  const [syncedKnowledgeCount, setSyncedKnowledgeCount] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem('smileclinic_synced_knowledge_selection');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.length;
+      }
+    } catch {}
+    return (rules.filter(r => r.active).length || rules.length) + checks.length;
+  });
 
 
 
@@ -883,69 +909,56 @@ export default function Dashboard() {
         >
 
           <div className="flex items-start justify-between">
-
             <div>
-
-              <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Rules &amp; Data</span>
-
+              <span className="text-[11px] uppercase tracking-wider text-outline font-bold">Clinical Knowledge Base</span>
               <div className="flex items-baseline gap-2 mt-1">
-
                 <span className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">
-
-                  <AnimatedCounter value={rulesCount} />
-
+                  <AnimatedCounter value={syncedKnowledgeCount} />
                 </span>
-
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#FAF5FF] text-[#553C9A] font-bold">
-
-                  <span className="material-symbols-outlined text-[13px]">verified</span>
-
-                  <span>Active Rules</span>
-
+                  <span className="material-symbols-outlined text-[13px]">account_tree</span>
+                  <span>Active in AI</span>
                 </span>
-
               </div>
-
             </div>
 
             <div className="w-10 h-10 rounded-xl bg-[#FAF5FF] flex items-center justify-center text-[#553C9A] group-hover:bg-[#553C9A] group-hover:text-white transition-colors duration-200 shadow-2xs">
-
-              <span className="material-symbols-outlined text-[22px]">database</span>
-
+              <span className="material-symbols-outlined text-[22px]">account_tree</span>
             </div>
-
           </div>
 
-          <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between gap-1">
+          {/* All 3 Data Items Breakdown */}
+          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-2.5 border-t border-surface-container text-center">
+            <div className="bg-[#FAF5FF] rounded-lg py-1 px-1.5 flex flex-col items-center">
+              <span className="text-xs font-extrabold text-[#553C9A] leading-tight">{syncedKnowledgeCount}</span>
+              <span className="text-[10px] text-outline font-medium">Knowledge</span>
+            </div>
+            <div className="bg-teal-50 rounded-lg py-1 px-1.5 flex flex-col items-center">
+              <span className="text-xs font-extrabold text-teal-800 leading-tight">{checks.length}</span>
+              <span className="text-[10px] text-outline font-medium">Prescriptions</span>
+            </div>
+            <div className="bg-emerald-50 rounded-lg py-1 px-1.5 flex flex-col items-center">
+              <span className="text-xs font-extrabold text-emerald-800 leading-tight">{rulesCount}</span>
+              <span className="text-[10px] text-outline font-medium">History Rules</span>
+            </div>
+          </div>
 
+          <div className="mt-3 pt-2.5 border-t border-surface-container flex items-center justify-between gap-1">
             <p className="text-[11px] text-on-surface-variant truncate">
-
-              Clinical CDS rules &amp; knowledge base
-
+              Active CDS rules &amp; knowledge sources
             </p>
 
             <button
-
               type="button"
-
               onClick={(e) => {
-
                 e.stopPropagation();
-
                 navigate('/rules');
-
               }}
-
               className="group/btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[#553C9A] bg-[#FAF5FF] hover:bg-[#553C9A] hover:text-white transition-colors duration-150 text-[11px] font-bold shadow-2xs cursor-pointer shrink-0"
-
-              title="Manage Clinical History & Data"
-
+              title="Manage Clinical Knowledge Base & History"
             >
-
-              <span>History &amp; Data</span>
-
+              <span>Knowledge Base</span>
               <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-
             </button>
 
           </div>
