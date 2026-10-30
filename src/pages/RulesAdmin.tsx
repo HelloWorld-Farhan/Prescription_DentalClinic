@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
@@ -100,7 +101,9 @@ export default function RulesAdmin() {
   const currentUserId = storedUser?.id || storedUser?.email || 'user-current';
   const currentClinicianName = storedUser?.fullName || 'Authorized Clinician';
 
-  const [activeTab, setActiveTab] = useState<'rules' | 'history' | 'knowledge'>('rules');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as 'rules' | 'history' | 'knowledge') || 'rules';
+  const [activeTab, setActiveTab] = useState<'rules' | 'history' | 'knowledge'>(initialTab);
   const [rules, setRules] = useState<InteractionRule[]>(() => VirtualDb.getRules(currentUserId));
   const [documentHistory, setDocumentHistory] = useState<UploadedDocumentRecord[]>(() =>
     getReconciledDocumentHistory(currentUserId)
@@ -186,6 +189,21 @@ export default function RulesAdmin() {
     setExtractedPreviewMedicines([]);
     setAddModalMode('upload');
   };
+
+  // URL Query Parameters Router (e.g. from /new-check -> /rules?tab=knowledge&sync=open)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const syncParam = searchParams.get('sync');
+    if (tabParam === 'knowledge' || tabParam === 'history' || tabParam === 'rules') {
+      setActiveTab(tabParam);
+    }
+    if (syncParam === 'open') {
+      setIsSyncModalOpen(true);
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('sync');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams]);
 
   // Real-time synchronization of rules and document history across tabs and components
   useEffect(() => {

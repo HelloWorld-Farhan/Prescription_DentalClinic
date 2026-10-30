@@ -7,7 +7,7 @@ import { Patient, PrescriptionItem, DrugInteractionAlert, SafetyCheckRecord } fr
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import ClinicalInquiriesModal from '../components/ClinicalInquiriesModal';
-import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
+
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
 import { uploadToR2, deleteDocumentRecord, saveDocumentRecord } from '../services/r2StorageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
@@ -262,7 +262,7 @@ export default function NewCheck() {
   const allergySummary = hasDocumentedAllergies ? parsedAllergies.join(', ') : 'None documented (NKDA)';
 
   // Knowledge Base Sync State & Active Medical History Conditions
-  const [isSyncKnowledgeModalOpen, setIsSyncKnowledgeModalOpen] = useState(false);
+
   const [syncedDocs, setSyncedDocs] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('smileclinic_synced_active_docs');
@@ -2085,17 +2085,17 @@ export default function NewCheck() {
                 </div>
               </div>
 
-              {/* SYNCHRONIZED MEDICAL HISTORY CONTEXT CARD */}
+              {/* SYNCHRONIZED KNOWLEDGE BASE CONTEXT CARD (READ-ONLY IN SAFETY CHECK) */}
               <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                 <div className="flex items-start gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="material-symbols-outlined text-[18px]">sync_saved_locally</span>
+                    <span className="material-symbols-outlined text-[18px]">account_tree</span>
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-on-surface">Synchronized Medical History &amp; Safety Knowledge</span>
-                      <span className="text-[10px] font-semibold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
-                        {syncedDocs.length > 0 ? `${syncedDocs.length} History Doc${syncedDocs.length === 1 ? '' : 's'}` : `${syncedConditions.length} Active`}
+                      <span className="text-xs font-bold text-on-surface">Active Clinical Knowledge Base (AI Enforced)</span>
+                      <span className="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                        {syncedDocs.length + syncedConditions.length + syncedChecks.length} Active Sources
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
@@ -2121,7 +2121,7 @@ export default function NewCheck() {
                           </span>
                         ))
                       ) : (
-                        <span className="text-[11px] text-outline italic">No history documents synced (General Dental Care)</span>
+                        <span className="text-[11px] text-outline italic">Default Universal Clinical Safety Protocol</span>
                       )}
                       {syncedChecks.length > 0 && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20">
@@ -2134,12 +2134,12 @@ export default function NewCheck() {
 
                 <button
                   type="button"
-                  onClick={() => setIsSyncKnowledgeModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg border border-primary/30 text-primary hover:bg-primary/10 font-bold text-[11px] transition-colors flex items-center gap-1.5 shrink-0 self-end sm:self-center cursor-pointer"
-                  title="Configure which historical conditions and screening data the AI incorporates"
+                  onClick={() => navigate('/rules?tab=knowledge&sync=open')}
+                  className="px-3.5 py-1.5 rounded-xl border border-primary/30 text-primary hover:bg-primary hover:text-white font-bold text-[11px] transition-all flex items-center gap-1.5 shrink-0 self-end sm:self-center cursor-pointer shadow-2xs"
+                  title="Configure and synchronize knowledge sources in History & Data Governance"
                 >
-                  <span className="material-symbols-outlined text-[15px]">tune</span>
-                  Adjust Synced History
+                  <span className="material-symbols-outlined text-[15px]">settings_suggest</span>
+                  <span>Manage in History &amp; Data →</span>
                 </button>
               </div>
 
@@ -2909,17 +2909,7 @@ export default function NewCheck() {
         document.body
       )}
 
-      {/* Synchronize Knowledge Base & History Modal */}
-      <SyncKnowledgeModal
-        isOpen={isSyncKnowledgeModalOpen}
-        onClose={() => setIsSyncKnowledgeModalOpen(false)}
-        onSyncComplete={() => {
-          try {
-            const raw = localStorage.getItem('smileclinic_synced_active_conditions');
-            if (raw) setSyncedConditions(JSON.parse(raw));
-          } catch (e) {}
-        }}
-      />
+
     </div>
   );
 }
