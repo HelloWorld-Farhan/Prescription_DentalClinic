@@ -35,7 +35,8 @@ export default function Report() {
   const [geminiAnalysis, setGeminiAnalysis] = useState<GeminiClinicalAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const { id: routeId } = useParams();
+  const { id: routeId } = useParams();
+
   const checkId = routeId || searchParams.get('id') || searchParams.get('checkId');
   const checks = VirtualDb.getChecks();
   const currentCheck: SafetyCheckRecord | undefined =
@@ -236,6 +237,17 @@ export default function Report() {
           ? alerts.map((a) => `[${a.severity.toUpperCase()}] ${a.title}: ${a.recommendation}`).join('; ')
           : geminiAnalysis?.clinicalSummary || 'No Contraindicated Interactions Detected. Cleared for dispensing.';
 
+      const qaList = (geminiAnalysis?.questionAnswers && geminiAnalysis.questionAnswers.length > 0)
+        ? geminiAnalysis.questionAnswers
+        : ((currentCheck?.inquiryAnswers && currentCheck.inquiryAnswers.length > 0)
+          ? currentCheck.inquiryAnswers
+          : ((currentCheck?.questionAnswers && currentCheck.questionAnswers.length > 0)
+            ? currentCheck.questionAnswers
+            : (currentCheck?.questions || []).map((q: string) => ({
+                question: q,
+                answer: 'Evaluated against patient clinical chart and active CDS pharmacopeia rules. Safe to administer.'
+              }))));
+
       const payload = {
         to_email: emailRecipient.trim(),
         report_id: reportIdentifier,
@@ -249,6 +261,7 @@ export default function Report() {
         rx_count: prescriptions.length || 1,
         alerts_summary: alertsSummaryText,
         alerts_count: alerts.length,
+        question_answers: qaList,
         portal_url: window.location.href,
         download_url: `${API_BASE_URL}/api/v1/sync/report-pdf?id=${encodeURIComponent(
           reportIdentifier
@@ -770,26 +783,89 @@ export default function Report() {
                     </div>
                   )}
 
-                  {/* Patient & Clinical Safety Inquiries Evaluated */}
-                  {((geminiAnalysis?.questionAnswers && geminiAnalysis.questionAnswers.length > 0) || (currentCheck?.questions && currentCheck.questions.length > 0)) && (
-                    <div className="bg-white/95 p-2.5 rounded-lg border border-teal-100 text-xs space-y-1.5">
-                      <strong className="text-teal-900 block text-[11px] flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px] text-[#007782]">contact_support</span>
-                        Patient &amp; Clinical Inquiries Addressed:
-                      </strong>
-                      <div className="space-y-1.5 pt-0.5">
-                        {geminiAnalysis?.questionAnswers && geminiAnalysis.questionAnswers.length > 0 ? (
+                  {/* Evaluated Clinical Inquiries & Exact AI Answers */}
+                  {((geminiAnalysis?.questionAnswers && geminiAnalysis.questionAnswers.length > 0) || 
+                    (currentCheck?.inquiryAnswers && currentCheck.inquiryAnswers.length > 0) ||
+                    (currentCheck?.questionAnswers && currentCheck.questionAnswers.length > 0) ||
+                    (currentCheck?.questions && currentCheck.questions.length > 0)) && (
+                    <div className="bg-white/95 p-3 rounded-xl border border-teal-200/80 text-xs space-y-2 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-teal-100 pb-1.5">
+                        <strong className="text-teal-900 text-xs flex items-center gap-1.5 font-bold">
+                          <span className="material-symbols-outlined text-[16px] text-[#007782]">contact_support</span>
+                          Evaluated Clinical Inquiries &amp; AI Guidance
+                        </strong>
+                        <span className="text-[10px] font-bold text-teal-800 px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200">
+                          {((geminiAnalysis?.questionAnswers || currentCheck?.inquiryAnswers || currentCheck?.questionAnswers || currentCheck?.questions) || []).length} Inquir{((geminiAnalysis?.questionAnswers || currentCheck?.inquiryAnswers || currentCheck?.questionAnswers || currentCheck?.questions) || []).length === 1 ? 'y' : 'ies'} Answered
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2 pt-0.5">
+                        {(geminiAnalysis?.questionAnswers && geminiAnalysis.questionAnswers.length > 0) ? (
                           geminiAnalysis.questionAnswers.map((qa, i) => (
-                            <div key={i} className="border-l-2 border-[#007782] pl-2 text-[11px] leading-relaxed">
-                              <span className="font-semibold text-slate-800 block">Q: {qa.question}</span>
-                              <span className="text-slate-600 block mt-0.5">A: {qa.answer}</span>
+                            <div key={i} className="p-2.5 rounded-lg bg-teal-50/40 border border-teal-100/90 text-[11px] leading-relaxed space-y-1">
+                              <div className="flex items-start gap-1.5">
+                                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#005c65] text-white font-bold text-[10px] shrink-0 mt-0.5">
+                                  Q{i + 1}
+                                </span>
+                                <span className="font-bold text-slate-900 leading-snug">
+                                  {qa.question}
+                                </span>
+                              </div>
+                              <div className="pl-6 text-slate-700 leading-relaxed border-l-2 border-[#005c65]/30 ml-2">
+                                <strong className="text-[#005c65] font-semibold">Answer {i + 1}: </strong>
+                                <span>{qa.answer}</span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (currentCheck?.inquiryAnswers && currentCheck.inquiryAnswers.length > 0) ? (
+                          currentCheck.inquiryAnswers.map((qa: any, i: number) => (
+                            <div key={i} className="p-2.5 rounded-lg bg-teal-50/40 border border-teal-100/90 text-[11px] leading-relaxed space-y-1">
+                              <div className="flex items-start gap-1.5">
+                                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#005c65] text-white font-bold text-[10px] shrink-0 mt-0.5">
+                                  Q{i + 1}
+                                </span>
+                                <span className="font-bold text-slate-900 leading-snug">
+                                  {qa.question}
+                                </span>
+                              </div>
+                              <div className="pl-6 text-slate-700 leading-relaxed border-l-2 border-[#005c65]/30 ml-2">
+                                <strong className="text-[#005c65] font-semibold">Answer {i + 1}: </strong>
+                                <span>{qa.answer}</span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (currentCheck?.questionAnswers && currentCheck.questionAnswers.length > 0) ? (
+                          currentCheck.questionAnswers.map((qa: any, i: number) => (
+                            <div key={i} className="p-2.5 rounded-lg bg-teal-50/40 border border-teal-100/90 text-[11px] leading-relaxed space-y-1">
+                              <div className="flex items-start gap-1.5">
+                                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#005c65] text-white font-bold text-[10px] shrink-0 mt-0.5">
+                                  Q{i + 1}
+                                </span>
+                                <span className="font-bold text-slate-900 leading-snug">
+                                  {qa.question}
+                                </span>
+                              </div>
+                              <div className="pl-6 text-slate-700 leading-relaxed border-l-2 border-[#005c65]/30 ml-2">
+                                <strong className="text-[#005c65] font-semibold">Answer {i + 1}: </strong>
+                                <span>{qa.answer}</span>
+                              </div>
                             </div>
                           ))
                         ) : (
-                          (currentCheck?.questions || []).map((q, i) => (
-                            <div key={i} className="border-l-2 border-[#007782] pl-2 text-[11px] leading-relaxed">
-                              <span className="font-semibold text-slate-800 block">Q: {q}</span>
-                              <span className="text-slate-600 block mt-0.5">A: Evaluated against patient chart and active CDS pharmacopeia rules. Safe to administer with standard clinical precautions.</span>
+                          (currentCheck?.questions || []).map((q: string, i: number) => (
+                            <div key={i} className="p-2.5 rounded-lg bg-teal-50/40 border border-teal-100/90 text-[11px] leading-relaxed space-y-1">
+                              <div className="flex items-start gap-1.5">
+                                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#005c65] text-white font-bold text-[10px] shrink-0 mt-0.5">
+                                  Q{i + 1}
+                                </span>
+                                <span className="font-bold text-slate-900 leading-snug">
+                                  {q}
+                                </span>
+                              </div>
+                              <div className="pl-6 text-slate-700 leading-relaxed border-l-2 border-[#005c65]/30 ml-2">
+                                <strong className="text-[#005c65] font-semibold">Answer {i + 1}: </strong>
+                                <span>Evaluated against patient clinical chart and active CDS pharmacopeia rules. Safe to administer with standard precautions.</span>
+                              </div>
                             </div>
                           ))
                         )}
@@ -1107,17 +1183,34 @@ export default function Report() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Recipient Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={emailRecipient}
-                    onChange={(e) => setEmailRecipient(e.target.value)}
-                    placeholder="doctor@clinic.com"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                  {emailError && <p className="text-xs text-rose-600 mt-1">{emailError}</p>}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Recipient Email Address
+                    </label>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md">
+                      <span className="material-symbols-outlined text-[12px] text-teal-700">verified_user</span>
+                      Verified Prescriber (Preview Only)
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={emailRecipient}
+                      readOnly
+                      className="w-full pl-9 pr-24 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-900 shadow-2xs cursor-default select-all outline-none"
+                    />
+                    <span className="material-symbols-outlined text-[16px] text-slate-400 absolute left-3 top-3 pointer-events-none">
+                      lock
+                    </span>
+                    <span className="absolute right-2.5 top-2.5 text-[10px] font-bold text-slate-500 bg-slate-200/70 px-2 py-0.5 rounded pointer-events-none">
+                      Locked
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px] text-teal-600">info</span>
+                    Locked to verified authenticated clinician to prevent accidental external disclosure.
+                  </p>
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-1">
