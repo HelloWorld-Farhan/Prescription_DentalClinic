@@ -710,6 +710,10 @@ export default function Alerts() {
         isOpen={!!activeDrawerAlert}
         onClose={() => setActiveDrawerAlert(null)}
         onOverride={handleOverride}
+        checkId={activeDrawerCheckId || undefined}
+        onSelectAlternative={(alt) => {
+          showConfirmation('Prescribed alternative noted: ' + alt + '. You can review or edit in New Check.', 'info');
+        }}
       />
 
       {/* Email Schedule Alert Modal - Mixes all active medications when triggered globally */}

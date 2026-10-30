@@ -1783,6 +1783,7 @@ export default function Dashboard() {
         isOpen={isDrawerOpen}
 
         onClose={() => setIsDrawerOpen(false)}
+        checkId={activeDrawerCheckId || checks[0]?.id}
 
         onOverride={(alertId, reason) => {
 

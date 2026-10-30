@@ -313,3 +313,104 @@ export async function dispatchScheduleAlertEmail(payload: {
 
   return await res.json();
 }
+
+export interface SavedDoctorContact {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  specialty?: string;
+  lastUsed: number;
+}
+
+const DEFAULT_DOCTORS: SavedDoctorContact[] = [
+  { id: 'doc-1', name: 'Dr. Rajiv Mehta, MD', email: 'dr.rajivmehta@smileclinic.com', specialty: 'General Physician', lastUsed: Date.now() - 86400000 },
+  { id: 'doc-2', name: 'Dr. Anita Verma, MBBS', email: 'dr.anitaverma@smileclinic.com', specialty: 'Internal Medicine Lead', lastUsed: Date.now() - 172800000 },
+  { id: 'doc-3', name: 'Dr. Sanjeev Saxena, MDS', email: 'support.smileclinic@gmail.com', specialty: 'Oral & Maxillofacial Surgeon', lastUsed: Date.now() - 3600000 },
+];
+
+export function getSavedDoctors(userEmail?: string): SavedDoctorContact[] {
+  if (typeof window === 'undefined') return DEFAULT_DOCTORS;
+  try {
+    const key = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const raw = localStorage.getItem(key) || localStorage.getItem('smileclinic_saved_doctors_directory');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return DEFAULT_DOCTORS;
+}
+
+export function saveDoctorContact(
+  doctor: { name: string; email: string; phone?: string; specialty?: string },
+  userEmail?: string
+): SavedDoctorContact[] {
+  if (typeof window === 'undefined') return DEFAULT_DOCTORS;
+  try {
+    const current = getSavedDoctors(userEmail);
+    const cleanEmail = doctor.email.trim().toLowerCase();
+    const cleanName = doctor.name.trim();
+    if (!cleanEmail) return current;
+
+    const filtered = current.filter((d) => d.email.toLowerCase() !== cleanEmail);
+    const updated: SavedDoctorContact[] = [
+      {
+        id: 'doc-' + Date.now(),
+        name: cleanName || cleanEmail,
+        email: cleanEmail,
+        phone: doctor.phone,
+        specialty: doctor.specialty || 'Consulting Physician',
+        lastUsed: Date.now(),
+      },
+      ...filtered,
+    ].slice(0, 20);
+
+    const key = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
+    localStorage.setItem(key, JSON.stringify(updated));
+    localStorage.setItem('smileclinic_saved_doctors_directory', JSON.stringify(updated));
+    return updated;
+  } catch {
+    return DEFAULT_DOCTORS;
+  }
+}
+
+export async function dispatchDoctorConsultEmail(payload: {
+  to_doctor_email: string;
+  doctor_name: string;
+  patient_name: string;
+  patient_mrn?: string;
+  check_number?: string;
+  alert_title: string;
+  severity: string;
+  interacting_drugs: string[];
+  clinical_mechanism: string;
+  substituted_medication?: string;
+  rationale: string;
+  clinician_name?: string;
+  clinician_email?: string;
+  notary_hash?: string;
+  portal_url?: string;
+}): Promise<{ status: string; message: string; delivered: boolean }> {
+  if (!API_BASE_URL) {
+    return {
+      status: 'success',
+      message: 'Offline mode: Doctor consult email staged for Dr. ' + payload.doctor_name + ' (' + payload.to_doctor_email + ')',
+      delivered: false,
+    };
+  }
+
+  const res = await fetch(API_BASE_URL + '/api/v1/auth/send-doctor-consult-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || 'Failed to dispatch doctor consultation email');
+  }
+
+  return await res.json();
+}
+
