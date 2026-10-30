@@ -41,7 +41,7 @@ function TopLoadingBar() {
 
   useEffect(() => {
     setLoading(true);
-    const timer = setTimeout(() => setLoading(false), 250);
+    const timer = setTimeout(() => setLoading(false), 90);
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
@@ -52,7 +52,7 @@ function TopLoadingBar() {
           initial={{ scaleX: 0, opacity: 1 }}
           animate={{ scaleX: 1, opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
           style={{ originX: 0 }}
           className="fixed top-0 left-0 right-0 h-[2px] bg-primary z-[9999] pointer-events-none"
         />
@@ -75,7 +75,8 @@ function AppRoutes() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Fullscreen Printable Report */}
-          <Route path="/report" element={<Report />} />
+          <Route path="/report" element={<Report />} />
+
           <Route path="/report/:id" element={<Report />} />
 
           {/* Legal & Support */}
@@ -105,7 +106,8 @@ function AppRoutes() {
             <Route path="/dashboard/audit-log" element={<AuditLog />} />
             <Route path="/dashboard/rules" element={<RulesAdmin />} />
             <Route path="/dashboard/settings" element={<Settings />} />
-            <Route path="/dashboard/report" element={<Report />} />
+            <Route path="/dashboard/report" element={<Report />} />
+
             <Route path="/dashboard/report/:id" element={<Report />} />
           </Route>
 
@@ -142,7 +144,7 @@ export default function App() {
   return (
     <MotionConfig
       reducedMotion="user"
-      transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
     >
       <BrowserRouter>
         <AppRoutes />

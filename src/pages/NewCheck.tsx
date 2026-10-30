@@ -1149,7 +1149,7 @@ export default function NewCheck() {
       {flowPhase === 'input' && (
         <motion.div
           key="inputPhase"
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.3 }}
@@ -2294,7 +2294,7 @@ export default function NewCheck() {
       {flowPhase === 'report' && savedCheckRecord && (
         <motion.div
           key="reportPhase"
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -16 }}
           transition={{ duration: 0.35 }}
@@ -2722,7 +2722,7 @@ export default function NewCheck() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
                 onClick={() => setInspectingAllergy(null)}
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
               />

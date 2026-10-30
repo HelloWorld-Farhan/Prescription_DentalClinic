@@ -637,7 +637,7 @@ export default function Dashboard() {
 
           whileHover={{ y: -4, scale: 1.01 }}
 
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
 
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-primary/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
 
@@ -759,7 +759,7 @@ export default function Dashboard() {
 
           whileHover={{ y: -4, scale: 1.01 }}
 
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
 
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#975A16]/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
 
@@ -845,7 +845,7 @@ export default function Dashboard() {
         <motion.div
           variants={cardVariants}
           whileHover={{ y: -4, scale: 1.01 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between relative overflow-hidden cursor-pointer transition-colors duration-200 transform-gpu will-change-transform hover:border-primary/50"
           onClick={() => navigate('/audit-log')}
           title="HIPAA & Clinical Audit Trail: Immutable legal ledger and cryptographic verification"
@@ -900,7 +900,7 @@ export default function Dashboard() {
 
           whileHover={{ y: -4, scale: 1.01 }}
 
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
 
           className="group bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-high/60 flex flex-col justify-between hover:border-[#553C9A]/50 cursor-pointer transition-colors duration-200 transform-gpu will-change-transform"
 

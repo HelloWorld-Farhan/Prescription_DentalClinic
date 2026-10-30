@@ -1392,7 +1392,7 @@ export default function RulesAdmin() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
                 onClick={() => setInspectRule(null)}
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
               />
@@ -1514,7 +1514,7 @@ export default function RulesAdmin() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
                 onClick={handleCloseAddModal}
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
               />

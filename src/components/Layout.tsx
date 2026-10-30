@@ -1164,10 +1164,10 @@ export default function Layout() {
           <ErrorBoundary key={location.pathname} resetKey={location.pathname} fallbackTitle="Unable to load this clinical safety view">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 14, filter: 'blur(3px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
-              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
               className="w-full"
             >
               <Outlet />

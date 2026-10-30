@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
-import { GOOGLE_APPS_SCRIPT_URL } from '../config/api';
+import { GOOGLE_APPS_SCRIPT_URL, API_BASE_URL } from '../config/api';
 import type { AuditLogEntry } from '../types';
 
 export interface AuditLogItem {
@@ -441,8 +441,7 @@ export default function ExportAuditModal({
       setEmailProgress(35);
 
       // 1. Primary: FastAPI backend /api/v1/auth/send-audit-email
-      const apiUrl =
-        import.meta.env.VITE_BACKEND_URL || 'https://dentalclinic-backend-eiav.onrender.com';
+      const apiUrl = API_BASE_URL;
 
       const backendPromise = fetch(`${apiUrl}/api/v1/auth/send-audit-email`, {
         method: 'POST',
