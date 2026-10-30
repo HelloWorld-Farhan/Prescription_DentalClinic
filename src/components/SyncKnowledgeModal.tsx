@@ -37,7 +37,7 @@ export default function SyncKnowledgeModal({
   // Syncable items list and selection
   const [items, setItems] = useState<SyncableItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'document' | 'check' | 'rule'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'history' | 'check'>('all');
 
   // Load real data from storage when opened (NO dummy static conditions)
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function SyncKnowledgeModal({
     try {
       const docs: UploadedDocumentRecord[] = getDocumentHistory();
       docs
-        .filter((doc) => !isAvatarFile(doc.filename) && !isAvatarFile(doc.storageUrl))
+        .filter((doc) => !isAvatarFile(doc.filename) && !isAvatarFile(doc.storageUrl) && doc.category !== 'prescription' && !doc.id.startsWith('doc-chk-'))
         .forEach((doc) => {
           let icon = 'description';
           const ft = (doc.fileType || '').toLowerCase();
@@ -151,7 +151,9 @@ export default function SyncKnowledgeModal({
 
   const filteredItems = useMemo(() => {
     if (categoryFilter === 'all') return items;
-    return items.filter((i) => i.type === categoryFilter);
+    if (categoryFilter === 'history') return items.filter((i) => i.type === 'document' || i.type === 'rule');
+    if (categoryFilter === 'check') return items.filter((i) => i.type === 'check');
+    return items;
   }, [items, categoryFilter]);
 
   const handleToggleItem = (id: string) => {
@@ -359,14 +361,14 @@ export default function SyncKnowledgeModal({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setCategoryFilter('document')}
+                        onClick={() => setCategoryFilter('history')}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
-                          categoryFilter === 'document'
+                          categoryFilter === 'history'
                             ? 'bg-primary text-on-primary'
                             : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                         }`}
                       >
-                        Uploaded History ({docCount})
+                        Clinical History ({docCount + ruleCount})
                       </button>
                       <button
                         type="button"
@@ -377,21 +379,8 @@ export default function SyncKnowledgeModal({
                             : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                         }`}
                       >
-                        Prior Regimens ({checkCount})
+                        Prescriptions & Regimens ({checkCount})
                       </button>
-                      {ruleCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setCategoryFilter('rule')}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
-                            categoryFilter === 'rule'
-                              ? 'bg-primary text-on-primary'
-                              : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                          }`}
-                        >
-                          Rules ({ruleCount})
-                        </button>
-                      )}
                     </div>
 
                     <button

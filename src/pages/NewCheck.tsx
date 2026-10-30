@@ -769,7 +769,8 @@ export default function NewCheck() {
           userId: storedUser?.email || storedUser?.id || 'clinician-user',
           authorName: prescriberDisplayName,
           extractedRulesCount: extractedMedicines.length || newRecord.prescriptions.length,
-          status: 'analyzed'
+          status: 'analyzed',
+          category: 'prescription'
         });
       }
       setSavedCheckRecord(newRecord);
@@ -836,7 +837,8 @@ export default function NewCheck() {
           userId: storedUser?.email || storedUser?.id || 'clinician-user',
           authorName: prescriberDisplayName,
           extractedRulesCount: extractedMedicines.length || newRecord.prescriptions.length,
-          status: 'analyzed'
+          status: 'analyzed',
+          category: 'prescription'
         });
       }
       setSavedCheckRecord(newRecord);

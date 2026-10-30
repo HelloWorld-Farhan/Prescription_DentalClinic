@@ -33,6 +33,7 @@ export interface UploadedDocumentRecord {
   extractedRulesCount: number;
 
   status: 'stored' | 'analyzed';
+  category?: 'history' | 'prescription' | 'report' | 'profile';
 
 }
 

@@ -111,6 +111,27 @@ export default function RulesAdmin() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [syncStatusText, setSyncStatusText] = useState('');
   const [lastSyncText, setLastSyncText] = useState<string>(() => getRelativeSyncText());
+  const [syncedKnowledge, setSyncedKnowledge] = useState<{
+    selection: string[];
+    docs: string[];
+    checks: string[];
+    conditions: string[];
+  }>(() => {
+    try {
+      const rawSel = localStorage.getItem('smileclinic_synced_knowledge_selection');
+      const rawDocs = localStorage.getItem('smileclinic_synced_active_docs');
+      const rawChecks = localStorage.getItem('smileclinic_synced_active_checks');
+      const rawConds = localStorage.getItem('smileclinic_synced_active_conditions');
+      return {
+        selection: rawSel ? JSON.parse(rawSel) : [],
+        docs: rawDocs ? JSON.parse(rawDocs) : [],
+        checks: rawChecks ? JSON.parse(rawChecks) : [],
+        conditions: rawConds ? JSON.parse(rawConds) : [],
+      };
+    } catch {
+      return { selection: [], docs: [], checks: [], conditions: [] };
+    }
+  });
   const [inspectRule, setInspectRule] = useState<InteractionRule | null>(null);
 
   // Deletion Modal States
@@ -172,14 +193,30 @@ export default function RulesAdmin() {
       setRules(VirtualDb.getRules(currentUserId));
       setDocumentHistory(getReconciledDocumentHistory(currentUserId));
     };
+    const handleKnowledgeSync = () => {
+      try {
+        const rawSel = localStorage.getItem('smileclinic_synced_knowledge_selection');
+        const rawDocs = localStorage.getItem('smileclinic_synced_active_docs');
+        const rawChecks = localStorage.getItem('smileclinic_synced_active_checks');
+        const rawConds = localStorage.getItem('smileclinic_synced_active_conditions');
+        setSyncedKnowledge({
+          selection: rawSel ? JSON.parse(rawSel) : [],
+          docs: rawDocs ? JSON.parse(rawDocs) : [],
+          checks: rawChecks ? JSON.parse(rawChecks) : [],
+          conditions: rawConds ? JSON.parse(rawConds) : [],
+        });
+      } catch {}
+    };
     window.addEventListener('smileclinic_rules_updated', handleSync);
     window.addEventListener('smileclinic_documents_updated', handleSync);
     window.addEventListener('smileclinic_checks_updated', handleSync);
+    window.addEventListener('smileclinic_knowledge_synced', handleKnowledgeSync);
     window.addEventListener('storage', handleSync);
     return () => {
       window.removeEventListener('smileclinic_rules_updated', handleSync);
       window.removeEventListener('smileclinic_documents_updated', handleSync);
       window.removeEventListener('smileclinic_checks_updated', handleSync);
+      window.removeEventListener('smileclinic_knowledge_synced', handleKnowledgeSync);
       window.removeEventListener('storage', handleSync);
     };
   }, [currentUserId]);
@@ -486,14 +523,31 @@ export default function RulesAdmin() {
     return filteredRules.slice((rulesPage - 1) * rulesPageSize, rulesPage * rulesPageSize);
   }, [filteredRules, rulesPage, rulesPageSize]);
 
-  // 5 items per page pagination for Tab 2 (Import & Upload History)
+  // Segregated document history for Tab 1 (Clinical History) and Tab 2 (Prescriptions)
+  const isPrescriptionDoc = (d: UploadedDocumentRecord) =>
+    d.category === 'prescription' ||
+    d.id.startsWith('doc-chk-') ||
+    (d.fileType && d.fileType.toLowerCase().includes('camera')) ||
+    (d.filename && (d.filename.toLowerCase().includes('prescription') || d.filename.toLowerCase().includes('camera')));
+
+  const prescriptionDocuments = useMemo(() => {
+    return documentHistory.filter(isPrescriptionDoc);
+  }, [documentHistory]);
+
+  const clinicalHistoryDocuments = useMemo(() => {
+    return documentHistory.filter((d) => !isPrescriptionDoc(d));
+  }, [documentHistory]);
+
+  const totalSyncedKnowledgeCount = syncedKnowledge.selection.length;
+
+  // 5 items per page pagination for Tab 2 (Prescription Safety Check History)
   const [historyPage, setHistoryPage] = useState(1);
   const historyPageSize = 5;
 
-  const totalHistoryPages = Math.max(1, Math.ceil(documentHistory.length / historyPageSize));
+  const totalHistoryPages = Math.max(1, Math.ceil(prescriptionDocuments.length / historyPageSize));
   const paginatedHistory = useMemo(() => {
-    return documentHistory.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
-  }, [documentHistory, historyPage, historyPageSize]);
+    return prescriptionDocuments.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
+  }, [prescriptionDocuments, historyPage, historyPageSize]);
 
   return (
     <div className="flex flex-col w-full gap-6 max-w-7xl mx-auto px-1 sm:px-2">
@@ -617,11 +671,11 @@ export default function RulesAdmin() {
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">history_edu</span>
-            <span>Import &amp; Upload History</span>
+            <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+            <span>Prescription Safety Check History</span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold whitespace-nowrap">
-              <span className="font-mono">{documentHistory.length}</span>
-              <span>records</span>
+              <span className="font-mono">{prescriptionDocuments.length}</span>
+              <span>prescriptions</span>
             </span>
           </button>
 
@@ -636,9 +690,11 @@ export default function RulesAdmin() {
           >
             <span className="material-symbols-outlined text-[18px]">account_tree</span>
             <span>Knowledge Sources</span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px] font-bold whitespace-nowrap">
-              <span className="font-mono">0</span>
-              <span>engines</span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
+              totalSyncedKnowledgeCount > 0 ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'
+            }`}>
+              <span className="font-mono">{totalSyncedKnowledgeCount}</span>
+              <span>sources active</span>
             </span>
           </button>
         </div>
@@ -911,18 +967,18 @@ export default function RulesAdmin() {
         </div>
       )}
 
-      {/* TAB: IMPORT & UPLOAD HISTORY */}
+      {/* TAB: PRESCRIPTION SAFETY CHECK HISTORY */}
       {activeTab === 'history' && (
         <div className="flex flex-col gap-5">
           {/* Quick Metrics Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
               <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <span className="material-symbols-outlined text-[22px]">upload_file</span>
+                <span className="material-symbols-outlined text-[22px]">receipt_long</span>
               </div>
               <div>
-                <span className="text-lg font-bold text-on-surface block leading-tight">{documentHistory.length}</span>
-                <span className="text-xs text-outline">Documents &amp; Camera Scans Ingested</span>
+                <span className="text-lg font-bold text-on-surface block leading-tight">{prescriptionDocuments.length}</span>
+                <span className="text-xs text-outline">Prescription Orders &amp; Camera Scans</span>
               </div>
             </div>
 
@@ -951,9 +1007,9 @@ export default function RulesAdmin() {
           <div className="bg-surface-container-lowest rounded-2xl shadow-xs border border-surface-container-high/60 overflow-hidden">
             <div className="p-4 border-b border-surface-container flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-bold text-on-surface">Clinical Document Ingestion &amp; Storage Audit</h3>
+                <h3 className="text-sm font-bold text-on-surface">Prescription Safety Check Ingestion &amp; Storage Audit</h3>
                 <p className="text-xs text-on-surface-variant">
-                  Chronological records of PDF, Word, Excel, and Camera Scans securely archived in encrypted vault.
+                  Chronological records of prescription PDFs, camera scans, and medication orders analyzed during safety checks.
                 </p>
               </div>
               <button
@@ -980,23 +1036,22 @@ export default function RulesAdmin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container text-on-surface">
-                  {documentHistory.length === 0 ? (
+                  {prescriptionDocuments.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-14 text-center">
                         <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto text-on-surface-variant">
-                          <span className="material-symbols-outlined text-4xl text-outline">history_edu</span>
-                          <span className="font-bold text-sm text-on-surface">0 Ingested Records in History</span>
+                          <span className="material-symbols-outlined text-4xl text-outline">receipt_long</span>
+                          <span className="font-bold text-sm text-on-surface">0 Prescriptions in History</span>
                           <p className="text-xs text-on-surface-variant leading-relaxed">
-                            Upload a clinical PDF, Word document, Excel spreadsheet, or take a photo with your mobile or laptop camera to build your historical repository.
+                            Upload a prescription slip or capture a photo in New Safety Check to build your prescription screening history.
                           </p>
-                          <button
-                            type="button"
-                            onClick={handleOpenAddModal}
-                            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover"
+                          <a
+                            href="/new-check"
+                            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover transition-colors"
                           >
-                            <span className="material-symbols-outlined text-[16px]">upload_file</span>
-                            <span>Upload First Document</span>
-                          </button>
+                            <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                            <span>Start New Safety Check</span>
+                          </a>
                         </div>
                       </td>
                     </tr>
@@ -1120,10 +1175,10 @@ export default function RulesAdmin() {
             </div>
 
             {/* 5 Items per Page Pagination Bar for Ingested Documents */}
-            {documentHistory.length > 0 && (
+            {prescriptionDocuments.length > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-surface-container-high bg-surface-container-lowest gap-3">
                 <span className="text-xs text-on-surface-variant font-medium">
-                  Showing <strong className="text-on-surface font-semibold">{(historyPage - 1) * historyPageSize + 1}</strong>–<strong className="text-on-surface font-semibold">{Math.min(historyPage * historyPageSize, documentHistory.length)}</strong> of <strong className="text-on-surface font-semibold">{documentHistory.length}</strong> ingested records
+                  Showing <strong className="text-on-surface font-semibold">{(historyPage - 1) * historyPageSize + 1}</strong>–<strong className="text-on-surface font-semibold">{Math.min(historyPage * historyPageSize, prescriptionDocuments.length)}</strong> of <strong className="text-on-surface font-semibold">{prescriptionDocuments.length}</strong> ingested records
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -1157,33 +1212,146 @@ export default function RulesAdmin() {
         </div>
       )}
 
-      {/* TAB 2: KNOWLEDGE SOURCES */}
+      {/* TAB 3: KNOWLEDGE SOURCES */}
       {activeTab === 'knowledge' && (
-        <div className="p-12 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex flex-col items-center justify-center text-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-surface-container text-outline flex items-center justify-center shadow-xs">
-            <span className="material-symbols-outlined text-3xl">account_tree</span>
+        <div className="flex flex-col gap-5">
+          {/* Metrics bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <span className="material-symbols-outlined text-[22px]">account_tree</span>
+              </div>
+              <div>
+                <span className="text-lg font-bold text-on-surface block leading-tight">{totalSyncedKnowledgeCount}</span>
+                <span className="text-xs text-outline">Active Knowledge Sources</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[22px]">healing</span>
+              </div>
+              <div>
+                <span className="text-lg font-bold text-emerald-800 block leading-tight">{syncedKnowledge.conditions.length}</span>
+                <span className="text-xs text-outline">Clinical Conditions &amp; Rules Active</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[22px]">receipt_long</span>
+              </div>
+              <div>
+                <span className="text-lg font-bold text-teal-800 block leading-tight">{syncedKnowledge.checks.length}</span>
+                <span className="text-xs text-outline">Prior Prescription Regimens Enforced</span>
+              </div>
+            </div>
           </div>
-          <h4 className="text-sm font-bold text-on-surface">0 Knowledge Sources Configured</h4>
-          <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
-            No external clinical pharmacopeias or knowledge source engines are currently configured. Connect clinical knowledge feeds or author custom rules.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover"
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Add Clinical Rule</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSyncModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary-container text-on-primary text-xs font-bold shadow-xs cursor-pointer hover:bg-primary"
-            >
-              <span className="material-symbols-outlined text-[16px]">sync</span>
-              <span>Sync Knowledge Base</span>
-            </button>
+
+          {/* Active Knowledge Sources Dashboard Card */}
+          <div className="bg-surface-container-lowest rounded-2xl shadow-xs border border-surface-container-high/60 overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-surface-container flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h3 className="text-sm font-bold text-on-surface">Active Prescription AI Knowledge Context</h3>
+                </div>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  The clinical conditions and prior prescription regimens currently selected to evaluate safety checks.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsSyncModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary-hover transition-colors cursor-pointer self-start sm:self-center"
+              >
+                <span className="material-symbols-outlined text-[16px]">sync</span>
+                <span>Synchronize Knowledge Base</span>
+              </button>
+            </div>
+
+            {totalSyncedKnowledgeCount === 0 ? (
+              <div className="p-12 flex flex-col items-center justify-center text-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-surface-container text-outline flex items-center justify-center shadow-xs">
+                  <span className="material-symbols-outlined text-3xl">account_tree</span>
+                </div>
+                <h4 className="text-sm font-bold text-on-surface">0 Knowledge Sources Synchronized</h4>
+                <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
+                  No active clinical history or prescription regimens have been synchronized into the AI engine. Click below to select which conditions (e.g. Kidney, Liver) and prior prescriptions to feed into the Safety Checker.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsSyncModalOpen(true)}
+                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover"
+                >
+                  <span className="material-symbols-outlined text-[16px]">sync</span>
+                  <span>Synchronize Knowledge Base</span>
+                </button>
+              </div>
+            ) : (
+              <div className="p-4 sm:p-6 flex flex-col gap-5">
+                {/* Active Clinical Conditions */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-outline mb-2.5 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600">medical_services</span>
+                    <span>Synchronized Clinical Conditions ({syncedKnowledge.conditions.length})</span>
+                  </h4>
+                  {syncedKnowledge.conditions.length === 0 ? (
+                    <p className="text-xs text-outline italic">No medical conditions currently selected.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {syncedKnowledge.conditions.map((cond, idx) => (
+                        <div
+                          key={`cond-${idx}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                          <span>{cond}</span>
+                          <span className="text-[10px] text-emerald-600 font-normal">Active in AI</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Active Prior Prescription Regimens */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-outline mb-2.5 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-teal-600">fact_check</span>
+                    <span>Synchronized Prescription Regimens ({syncedKnowledge.checks.length})</span>
+                  </h4>
+                  {syncedKnowledge.checks.length === 0 ? (
+                    <p className="text-xs text-outline italic">No prior prescriptions currently selected.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {syncedKnowledge.checks.map((chkId, idx) => {
+                        const check = VirtualDb.getCheckById(chkId);
+                        const label = check ? `Prescription #${check.checkNumber || check.id} — ${check.patientName}` : `Prescription Check #${chkId}`;
+                        return (
+                          <div
+                            key={`chk-${idx}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-xs font-bold text-teal-800"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                            <span>{label}</span>
+                            <span className="text-[10px] text-teal-600 font-normal">Cross-Screened</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Information Callout */}
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container flex items-start gap-2.5 text-xs text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">verified_user</span>
+                  <div className="leading-relaxed">
+                    <strong className="text-on-surface font-semibold">Strict AI Enforced Scope:</strong> When you run a prescription check in <span className="font-semibold text-primary">New Safety Check</span>, the AI engine evaluates drug interactions strictly against the synchronized conditions and regimens above. To activate or deactivate items, click <span className="font-semibold text-on-surface cursor-pointer underline" onClick={() => setIsSyncModalOpen(true)}>Synchronize Knowledge Base</span>.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
