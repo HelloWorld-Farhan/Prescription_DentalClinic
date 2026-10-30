@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DrugInteractionAlert } from '../types';
@@ -35,21 +35,22 @@ export default function AlertDetailDrawer({
   checkNumber: propCheckNumber,
   checkId: propCheckId,
 }: AlertDetailDrawerProps) {
-  // Decision mode: 'doctor_consult' (Consult & Change), 'resolve' (Alternative), 'override' (Clinical Override)
-  const [decision, setDecision] = useState<'doctor_consult' | 'resolve' | 'override'>('doctor_consult');
-  
-  // Doctor consultation fields
+  // Doctor consultation input states (strictly no hardcoded default names or emails)
   const [doctorName, setDoctorName] = useState('');
   const [doctorEmail, setDoctorEmail] = useState('');
   const [newMedication, setNewMedication] = useState('');
-  const [overrideRationale, setOverrideRationale] = useState('');
   
-  // Suggestion & UI states
+  // Validation errors
+  const [doctorNameError, setDoctorNameError] = useState('');
+  const [doctorEmailError, setDoctorEmailError] = useState('');
+  
+  // UI & suggestion states
   const [savedDoctors, setSavedDoctors] = useState<SavedDoctorContact[]>([]);
-  const [showDoctorSuggestions, setShowDoctorSuggestions] = useState(false);
+  const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSentSuccess, setEmailSentSuccess] = useState(false);
+  const [sentEventInfo, setSentEventInfo] = useState<{ doctor: string; email: string; time: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -75,41 +76,57 @@ export default function AlertDetailDrawer({
   const checkNumber = propCheckNumber || matchingCheck?.checkNumber || matchingCheck?.id || 'CHK-CURRENT';
   const effectiveCheckId = propCheckId || matchingCheck?.id || 'CHK-CURRENT';
 
-  // Load saved doctors on mount or user email change
+  // Accurately extract the two interacting drug names (Never "Primary drug" or "Secondary drug")
+  const { drugA, drugB } = useMemo(() => {
+    let a = '';
+    let b = '';
+
+    if (Array.isArray(alert?.interactingDrugs) && alert.interactingDrugs.length >= 2) {
+      a = alert.interactingDrugs[0];
+      b = alert.interactingDrugs[1];
+    } else if (Array.isArray(alert?.interactingDrugs) && alert.interactingDrugs.length === 1) {
+      a = alert.interactingDrugs[0];
+    }
+
+    if ((!a || !b) && alert?.title) {
+      const parts = alert.title.split(/\s*(?:↔|<->|\+|vs\.?|with|and)\s*/i);
+      if (parts.length >= 2) {
+        if (!a) a = parts[0].trim();
+        if (!b) {
+          b = parts[1]
+            .replace(/\(.*?\)/g, '')
+            .replace(/(?:hazard|interaction|warning|alert|contraindication)/gi, '')
+            .trim();
+        }
+      }
+    }
+
+    if ((!a || !b) && matchingCheck?.prescriptions?.length) {
+      const rxNames = matchingCheck.prescriptions.map((p) => p.drugName);
+      if (!a && rxNames[0]) a = rxNames[0];
+      if (!b && rxNames[1]) b = rxNames[1];
+    }
+
+    return {
+      drugA: a || 'Prescribed Agent',
+      drugB: b || 'Interacting Agent',
+    };
+  }, [alert, matchingCheck]);
+
+  const alternativeAvailable = alert?.alternativeSuggestion || (alert?.alternatives && alert.alternatives[0]) || '';
+
+  // Load user's saved doctors on mount or user change
   useEffect(() => {
     const list = getSavedDoctors(loggedEmail);
     setSavedDoctors(list);
-    if (list.length > 0 && !doctorName) {
-      setDoctorName(list[0].name);
-      setDoctorEmail(list[0].email);
-    }
   }, [loggedEmail]);
 
-  // Sync alternative recommendation into new medication input if available
+  // Pre-fill alternative medication once
   useEffect(() => {
-    if (!alert) return;
-    const defaultAlt = alert.alternativeSuggestion || (alert.alternatives && alert.alternatives[0]) || '';
-    if (defaultAlt && !newMedication) {
-      setNewMedication(defaultAlt);
+    if (alternativeAvailable && !newMedication) {
+      setNewMedication(alternativeAvailable);
     }
-
-    const drugA = alert.interactingDrugs?.[0] || 'Proposed agent';
-    const drugB = alert.interactingDrugs?.[1] || 'Interacting agent';
-
-    if (decision === 'doctor_consult') {
-      setOverrideRationale(
-        `Consulted prescribing doctor regarding ${alert.title}. Discussed interaction between ${drugA} and ${drugB}. Regimen adjusted to prevent adverse clinical hazard.`
-      );
-    } else if (decision === 'resolve') {
-      setOverrideRationale(
-        `Prescription modified to safe therapeutic alternative (${newMedication || defaultAlt || 'prescribed alternative'}). Interacting agent discontinued.`
-      );
-    } else {
-      setOverrideRationale(
-        `Clinician override attested by ${loggedClinician}. Therapeutic necessity assessed with patient monitoring protocol instituted.`
-      );
-    }
-  }, [alert, decision]);
+  }, [alternativeAvailable]);
 
   // Lock body scroll on open
   useEffect(() => {
@@ -128,6 +145,27 @@ export default function AlertDetailDrawer({
     };
   }, [isOpen, onClose]);
 
+  // AI-generated immutable clinical consultation message
+  const aiClinicalDirective = useMemo(() => {
+    if (!alert) return '';
+    const replacementText = newMedication.trim()
+      ? `Discontinue/substitute ${drugA} with recommended safer alternative: ${newMedication.trim()}.`
+      : alternativeAvailable
+      ? `Discontinue/substitute ${drugA} with recommended alternative: ${alternativeAvailable}.`
+      : `Prescribing doctor review requested to titrate dose or select non-interacting therapeutic alternative.`;
+
+    return `CLINICAL CONSULTATION DIRECTIVE — ${alert.title.toUpperCase()}
+Patient: ${patientName} (MRN: ${patientMrn}) | Check #${checkNumber}
+Severity Flag: ${alert.severity.toUpperCase()} (${alert.evidenceGrade || 'Class I - Definitive'})
+
+Identified Interaction: Concurrent administration of ${drugA} with ${drugB}.
+Pharmacological Mechanism: ${alert.mechanism || alert.description || alert.clinicalImpact || 'Risk of heightened physiological toxicity or metabolic disruption.'}
+
+Prescriber Action Requested:
+${replacementText}
+Please confirm regimen modification or clinical guidance upon receipt of this memorandum.`;
+  }, [alert, drugA, drugB, patientName, patientMrn, checkNumber, newMedication, alternativeAvailable]);
+
   if (!alert || typeof document === 'undefined') return null;
 
   const isContraindicated = alert.severity === 'contraindicated';
@@ -144,51 +182,70 @@ export default function AlertDetailDrawer({
   const handleSelectDoctorSuggestion = (doc: SavedDoctorContact) => {
     setDoctorName(doc.name);
     setDoctorEmail(doc.email);
-    setShowDoctorSuggestions(false);
+    setDoctorNameError('');
+    setDoctorEmailError('');
+    setShowDoctorDropdown(false);
   };
 
-  const handleAdoptAlternativeQuick = (alt: string) => {
-    setNewMedication(alt);
-    setDecision('doctor_consult');
-    setOverrideRationale(
-      `Prescription modified to recommended alternative: ${alt}. Verified with prescribing doctor to avoid ${alert.title}.`
-    );
-    showConfirmation(`Pre-filled alternative medication: ${alt}`, 'info');
+  const validateDoctorInputs = (): boolean => {
+    let valid = true;
+    const cleanName = doctorName.trim();
+    const cleanEmail = doctorEmail.trim();
+
+    if (!cleanName) {
+      setDoctorNameError('Please enter the doctor / prescriber name.');
+      valid = false;
+    } else {
+      setDoctorNameError('');
+    }
+
+    if (!cleanEmail) {
+      setDoctorEmailError('Please enter the doctor email address.');
+      valid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setDoctorEmailError('Please enter a valid email address (e.g. doctor@hospital.com).');
+      valid = false;
+    } else {
+      setDoctorEmailError('');
+    }
+
+    return valid;
   };
 
   // Dispatch Email directly to Doctor
   const handleSendDoctorEmail = async () => {
-    const cleanDocEmail = doctorEmail.trim();
-    if (!cleanDocEmail || !cleanDocEmail.includes('@') || !cleanDocEmail.includes('.')) {
-      showConfirmation('Please enter a valid doctor email address to dispatch the alert.', 'error');
-      return;
-    }
+    if (!validateDoctorInputs()) return;
 
     setIsSendingEmail(true);
+    const cleanDocEmail = doctorEmail.trim();
+    const cleanDocName = doctorName.trim();
+
     try {
       await dispatchDoctorConsultEmail({
         to_doctor_email: cleanDocEmail,
-        doctor_name: doctorName.trim() || 'Prescribing Doctor',
+        doctor_name: cleanDocName,
         patient_name: patientName,
         patient_mrn: patientMrn,
         check_number: checkNumber,
         alert_title: alert.title,
         severity: alert.severity,
-        interacting_drugs: alert.interactingDrugs || [],
-        clinical_mechanism: alert.mechanism || alert.description || alert.clinicalImpact || 'Identified pharmacological hazard',
-        substituted_medication: newMedication.trim() || 'Pending Doctor Recommendation',
-        rationale: overrideRationale.trim() || 'Urgent consultation requested for drug-drug interaction.',
+        interacting_drugs: [drugA, drugB],
+        clinical_mechanism: alert.mechanism || alert.description || alert.clinicalImpact || 'Pharmacological interaction identified',
+        substituted_medication: newMedication.trim() || alternativeAvailable || 'Safer Therapeutic Alternative',
+        rationale: aiClinicalDirective,
         clinician_name: loggedClinician,
         clinician_email: loggedEmail,
       });
 
-      // Save doctor contact in local directory
-      saveDoctorContact({ name: doctorName, email: cleanDocEmail }, loggedEmail);
-      setSavedDoctors(getSavedDoctors(loggedEmail));
+      // Save doctor contact in local directory for future 1-click suggestions
+      const updatedList = saveDoctorContact({ name: cleanDocName, email: cleanDocEmail }, loggedEmail);
+      setSavedDoctors(updatedList);
 
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setSentEventInfo({ doctor: cleanDocName, email: cleanDocEmail, time: timeStr });
       setEmailSentSuccess(true);
-      showConfirmation(`Clinical alert & consultation email sent to Dr. ${doctorName || cleanDocEmail}`, 'success');
-      setTimeout(() => setEmailSentSuccess(false), 4000);
+      showConfirmation(`Medication change alert successfully sent to Dr. ${cleanDocName} (${cleanDocEmail})`, 'success');
+      setTimeout(() => setEmailSentSuccess(false), 5000);
     } catch (err: any) {
       showConfirmation(err?.message || 'Failed to dispatch email to doctor. Please check connection.', 'error');
     } finally {
@@ -196,32 +253,24 @@ export default function AlertDetailDrawer({
     }
   };
 
-  // Submit and Sign Protocol
+  // Submit and Sign Protocol in Database
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    if (!validateDoctorInputs()) return;
 
-    // Save doctor info if entered
-    if (doctorEmail.trim()) {
-      saveDoctorContact({ name: doctorName, email: doctorEmail }, loggedEmail);
-    }
+    setIsSubmitting(true);
+    const cleanDocName = doctorName.trim();
+    const cleanDocEmail = doctorEmail.trim();
+
+    saveDoctorContact({ name: cleanDocName, email: cleanDocEmail }, loggedEmail);
 
     setTimeout(() => {
       setIsSubmitting(false);
       setIsSuccess(true);
 
-      const decisionPrefix =
-        decision === 'doctor_consult'
-          ? 'DOCTOR CONSULT & CHANGE'
-          : decision === 'resolve'
-          ? 'RESOLVED WITH ALTERNATIVE'
-          : 'CLINICAL OVERRIDE';
+      const changeNote = newMedication.trim() ? ` [Proposed Alternative: ${newMedication.trim()}]` : '';
+      const fullReason = `DOCTOR CONSULTED & REGIMEN MODIFIED [Prescriber: ${cleanDocName} (${cleanDocEmail})]${changeNote} — ${aiClinicalDirective.slice(0, 160)}...`;
 
-      const changeNote = newMedication.trim() ? ` [New Medication: ${newMedication.trim()}]` : '';
-      const docNote = doctorName.trim() ? ` [Prescriber: ${doctorName.trim()} (${doctorEmail.trim()})]` : '';
-      const fullReason = `${decisionPrefix}${docNote}${changeNote} - ${overrideRationale}`;
-
-      // Notify parent callbacks
       if (newMedication.trim() && onSelectAlternative) {
         onSelectAlternative(newMedication.trim());
       }
@@ -233,10 +282,6 @@ export default function AlertDetailDrawer({
       }, 700);
     }, 450);
   };
-
-  const drugA = alert.interactingDrugs?.[0] || 'Primary drug';
-  const drugB = alert.interactingDrugs?.[1] || 'Secondary drug';
-  const alternativeAvailable = alert.alternativeSuggestion || (alert.alternatives && alert.alternatives[0]);
 
   return createPortal(
     <AnimatePresence>
@@ -309,7 +354,7 @@ export default function AlertDetailDrawer({
                     <strong className="text-on-surface">Pharmacological Hazard: </strong>
                     {alert.mechanism
                       ? `${alert.mechanism} — ${alert.clinicalImpact || 'Requires physician evaluation prior to dispensing.'}`
-                      : `Concurrent administration of ${drugA} with ${drugB} creates potential clinical complications. Dosage adjustment or non-interacting alternative required.`}
+                      : `Concurrent administration of ${drugA} with ${drugB} precipitates clinical complications. Prescriber review required.`}
                   </div>
                 </div>
               </section>
@@ -375,11 +420,14 @@ export default function AlertDetailDrawer({
                         <div className="mt-2">
                           <button
                             type="button"
-                            onClick={() => handleAdoptAlternativeQuick(alternativeAvailable)}
+                            onClick={() => {
+                              setNewMedication(alternativeAvailable);
+                              showConfirmation(`Pre-filled alternative: ${alternativeAvailable}`, 'info');
+                            }}
                             className="inline-flex items-center gap-1.5 text-xs text-primary font-bold hover:underline bg-primary/10 px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
                           >
                             <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
-                            <span>Adopt Alternative into Prescription Form →</span>
+                            <span>Set as Proposed Replacement Medication →</span>
                           </button>
                         </div>
                       )}
@@ -391,7 +439,7 @@ export default function AlertDetailDrawer({
                     </div>
                     <div className="text-xs text-on-surface leading-relaxed">
                       <strong className="text-on-surface">If combination is clinically essential: </strong>
-                      Consult prescribing physician to evaluate dosage titration. Instruct patient on reporting adverse symptoms immediately and record monitoring protocol.
+                      Notify doctor to calibrate dosage under heightened clinical telemetry. Instruct patient on reporting adverse symptoms immediately.
                     </div>
                   </div>
                 </div>
@@ -434,16 +482,16 @@ export default function AlertDetailDrawer({
                   </div>
                 </div>
                 <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container text-xs text-on-surface leading-relaxed">
-                  “Taking <strong>{drugA}</strong> together with <strong>{drugB}</strong> carries an interaction risk ({alert.title.toLowerCase()}). To ensure patient safety, the doctor should be informed to either recommend a non-interacting alternative medication or adjust the dosage with routine monitoring.”
+                  “Taking <strong>{drugA}</strong> together with <strong>{drugB}</strong> carries an interaction risk ({alert.title.toLowerCase()}). To ensure patient safety, the doctor must be informed so they can evaluate prescribing an alternative medicine or adjusting the dosage with routine monitoring.”
                 </div>
               </section>
 
-              {/* 6. Doctor Consultation, Medication Change & Decision Sign-Off */}
+              {/* 6. Unified Doctor Notification & Medication Change (ONE Option) */}
               <section className="space-y-4 pt-4 border-t border-surface-container">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-[20px]">medical_services</span>
-                    <h3 className="text-base font-bold text-on-surface">6. Doctor Consultation & Medication Change</h3>
+                    <h3 className="text-base font-bold text-on-surface">6. Notify Doctor & Change Medication</h3>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 text-[11px] font-bold">
@@ -454,122 +502,42 @@ export default function AlertDetailDrawer({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Selectable Decision Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup">
+                  {/* Doctor Input Box */}
+                  <div className="p-4 rounded-xl bg-surface-container-low border border-primary/25 space-y-3.5">
                     
-                    {/* Option 1: Doctor Consult & Change (Recommended) */}
-                    <div
-                      onClick={() => setDecision('doctor_consult')}
-                      className={`relative flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                        decision === 'doctor_consult'
-                          ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary'
-                          : 'border-surface-container-high bg-surface-container-lowest hover:border-primary/40'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-primary flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[15px]">forward_to_inbox</span>
-                          Consult Doctor & Change
-                        </span>
-                        <input
-                          type="radio"
-                          name="cds-decision"
-                          checked={decision === 'doctor_consult'}
-                          onChange={() => setDecision('doctor_consult')}
-                          className="w-4 h-4 text-primary accent-primary"
-                        />
-                      </div>
-                      <span className="text-[11px] text-on-surface leading-tight font-medium">
-                        Notify prescribing doctor via email and write replacement drug.
-                      </span>
-                    </div>
-
-                    {/* Option 2: Resolve with Alternative */}
-                    <div
-                      onClick={() => setDecision('resolve')}
-                      className={`relative flex flex-col p-3 rounded-xl border cursor-pointer transition-all ${
-                        decision === 'resolve'
-                          ? 'border-emerald-600 bg-emerald-500/10 shadow-xs ring-1 ring-emerald-600'
-                          : 'border-surface-container-high bg-surface-container-lowest hover:border-emerald-500/40'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
-                          Direct Substitution
-                        </span>
-                        <input
-                          type="radio"
-                          name="cds-decision"
-                          checked={decision === 'resolve'}
-                          onChange={() => setDecision('resolve')}
-                          className="w-4 h-4 text-emerald-600 accent-emerald-600"
-                        />
-                      </div>
-                      <span className="text-[11px] text-on-surface-variant leading-tight">
-                        Order modified to non-interacting alternative medication.
-                      </span>
-                    </div>
-
-                    {/* Option 3: Prescriber Override */}
-                    <div
-                      onClick={() => setDecision('override')}
-                      className={`relative flex flex-col p-3 rounded-xl border cursor-pointer transition-all ${
-                        decision === 'override'
-                          ? 'border-amber-600 bg-amber-500/10 shadow-xs ring-1 ring-amber-600'
-                          : 'border-surface-container-high bg-surface-container-lowest hover:border-amber-500/40'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-amber-800 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[15px]">gavel</span>
-                          Clinical Override
-                        </span>
-                        <input
-                          type="radio"
-                          name="cds-decision"
-                          checked={decision === 'override'}
-                          onChange={() => setDecision('override')}
-                          className="w-4 h-4 text-amber-600 accent-amber-600"
-                        />
-                      </div>
-                      <span className="text-[11px] text-on-surface-variant leading-tight">
-                        Prescriber accepts risk with documented monitoring rationale.
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Doctor Contact & Regimen Modification Fields */}
-                  <div className="p-4 rounded-xl bg-surface-container-low border border-primary/25 space-y-3">
-                    <div className="flex items-center justify-between pb-1 border-b border-surface-container">
+                    {/* Header with Saved Doctors Suggestions */}
+                    <div className="flex items-center justify-between pb-2 border-b border-surface-container">
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary text-[18px]">person_pin</span>
-                        <span className="text-xs font-bold text-on-surface">Doctor Consultation & Medication Details</span>
+                        <span className="material-symbols-outlined text-primary text-[18px]">forward_to_inbox</span>
+                        <span className="text-xs font-bold text-on-surface">Prescribing Doctor Contact Details</span>
                       </div>
+                      
                       {savedDoctors.length > 0 && (
                         <div className="relative">
                           <button
                             type="button"
-                            onClick={() => setShowDoctorSuggestions(!showDoctorSuggestions)}
-                            className="text-[11px] text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                            onClick={() => setShowDoctorDropdown(!showDoctorDropdown)}
+                            className="text-[11px] text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer bg-primary/10 px-2 py-0.5 rounded-md"
                           >
-                            <span>Saved Doctors ({savedDoctors.length})</span>
+                            <span className="material-symbols-outlined text-[13px]">history_edu</span>
+                            <span>Autofill Saved Doctor ({savedDoctors.length})</span>
                             <span className="material-symbols-outlined text-[14px]">arrow_drop_down</span>
                           </button>
-                          {showDoctorSuggestions && (
-                            <div className="absolute right-0 mt-1 w-64 bg-surface-container-lowest border border-surface-container-high rounded-xl shadow-lg z-20 py-1 text-xs">
-                              <div className="px-3 py-1 font-bold text-[10px] uppercase text-on-surface-variant border-b border-surface-container">
-                                Select Previously Used Doctor
+                          
+                          {showDoctorDropdown && (
+                            <div className="absolute right-0 mt-1.5 w-72 bg-surface-container-lowest border border-surface-container-high rounded-xl shadow-xl z-30 py-1 text-xs">
+                              <div className="px-3 py-1.5 font-bold text-[10px] uppercase text-on-surface-variant border-b border-surface-container">
+                                Click to Autofill Previously Used Doctor
                               </div>
                               {savedDoctors.map((doc) => (
                                 <button
                                   key={doc.id}
                                   type="button"
                                   onClick={() => handleSelectDoctorSuggestion(doc)}
-                                  className="w-full text-left px-3 py-1.5 hover:bg-surface-container flex flex-col transition-colors cursor-pointer"
+                                  className="w-full text-left px-3 py-2 hover:bg-surface-container flex flex-col transition-colors cursor-pointer border-b border-surface-container/50 last:border-b-0"
                                 >
                                   <strong className="text-on-surface">{doc.name}</strong>
-                                  <span className="text-[11px] text-on-surface-variant">{doc.email}</span>
+                                  <span className="text-[11px] text-on-surface-variant font-mono">{doc.email}</span>
                                 </button>
                               ))}
                             </div>
@@ -578,7 +546,7 @@ export default function AlertDetailDrawer({
                       )}
                     </div>
 
-                    {/* Doctor Name and Email inputs */}
+                    {/* Doctor Name and Email inputs (Starts blank, validates on send/submit) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="text-[11px] font-bold text-on-surface block mb-1">
@@ -587,11 +555,20 @@ export default function AlertDetailDrawer({
                         <input
                           type="text"
                           value={doctorName}
-                          onChange={(e) => setDoctorName(e.target.value)}
-                          placeholder="e.g. Dr. Rajiv Mehta, MD"
-                          className="w-full rounded-lg bg-surface-container-lowest border border-outline-variant px-3 py-2 text-xs text-on-surface placeholder:text-outline focus:border-primary focus:outline-none"
+                          onChange={(e) => {
+                            setDoctorName(e.target.value);
+                            if (e.target.value.trim()) setDoctorNameError('');
+                          }}
+                          placeholder="e.g. Dr. A. Sharma"
+                          className={`w-full rounded-lg bg-surface-container-lowest border px-3 py-2 text-xs text-on-surface placeholder:text-outline focus:outline-none transition-all ${
+                            doctorNameError ? 'border-error ring-1 ring-error' : 'border-outline-variant focus:border-primary'
+                          }`}
                         />
+                        {doctorNameError && (
+                          <span className="text-[10px] text-error font-medium block mt-1">{doctorNameError}</span>
+                        )}
                       </div>
+
                       <div>
                         <label className="text-[11px] font-bold text-on-surface block mb-1">
                           Doctor Email Address <span className="text-error">*</span>
@@ -599,19 +576,27 @@ export default function AlertDetailDrawer({
                         <input
                           type="email"
                           value={doctorEmail}
-                          onChange={(e) => setDoctorEmail(e.target.value)}
-                          placeholder="e.g. doctor@hospital.com"
-                          className="w-full rounded-lg bg-surface-container-lowest border border-outline-variant px-3 py-2 text-xs text-on-surface placeholder:text-outline focus:border-primary focus:outline-none font-mono"
+                          onChange={(e) => {
+                            setDoctorEmail(e.target.value);
+                            if (e.target.value.trim()) setDoctorEmailError('');
+                          }}
+                          placeholder="e.g. doctor@clinic.com"
+                          className={`w-full rounded-lg bg-surface-container-lowest border px-3 py-2 text-xs text-on-surface placeholder:text-outline focus:outline-none font-mono transition-all ${
+                            doctorEmailError ? 'border-error ring-1 ring-error' : 'border-outline-variant focus:border-primary'
+                          }`}
                         />
+                        {doctorEmailError && (
+                          <span className="text-[10px] text-error font-medium block mt-1">{doctorEmailError}</span>
+                        )}
                       </div>
                     </div>
 
-                    {/* New Medication / Substituted Medication Input */}
+                    {/* Substituted / New Medication */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[11px] font-bold text-on-surface flex items-center gap-1">
                           <span>Substituted / New Medication</span>
-                          <span className="text-[10px] text-on-surface-variant font-normal">(Changed by Doctor)</span>
+                          <span className="text-[10px] text-on-surface-variant font-normal">(Changed or Advised by Doctor)</span>
                         </label>
                         {alternativeAvailable && (
                           <button
@@ -619,7 +604,7 @@ export default function AlertDetailDrawer({
                             onClick={() => setNewMedication(alternativeAvailable)}
                             className="text-[10px] text-primary font-bold hover:underline"
                           >
-                            Fill with recommended alternative
+                            Reset to recommended alternative
                           </button>
                         )}
                       </div>
@@ -632,27 +617,28 @@ export default function AlertDetailDrawer({
                       />
                     </div>
 
-                    {/* Clinical Rationale Textarea */}
+                    {/* AI-Generated Clinical Memo (Read-Only as requested by user) */}
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] font-bold text-on-surface flex items-center gap-1">
-                          <span>Clinical Consultation Rationale & Prescriber Note</span>
-                          <span className="text-error">*</span>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-bold text-on-surface flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-primary text-[15px]">auto_awesome</span>
+                          <span>AI Clinical Directive for Doctor (Non-Editable)</span>
                         </label>
-                        <span className="text-[10px] text-on-surface-variant">{overrideRationale.length} characters</span>
+                        <span className="text-[10px] text-primary font-semibold bg-primary/10 px-2 py-0.5 rounded">
+                          Generated by AI Engine
+                        </span>
                       </div>
-                      <textarea
-                        rows={2}
-                        value={overrideRationale}
-                        onChange={(e) => setOverrideRationale(e.target.value)}
-                        placeholder="Document clinical consultation notes, doctor recommendations, and substituted medication plan..."
-                        className="w-full rounded-lg bg-surface-container-lowest border border-outline-variant p-2.5 text-xs text-on-surface placeholder:text-outline focus:border-primary focus:outline-none leading-normal"
-                      />
+                      <div className="w-full rounded-lg bg-surface-container-lowest border border-surface-container p-3 text-xs text-on-surface leading-relaxed font-mono whitespace-pre-wrap select-text">
+                        {aiClinicalDirective}
+                      </div>
+                      <span className="text-[10px] text-on-surface-variant block mt-1">
+                        The above clinical memo is locked and automatically formatted to ensure standard medical safety protocol.
+                      </span>
                     </div>
 
-                    {/* Live Email Preview Toggle & Card */}
+                    {/* Live Doctor Email Preview Toggle & Dispatch Action */}
                     <div className="pt-1">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <button
                           type="button"
                           onClick={() => setShowEmailPreview(!showEmailPreview)}
@@ -661,14 +647,14 @@ export default function AlertDetailDrawer({
                           <span className="material-symbols-outlined text-[16px]">
                             {showEmailPreview ? 'visibility_off' : 'visibility'}
                           </span>
-                          <span>{showEmailPreview ? 'Hide Live Doctor Email Preview' : 'Show Live Doctor Email Preview'}</span>
+                          <span>{showEmailPreview ? 'Hide Email Delivery Preview' : 'Show Email Delivery Preview'}</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={handleSendDoctorEmail}
-                          disabled={isSendingEmail || !doctorEmail.trim()}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 transition-all"
+                          disabled={isSendingEmail}
+                          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 transition-all"
                         >
                           {isSendingEmail ? (
                             <>
@@ -678,35 +664,35 @@ export default function AlertDetailDrawer({
                           ) : emailSentSuccess ? (
                             <>
                               <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                              <span>Email Dispatched!</span>
+                              <span>Email Dispatched Successfully!</span>
                             </>
                           ) : (
                             <>
                               <span className="material-symbols-outlined text-[15px]">send</span>
-                              <span>Send Email to Doctor</span>
+                              <span>Send Alert Email to Doctor</span>
                             </>
                           )}
                         </button>
                       </div>
 
+                      {/* Expandable Live Email Preview */}
                       {showEmailPreview && (
                         <div className="mt-2.5 p-3.5 rounded-xl bg-surface-container-lowest border border-primary/30 shadow-xs space-y-2 text-xs">
                           <div className="flex items-center justify-between border-b border-surface-container pb-1.5">
                             <span className="font-bold text-primary flex items-center gap-1">
                               <span className="material-symbols-outlined text-[14px]">mail</span>
-                              Email Template Preview (To Doctor)
+                              Email Template: doctor_medication_change_alert.html
                             </span>
-                            <span className="font-mono text-[10px] text-on-surface-variant">smileclinic-mailer</span>
+                            <span className="font-mono text-[10px] text-on-surface-variant">Smile Clinic Mailer</span>
                           </div>
                           <div className="space-y-1 text-[11px] text-on-surface-variant leading-relaxed">
-                            <div><strong>To:</strong> Dr. {doctorName || 'Prescriber'} &lt;{doctorEmail || 'doctor@email.com'}&gt;</div>
+                            <div><strong>Recipient:</strong> Dr. {doctorName.trim() || '[Doctor Name]'} &lt;{doctorEmail.trim() || '[doctor@email.com]'}&gt;</div>
                             <div><strong>Subject:</strong> Smile Clinic CDS Alert: Prescription Interaction Consultation for {patientName} [{alert.severity.toUpperCase()}]</div>
                             <div><strong>Patient:</strong> {patientName} (MRN: {patientMrn}) | Check #{checkNumber}</div>
                             <div><strong>Interacting Drugs:</strong> <span className="text-error font-semibold">{drugA} ↔ {drugB}</span></div>
-                            <div><strong>Alert:</strong> {alert.title} ({alert.severity})</div>
-                            <div><strong>Substituted Alternative:</strong> <span className="text-emerald-700 font-bold">{newMedication || 'Pending Doctor Selection'}</span></div>
-                            <div className="p-2 rounded bg-surface-container-low border border-surface-container text-on-surface mt-1">
-                              <strong>Clinician Note: </strong>{overrideRationale || 'Please review medication change.'}
+                            <div><strong>Proposed Replacement:</strong> <span className="text-emerald-700 font-bold">{newMedication || alternativeAvailable || 'Safer Therapeutic Alternative'}</span></div>
+                            <div className="p-2 rounded bg-surface-container-low border border-surface-container text-on-surface mt-1 whitespace-pre-wrap font-mono text-[10.5px]">
+                              {aiClinicalDirective}
                             </div>
                             <div className="text-[10px] text-outline pt-1">
                               Dispatched by {loggedClinician} ({loggedEmail}) • Smile Clinic CDS Safety Guard
@@ -731,11 +717,11 @@ export default function AlertDetailDrawer({
                     </div>
                   </div>
 
-                  {/* Drawer Action Footer Buttons */}
-                  <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                  {/* Submit and Save to Database */}
+                  <div className="pt-1 flex flex-col sm:flex-row items-center gap-3">
                     <button
                       type="submit"
-                      disabled={isSubmitting || isSuccess || overrideRationale.trim().length < 10}
+                      disabled={isSubmitting || isSuccess}
                       className={`w-full sm:flex-1 h-11 px-4 rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
                         isSuccess
                           ? 'bg-emerald-600 text-white shadow-emerald-500/20'
@@ -745,17 +731,17 @@ export default function AlertDetailDrawer({
                       {isSuccess ? (
                         <>
                           <span className="material-symbols-outlined text-[18px] text-white">verified</span>
-                          <span>Decision & Regimen Saved to Database!</span>
+                          <span>Regimen Change Saved to Cloud Database!</span>
                         </>
                       ) : isSubmitting ? (
                         <>
                           <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                          <span>Saving to Cloud Database...</span>
+                          <span>Recording Consultation to DB...</span>
                         </>
                       ) : (
                         <>
                           <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
-                          <span>Submit Clinical Review & Save to Database</span>
+                          <span>Sign & Save Consultation to Database</span>
                         </>
                       )}
                     </button>
@@ -780,7 +766,7 @@ export default function AlertDetailDrawer({
                   <span className="text-xs text-on-surface-variant font-medium">Real-Time Database Records</span>
                 </div>
                 <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-surface-container">
-                  {/* Event 1 */}
+                  {/* Event 1: Triggered rule with REAL drug names */}
                   <div className="relative">
                     <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-error-container text-error flex items-center justify-center ring-4 ring-surface-container-lowest">
                       <span className="material-symbols-outlined text-[12px]">warning</span>
@@ -797,7 +783,26 @@ export default function AlertDetailDrawer({
                     </div>
                   </div>
 
-                  {/* Event 2 */}
+                  {/* Event 2: Sent doctor email if triggered */}
+                  {sentEventInfo && (
+                    <div className="relative">
+                      <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center ring-4 ring-surface-container-lowest">
+                        <span className="material-symbols-outlined text-[12px]">send</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-bold text-emerald-800">Doctor Consultation Email Dispatched</span>
+                          <span className="text-outline">•</span>
+                          <span className="font-mono text-on-surface-variant">{sentEventInfo.time}</span>
+                        </div>
+                        <p className="text-xs text-on-surface-variant mt-0.5">
+                          Alert sent to <strong className="text-on-surface">Dr. {sentEventInfo.doctor}</strong> (<span className="font-mono">{sentEventInfo.email}</span>) requesting regimen change.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Event 3: Patient screening context */}
                   <div className="relative">
                     <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant flex items-center justify-center ring-4 ring-surface-container-lowest">
                       <span className="material-symbols-outlined text-[12px]">flag</span>

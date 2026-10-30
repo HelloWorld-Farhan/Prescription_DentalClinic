@@ -323,11 +323,7 @@ export interface SavedDoctorContact {
   lastUsed: number;
 }
 
-const DEFAULT_DOCTORS: SavedDoctorContact[] = [
-  { id: 'doc-1', name: 'Dr. Rajiv Mehta, MD', email: 'dr.rajivmehta@smileclinic.com', specialty: 'General Physician', lastUsed: Date.now() - 86400000 },
-  { id: 'doc-2', name: 'Dr. Anita Verma, MBBS', email: 'dr.anitaverma@smileclinic.com', specialty: 'Internal Medicine Lead', lastUsed: Date.now() - 172800000 },
-  { id: 'doc-3', name: 'Dr. Sanjeev Saxena, MDS', email: 'support.smileclinic@gmail.com', specialty: 'Oral & Maxillofacial Surgeon', lastUsed: Date.now() - 3600000 },
-];
+const DEFAULT_DOCTORS: SavedDoctorContact[] = [];
 
 export function getSavedDoctors(userEmail?: string): SavedDoctorContact[] {
   if (typeof window === 'undefined') return DEFAULT_DOCTORS;
