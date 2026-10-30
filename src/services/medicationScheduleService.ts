@@ -460,6 +460,7 @@ export async function dispatchDoctorConsultEmail(payload: {
       to: cleanDocEmail,
       subject: `Smile Clinic CDS Alert: Prescription Interaction Consultation for ${payload.patient_name} [${payload.severity.toUpperCase()}]`,
       html: directHtml,
+      htmlBody: directHtml,
       text: `Smile Clinic CDS Alert for ${payload.patient_name}: Interaction detected for ${drugPair}. Please review portal.`,
     };
 

@@ -130,8 +130,17 @@ export default function Alerts() {
   };
 
   const handleOverride = (alertId: string, reason: string) => {
-    if (activeDrawerCheckId) {
-      VirtualDb.overrideAlert(activeDrawerCheckId, alertId, reason, getActiveClinicianName());
+    let targetCheckId = activeDrawerCheckId;
+    if (!targetCheckId) {
+      const allChecks = VirtualDb.getChecks();
+      const parent = allChecks.find((c) =>
+        (c.alerts || []).some((a) => a.id === alertId || a.title === alertId)
+      );
+      if (parent) targetCheckId = parent.id;
+    }
+
+    if (targetCheckId) {
+      VirtualDb.overrideAlert(targetCheckId, alertId, reason, getActiveClinicianName());
       setChecks([...VirtualDb.getChecks()]);
       setActiveDrawerAlert(null);
       showConfirmation('Clinical decision signed & recorded into HIPAA audit trail', 'success');
