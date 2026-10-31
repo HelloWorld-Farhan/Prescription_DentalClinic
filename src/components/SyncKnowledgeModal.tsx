@@ -44,6 +44,7 @@ export default function SyncKnowledgeModal({
   // Multi-KB profiles and currently configured slot
   const [multiKbs, setMultiKbs] = useState<KnowledgeBaseProfile[]>([]);
   const [selectedKbId, setSelectedKbId] = useState<string>('kb-1');
+  const [kbName, setKbName] = useState<string>('');
 
   // Syncable items list and selection
   const [items, setItems] = useState<SyncableItem[]>([]);
@@ -66,6 +67,8 @@ export default function SyncKnowledgeModal({
       ? targetKbId
       : state.activeKbId;
     setSelectedKbId(initialKbId);
+    const initialProfile = state.knowledgeBases.find(k => k.id === initialKbId);
+    setKbName(initialProfile?.name || '');
 
     const loadedItems: SyncableItem[] = [];
 
@@ -151,6 +154,9 @@ export default function SyncKnowledgeModal({
     if (isSyncing) return;
     setSelectedKbId(kbId);
     const targetKb = multiKbs.find((k) => k.id === kbId);
+    if (targetKb) {
+      setKbName(targetKb.name);
+    }
     if (targetKb && targetKb.selection && targetKb.selection.length > 0) {
       const validSet = new Set(targetKb.selection.filter((id) => items.some((i) => i.id === id)));
       setSelectedIds(validSet);
@@ -236,10 +242,11 @@ export default function SyncKnowledgeModal({
     });
 
     const targetKbName = multiKbs.find((k) => k.id === selectedKbId)?.name || 'Knowledge Base';
+    const trimmedName = kbName.trim() || targetKbName;
 
     setIsSyncing(true);
     setSyncProgress(25);
-    setActiveStepText(`Validating ${selectedIds.size} selected sources for ${targetKbName}...`);
+    setActiveStepText(`Validating ${selectedIds.size} selected sources for ${trimmedName}...`);
 
     setTimeout(() => {
       setSyncProgress(60);
@@ -249,7 +256,7 @@ export default function SyncKnowledgeModal({
 
     setTimeout(() => {
       setSyncProgress(85);
-      setActiveStepText(`Injecting knowledge sources into "${targetKbName}"...`);
+      setActiveStepText(`Injecting knowledge sources into "${trimmedName}"...`);
     }, 1200);
 
     setTimeout(() => {
@@ -259,8 +266,9 @@ export default function SyncKnowledgeModal({
 
       const selectionArray = Array.from(selectedIds);
 
-      // Save into the targeted Knowledge Base profile
+      // Save into the targeted Knowledge Base profile with user-provided name
       saveKnowledgeBase(selectedKbId, {
+        name: trimmedName,
         selection: selectionArray,
         docs: selectedDocs,
         checks: selectedChecks,
@@ -269,7 +277,7 @@ export default function SyncKnowledgeModal({
       });
 
       showConfirmation(
-        `Synchronized ${selectedDocs.length} history documents and ${selectedChecks.length} prior prescriptions into "${targetKbName}"`,
+        `Synchronized ${selectedDocs.length} history documents and ${selectedChecks.length} prior prescriptions into "${trimmedName}"`,
         'success'
       );
 
@@ -366,6 +374,25 @@ export default function SyncKnowledgeModal({
                   );
                 })}
               </div>
+            </div>
+
+            {/* Knowledge Base Name Customization Field */}
+            <div className="pt-2 pb-1 shrink-0">
+              <label className="flex items-center justify-between text-xs font-semibold text-on-surface-variant mb-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-primary">badge</span>
+                  <span>Knowledge Base Name:</span>
+                </span>
+                <span className="text-[10px] text-emerald-600 font-medium">Saves to DB & syncs to all devices</span>
+              </label>
+              <input
+                type="text"
+                disabled={isSyncing}
+                value={kbName}
+                onChange={(e) => setKbName(e.target.value)}
+                placeholder="Enter Knowledge Base Name (e.g. Pediatric & Geriatric Safety)"
+                className="w-full text-xs font-bold px-3 py-2 rounded-xl border border-surface-container-high bg-surface-container-low text-on-surface focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-colors shadow-2xs"
+              />
             </div>
 
             {/* Category Filter Pills & Select All Row */}

@@ -9,7 +9,7 @@ import CameraCaptureModal from '../components/CameraCaptureModal';
 import ClinicalInquiriesModal from '../components/ClinicalInquiriesModal';
 
 import MinimalExtractionOverlay from '../components/MinimalExtractionOverlay';
-import { uploadToR2, deleteDocumentRecord, saveDocumentRecord } from '../services/r2StorageService';
+import { uploadToR2, deleteDocumentRecord, saveDocumentRecord, getDocumentHistory } from '../services/r2StorageService';
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
 import { executePrescriptionSafetyCheck } from '../services/cloudSyncService';
@@ -17,6 +17,7 @@ import {
   getMultiKnowledgeBaseState,
   getActiveKnowledgeBase,
   setActiveKnowledgeBase,
+  getRulesForKnowledgeBase,
   MultiKnowledgeBaseState,
   KnowledgeBaseProfile,
 } from '../services/knowledgeBaseService';
@@ -288,6 +289,7 @@ export default function NewCheck() {
   const [syncedDocs, setSyncedDocs] = useState<string[]>(() => activeKb.docs || []);
   const [syncedChecks, setSyncedChecks] = useState<string[]>(() => activeKb.checks || []);
   const [syncedConditions, setSyncedConditions] = useState<string[]>(() => activeKb.conditions || []);
+  const [isKbRulesExpanded, setIsKbRulesExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     const handleSyncUpdate = () => {
@@ -321,6 +323,17 @@ export default function NewCheck() {
       showConfirmation(`Prescription AI safety check context switched to "${switched.name}"`, 'success');
     }
   };
+
+  const activeKbRules = useMemo(() => {
+    try {
+      const allRules = VirtualDb.getRules();
+      const allDocs = getDocumentHistory();
+      const allChecks = VirtualDb.getChecks();
+      return getRulesForKnowledgeBase(activeKb, allRules, allDocs, allChecks);
+    } catch {
+      return [];
+    }
+  }, [activeKb, syncedDocs, syncedChecks, syncedConditions]);
 
   // Modal State for inspecting individual allergy safety details
   const [inspectingAllergy, setInspectingAllergy] = useState<string | null>(null);
@@ -2292,6 +2305,73 @@ export default function NewCheck() {
                     <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20">
                       +{syncedChecks.length} prior check{syncedChecks.length === 1 ? '' : 's'}
                     </span>
+                  )}
+                </div>
+
+                {/* View Enforced Rules in Active Knowledge Base Dropdown / Expander */}
+                <div className="pt-1.5 border-t border-primary/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsKbRulesExpanded(!isKbRulesExpanded)}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary hover:text-primary-hover transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">
+                      {isKbRulesExpanded ? 'expand_less' : 'expand_more'}
+                    </span>
+                    <span>
+                      {isKbRulesExpanded ? 'Hide Enforced Rules' : `View All Enforced Rules (${activeKbRules.length})`}
+                    </span>
+                  </button>
+
+                  {isKbRulesExpanded && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-surface-container-lowest border border-primary/20 space-y-2 max-h-60 overflow-y-auto">
+                      {activeKbRules.length === 0 ? (
+                        <p className="text-xs text-outline italic text-center py-2">
+                          No specific rules active in &ldquo;{activeKb.name}&rdquo;. Synchronize sources in History &amp; Data to import rules.
+                        </p>
+                      ) : (
+                        activeKbRules.map((kr, idx) => {
+                          const r = kr.rule;
+                          return (
+                            <div
+                              key={r.id || idx}
+                              className="p-2.5 rounded-lg bg-surface-container-low border border-surface-container flex flex-col gap-1 text-xs"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-bold text-on-surface">
+                                  {r.drugA} {r.drugB ? `↔ ${r.drugB}` : ''}
+                                </span>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                    r.severity === 'contraindicated'
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : r.severity === 'major'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-blue-100 text-blue-800'
+                                  }`}
+                                >
+                                  {r.severity}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-on-surface-variant line-clamp-2">
+                                {r.description}
+                              </p>
+                              {kr.pdfUrl && (
+                                <a
+                                  href={kr.pdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-primary hover:underline self-start mt-0.5"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">picture_as_pdf</span>
+                                  <span>View PDF ({kr.sourceDoc?.filename || r.sourceFile || 'Source'})</span>
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
