@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authApi } from '../services/authApi';
+import { Spinner } from '../components/Spinner';
 import { signInWithGooglePopup } from '../services/firebase';
 import AvatarCropModal from '../components/AvatarCropModal';
 import { showConfirmation } from '../services/confirmation';
@@ -1339,7 +1340,7 @@ export default function Settings() {
                   >
                     {isSendingPasswordOtp ? (
                       <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <Spinner size="sm" color="text-white" />
                         <span>
                           {verificationMethod === 'email'
                             ? 'Sending OTP Passcode...'
@@ -1461,7 +1462,7 @@ export default function Settings() {
                     >
                       {isSavingPassword ? (
                         <>
-                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          <Spinner size="sm" color="text-white" />
                           <span>Updating Password in Database...</span>
                         </>
                       ) : (
@@ -2306,7 +2307,7 @@ export default function Settings() {
                   >
                     {isOtpVerifying ? (
                       <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <Spinner size="sm" color="text-white" />
                         <span>Validating Token...</span>
                       </>
                     ) : (

@@ -7,6 +7,7 @@ import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import { authApi } from '../services/authApi';
 import { recordLoginEvent } from '../services/sessionAudit';
 import { signInWithGooglePopup } from '../services/firebase';
+import { Spinner } from '../components/Spinner';
 
 export interface RegisteredPrescriber {
   fullName: string;
@@ -745,15 +746,15 @@ export default function Signup() {
                     whileTap={{ scale: isSubmitting ? 1 : 0.985 }}
                     type="submit"
                     disabled={isSubmitting}
-                    className={`w-full py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 shadow-md transition-all cursor-pointer ${
+                    className={`w-full py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 shadow-md transition-all select-none ${
                       isSubmitting
-                        ? 'bg-primary/80 text-white cursor-wait opacity-90'
-                        : 'bg-primary hover:bg-primary-hover text-white hover:shadow-lg'
+                        ? 'bg-primary/90 text-white cursor-wait shadow-sm opacity-95'
+                        : 'bg-primary hover:bg-primary-hover text-white hover:shadow-lg cursor-pointer'
                     }`}
                   >
                     {isSubmitting ? (
                       <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <Spinner size="sm" color="text-white" />
                         <span>Authenticating &amp; Sending Verification Code...</span>
                       </>
                     ) : (
@@ -789,7 +790,7 @@ export default function Signup() {
                   >
                     {isGoogleLoading ? (
                       <>
-                        <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+                        <Spinner size="sm" color="text-primary" />
                         <span>Connecting with Google...</span>
                       </>
                     ) : (
@@ -954,7 +955,10 @@ export default function Signup() {
                     className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
                   >
                     {isVerifying ? (
-                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <>
+                        <Spinner size="sm" color="text-white" />
+                        <span>Verifying &amp; Activating Account...</span>
+                      </>
                     ) : (
                       <>
                         <span className="material-symbols-outlined text-[16px]">verified_user</span>

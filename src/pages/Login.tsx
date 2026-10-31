@@ -8,6 +8,7 @@ import AuthInfoPanel from '../components/AuthInfoPanel';
 import { authApi } from '../services/authApi';
 import { recordLoginEvent } from '../services/sessionAudit';
 import { signInWithGooglePopup } from '../services/firebase';
+import { Spinner } from '../components/Spinner';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -688,15 +689,15 @@ export default function Login() {
                         whileHover={!isLoading ? { scale: 1.015, y: -1 } : {}}
                         whileTap={!isLoading ? { scale: 0.985 } : {}}
                         disabled={isLoading}
-                        className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 select-none ${
+                        className={`w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 transition-all duration-200 select-none ${
                           !isLoading
                             ? 'bg-primary hover:bg-primary-hover text-white shadow-md hover:shadow-lg cursor-pointer'
-                            : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
+                            : 'bg-primary/90 text-white shadow-md cursor-wait opacity-95'
                         }`}
                       >
                         {isLoading ? (
                           <>
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0"></span>
+                            <Spinner size="sm" color="text-white" />
                             <span>Authenticating...</span>
                           </>
                         ) : (
@@ -732,7 +733,7 @@ export default function Login() {
                       >
                         {isGoogleLoading ? (
                           <>
-                            <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+                            <Spinner size="sm" color="text-primary" />
                             <span>Connecting with Google...</span>
                           </>
                         ) : (
@@ -896,7 +897,7 @@ export default function Login() {
                       className="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
                     >
                       {isResendingLoginOtp && (
-                        <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+                        <Spinner size="xs" color="text-primary" />
                       )}
                       <span>{isResendingLoginOtp ? 'Sending OTP...' : 'Resend Code'}</span>
                     </button>
@@ -918,7 +919,7 @@ export default function Login() {
                   >
                     {isVerifyingLoginOtp ? (
                       <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0"></span>
+                        <Spinner size="sm" color="text-white" />
                         <span>Verifying...</span>
                       </>
                     ) : (

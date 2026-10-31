@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Spinner } from './Spinner';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import OtpVerificationInput from './OtpVerificationInput';
@@ -473,7 +474,7 @@ export default function ForgotPasswordModal({
                   >
                     {isSubmitting ? (
                       <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <Spinner size="sm" color="text-white" />
                         <span>{method === 'email' ? 'Sending OTP Code...' : 'Verifying Identity...'}</span>
                       </>
                     ) : (
@@ -629,7 +630,10 @@ export default function ForgotPasswordModal({
                     className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
                   >
                     {isSubmitting ? (
-                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <>
+                        <Spinner size="sm" color="text-white" />
+                        <span>Validating OTP Code...</span>
+                      </>
                     ) : (
                       <>
                         <span>Confirm &amp; Proceed</span>
@@ -753,7 +757,10 @@ export default function ForgotPasswordModal({
                     className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     {isSubmitting ? (
-                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <>
+                        <Spinner size="sm" color="text-white" />
+                        <span>Updating Prescriber Password...</span>
+                      </>
                     ) : (
                       <>
                         <span className="material-symbols-outlined text-[16px]">save</span>

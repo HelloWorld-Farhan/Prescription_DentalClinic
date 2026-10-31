@@ -88,9 +88,9 @@ textarea,
   animation: modernFadeIn 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Reduced Motion Clinical Accessibility Rule (exempting critical loaders) */
+/* Reduced Motion Clinical Accessibility Rule (exempting critical loaders and spinners) */
 @media (prefers-reduced-motion: reduce) {
-  *:not(.saving-spinner):not(.saving-spinner *) {
+  *:not(.saving-spinner):not(.saving-spinner *):not(.animate-spin):not(.animate-spin *) {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -98,9 +98,11 @@ textarea,
 }
 
 /* Force 60fps Spinner for Cloudflare R2 and Async Operations */
-.saving-spinner {
+.saving-spinner,
+.animate-spin {
   animation: forceSpinAlways 0.75s linear infinite !important;
   transform-origin: center center;
+  will-change: transform;
 }
 @keyframes forceSpinAlways {
   0% { transform: rotate(0deg); }
