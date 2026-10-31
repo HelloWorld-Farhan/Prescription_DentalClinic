@@ -612,13 +612,6 @@ export default function Layout() {
 
   const handleLogout = async () => {
     try {
-      const email = authApi.getCurrentUser()?.email;
-      const deviceId = getDeviceId();
-      if (email && deviceId) {
-        await authApi.revokeSession(email, deviceId);
-      }
-    } catch {}
-    try {
       localStorage.removeItem('smileclinic_remembered_email');
       sessionStorage.clear();
     } catch {}

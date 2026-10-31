@@ -47,13 +47,13 @@ export default function Login() {
   useEffect(() => {
     setClinicalId('');
     setPassword('');
-    setRememberDevice(false);
+    setRememberDevice(true);
   }, []);
   const [clinicalIdTouched, setClinicalIdTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [authorizedConfirmation, setAuthorizedConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(() => {
     const revoked = sessionStorage.getItem('smileclinic_session_revoked_flash');
