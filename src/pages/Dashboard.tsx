@@ -431,24 +431,21 @@ export default function Dashboard() {
 
 
 
-  const handleBatchSync = useCallback(() => {
-
+  const handleBatchSync = useCallback(async () => {
     if (isBatchSyncing) return;
-
     setIsBatchSyncing(true);
-
     showConfirmation('Connecting to EHR Gateway & reconciling FHIR v4 patient records...', 'info', 1500);
-
-    setTimeout(() => {
-
+    try {
+      await pullFromCloud();
       setChecks(VirtualDb.getChecks());
-
-      setIsBatchSyncing(false);
-
+      setRules(VirtualDb.getRules());
+      setAuditLogs(VirtualDb.getAuditLogs());
       showConfirmation('Batch EHR synchronization complete: all clinical records verified.', 'success');
-
-    }, 1200);
-
+    } catch {
+      showConfirmation('Batch EHR sync encountered an issue; cached records active.', 'warning');
+    } finally {
+      setIsBatchSyncing(false);
+    }
   }, [isBatchSyncing]);
 
 

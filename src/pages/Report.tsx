@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, formatISTDateTime } from '../services/prescriptionService';
 import { SafetyCheckRecord } from '../types';
-import { getClinicianEmail } from '../services/cloudSyncService';
+import { getClinicianEmail, pullFromCloud } from '../services/cloudSyncService';
 import { showConfirmation } from '../services/confirmation';
 import { API_BASE_URL } from '../config/api';
 
@@ -33,7 +33,29 @@ export default function Report() {
   const { id: routeId } = useParams();
 
   const checkId = routeId || searchParams.get('id') || searchParams.get('checkId');
-  const checks = VirtualDb.getChecks();
+  const [checks, setChecks] = useState<SafetyCheckRecord[]>(() => VirtualDb.getChecks());
+  const [isLoadingFromCloud, setIsLoadingFromCloud] = useState<boolean>(() => VirtualDb.getChecks().length === 0);
+
+  useEffect(() => {
+    let isMounted = true;
+    pullFromCloud().then(() => {
+      if (!isMounted) return;
+      setChecks(VirtualDb.getChecks());
+      setIsLoadingFromCloud(false);
+    }).catch(() => {
+      if (isMounted) setIsLoadingFromCloud(false);
+    });
+
+    const handleSync = () => {
+      setChecks(VirtualDb.getChecks());
+    };
+    window.addEventListener('smileclinic_checks_updated', handleSync);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('smileclinic_checks_updated', handleSync);
+    };
+  }, []);
+
   const currentCheck: SafetyCheckRecord | undefined =
     checks.find((c) => c.id === checkId || c.checkNumber === checkId) ||
     (checkId ? undefined : checks[0]);

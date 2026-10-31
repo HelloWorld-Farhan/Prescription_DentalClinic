@@ -398,19 +398,15 @@ export function formatISTTime(timestampOrDate: number | string | Date = Date.now
 import { Patient, SafetyCheckRecord, AuditLogEntry, DrugInteractionAlert, PrescriptionItem, InteractionRule } from '../types';
 
 import {
-
   syncCheckToCloud,
-
+  deleteCheckFromCloud,
+  clearAllChecksFromCloud,
   syncAuditLogToCloud,
-
+  deleteAuditLogFromCloud,
   syncRuleToCloud,
-
   deleteRuleFromCloud,
-
   toggleRuleInCloud,
-
   deleteRulesBySourceFromCloud,
-
 } from './cloudSyncService';
 
 
@@ -830,6 +826,7 @@ export class ClinicalDecisionSupport {
 
   static deleteCheck(id: string): SafetyCheckRecord[] {
     _cachedChecks = _cachedChecks.filter(c => c.id !== id && c.checkNumber !== id);
+    deleteCheckFromCloud(id);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
     }
@@ -838,9 +835,19 @@ export class ClinicalDecisionSupport {
 
   static clearChecks() {
     _cachedChecks = [];
+    clearAllChecksFromCloud();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
     }
+  }
+
+  static deleteAuditLog(id: string): AuditLogEntry[] {
+    _cachedAuditLogs = _cachedAuditLogs.filter(a => a.id !== id);
+    deleteAuditLogFromCloud(id);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smileclinic_audit_updated'));
+    }
+    return _cachedAuditLogs;
   }
 
   static updateCheck(id: string, updates: Partial<SafetyCheckRecord>) {

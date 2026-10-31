@@ -192,8 +192,12 @@ export async function pullFromCloud(): Promise<boolean> {
             sourceType: c.sourceType || c.source_type,
             digitalSeal: c.digitalSeal,
             fhirSynced: !!c.fhirSynced,
+            wordUrl: c.wordUrl,
+            csvUrl: c.csvUrl,
             questions: c.questions || [],
-            questionAnswers: c.questionAnswers || [],
+            questionAnswers: c.questionAnswers || c.inquiryAnswers || c.clinicalInquiries || [],
+            inquiryAnswers: c.inquiryAnswers || c.questionAnswers || c.clinicalInquiries || [],
+            patientVitals: c.patientVitals || {},
           };
         });
         PrescriptionStorage.setChecks(mappedChecks);
@@ -359,6 +363,43 @@ export async function pullFromCloud(): Promise<boolean> {
           }
         } catch (e) {
           console.warn('[CloudSync] Failed to reconcile alert settings state', e);
+        }
+      }
+
+      // 9. Reconcile Synced Knowledge & Medical History Source Selection
+      if (data.syncedKnowledge && typeof data.syncedKnowledge === 'object') {
+        try {
+          const sk = data.syncedKnowledge;
+          if (Array.isArray(sk.selection)) {
+            localStorage.setItem('smileclinic_synced_knowledge_selection', JSON.stringify(sk.selection));
+          }
+          if (Array.isArray(sk.docs)) {
+            localStorage.setItem('smileclinic_synced_active_docs', JSON.stringify(sk.docs));
+          }
+          if (Array.isArray(sk.checks)) {
+            localStorage.setItem('smileclinic_synced_active_checks', JSON.stringify(sk.checks));
+          }
+          if (Array.isArray(sk.rules)) {
+            localStorage.setItem('smileclinic_synced_active_rules', JSON.stringify(sk.rules));
+          }
+          if (Array.isArray(sk.conditions)) {
+            localStorage.setItem('smileclinic_synced_active_conditions', JSON.stringify(sk.conditions));
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('smileclinic_knowledge_synced', {
+                detail: {
+                  selection: sk.selection || [],
+                  docs: sk.docs || [],
+                  checks: sk.checks || [],
+                  rules: sk.rules || [],
+                  conditions: sk.conditions || [],
+                },
+              })
+            );
+          }
+        } catch (e) {
+          console.warn('[CloudSync] Failed to reconcile synced knowledge state', e);
         }
       }
 
