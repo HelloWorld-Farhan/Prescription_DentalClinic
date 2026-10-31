@@ -5,6 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, AlertSeverity, PrescriptionItem } from '../types';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
+import {
+  getMultiKnowledgeBaseState,
+  getActiveKnowledgeBase,
+  setActiveKnowledgeBase,
+  clearKnowledgeBase,
+  renameKnowledgeBase,
+  MultiKnowledgeBaseState,
+  KnowledgeBaseProfile,
+} from '../services/knowledgeBaseService';
 import { showConfirmation } from '../services/confirmation';
 import CustomDropdown from '../components/CustomDropdown';
 import CameraCaptureModal from '../components/CameraCaptureModal';
@@ -114,6 +123,10 @@ export default function RulesAdmin() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [syncStatusText, setSyncStatusText] = useState('');
   const [lastSyncText, setLastSyncText] = useState<string>(() => getRelativeSyncText());
+  const [multiKbState, setMultiKbState] = useState<MultiKnowledgeBaseState>(() => getMultiKnowledgeBaseState());
+  const [targetSyncKbId, setTargetSyncKbId] = useState<string>('kb-1');
+  const [editingKbId, setEditingKbId] = useState<string | null>(null);
+  const [editingKbName, setEditingKbName] = useState<string>('');
   const [syncedKnowledge, setSyncedKnowledge] = useState<{
     selection: string[];
     docs: string[];
@@ -213,15 +226,14 @@ export default function RulesAdmin() {
     };
     const handleKnowledgeSync = () => {
       try {
-        const rawSel = localStorage.getItem('smileclinic_synced_knowledge_selection');
-        const rawDocs = localStorage.getItem('smileclinic_synced_active_docs');
-        const rawChecks = localStorage.getItem('smileclinic_synced_active_checks');
-        const rawConds = localStorage.getItem('smileclinic_synced_active_conditions');
+        const freshState = getMultiKnowledgeBaseState();
+        setMultiKbState(freshState);
+        const active = freshState.knowledgeBases.find((k) => k.id === freshState.activeKbId) || freshState.knowledgeBases[0];
         setSyncedKnowledge({
-          selection: rawSel ? JSON.parse(rawSel) : [],
-          docs: rawDocs ? JSON.parse(rawDocs) : [],
-          checks: rawChecks ? JSON.parse(rawChecks) : [],
-          conditions: rawConds ? JSON.parse(rawConds) : [],
+          selection: active.selection || [],
+          docs: active.docs || [],
+          checks: active.checks || [],
+          conditions: active.conditions || [],
         });
       } catch {}
     };
@@ -1236,151 +1248,336 @@ export default function RulesAdmin() {
         </div>
       )}
 
-      {/* TAB 3: KNOWLEDGE SOURCES */}
-      {activeTab === 'knowledge' && (
-        <div className="flex flex-col gap-5">
-          {/* Metrics bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <span className="material-symbols-outlined text-[22px]">account_tree</span>
-              </div>
-              <div>
-                <span className="text-lg font-bold text-on-surface block leading-tight">{totalSyncedKnowledgeCount}</span>
-                <span className="text-xs text-outline">Active Knowledge Sources</span>
-              </div>
-            </div>
+      {/* TAB 3: KNOWLEDGE SOURCES (MULTI-PROFILE KNOWLEDGE BASES) */}
+      {activeTab === 'knowledge' && (() => {
+        const activeKb = multiKbState.knowledgeBases.find((k) => k.id === multiKbState.activeKbId) || multiKbState.knowledgeBases[0];
+        const activeTotalSources = (activeKb.docs?.length || 0) + (activeKb.checks?.length || 0);
 
-            <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[22px]">healing</span>
-              </div>
-              <div>
-                <span className="text-lg font-bold text-emerald-800 block leading-tight">{syncedKnowledge.conditions.length}</span>
-                <span className="text-xs text-outline">Clinical Conditions &amp; Rules Active</span>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[22px]">receipt_long</span>
-              </div>
-              <div>
-                <span className="text-lg font-bold text-teal-800 block leading-tight">{syncedKnowledge.checks.length}</span>
-                <span className="text-xs text-outline">Prior Prescription Regimens Enforced</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Knowledge Sources Dashboard Card */}
-          <div className="bg-surface-container-lowest rounded-2xl shadow-xs border border-surface-container-high/60 overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-surface-container flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <h3 className="text-sm font-bold text-on-surface">Active Prescription AI Knowledge Context</h3>
+        return (
+          <div className="flex flex-col gap-6">
+            {/* Top Metrics Bar for Active Selected Knowledge Base */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[22px]">account_tree</span>
                 </div>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  The clinical conditions and prior prescription regimens currently selected to evaluate safety checks.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsSyncModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary-hover transition-colors cursor-pointer self-start sm:self-center"
-              >
-                <span className="material-symbols-outlined text-[16px]">sync</span>
-                <span>Synchronize Knowledge Base</span>
-              </button>
-            </div>
-
-            {totalSyncedKnowledgeCount === 0 ? (
-              <div className="p-12 flex flex-col items-center justify-center text-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-surface-container text-outline flex items-center justify-center shadow-xs">
-                  <span className="material-symbols-outlined text-3xl">account_tree</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base font-bold text-on-surface truncate block leading-tight">
+                      {activeKb.name}
+                    </span>
+                  </div>
+                  <span className="text-xs text-primary font-medium flex items-center gap-1 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    Enforced in AI Safety Checks
+                  </span>
                 </div>
-                <h4 className="text-sm font-bold text-on-surface">0 Knowledge Sources Synchronized</h4>
-                <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
-                  No active clinical history or prescription regimens have been synchronized into the AI engine. Click below to select which conditions (e.g. Kidney, Liver) and prior prescriptions to feed into the Safety Checker.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setIsSyncModalOpen(true)}
-                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover"
-                >
-                  <span className="material-symbols-outlined text-[16px]">sync</span>
-                  <span>Synchronize Knowledge Base</span>
-                </button>
               </div>
-            ) : (
-              <div className="p-4 sm:p-6 flex flex-col gap-5">
-                {/* Active Clinical Conditions */}
+
+              <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[22px]">healing</span>
+                </div>
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-outline mb-2.5 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px] text-emerald-600">medical_services</span>
-                    <span>Synchronized Clinical Conditions ({syncedKnowledge.conditions.length})</span>
-                  </h4>
-                  {syncedKnowledge.conditions.length === 0 ? (
-                    <p className="text-xs text-outline italic">No medical conditions currently selected.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {syncedKnowledge.conditions.map((cond, idx) => (
-                        <div
-                          key={`cond-${idx}`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                          <span>{cond}</span>
-                          <span className="text-[10px] text-emerald-600 font-normal">Active in AI</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <span className="text-lg font-bold text-emerald-800 block leading-tight">
+                    {activeKb.conditions?.length || 0}
+                  </span>
+                  <span className="text-xs text-outline">Clinical Conditions in Active KB</span>
                 </div>
+              </div>
 
-                {/* Active Prior Prescription Regimens */}
+              <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-xs flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[22px]">receipt_long</span>
+                </div>
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-outline mb-2.5 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px] text-teal-600">fact_check</span>
-                    <span>Synchronized Prescription Regimens ({syncedKnowledge.checks.length})</span>
-                  </h4>
-                  {syncedKnowledge.checks.length === 0 ? (
-                    <p className="text-xs text-outline italic">No prior prescriptions currently selected.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {syncedKnowledge.checks.map((chkId, idx) => {
-                        const check = VirtualDb.getCheckById(chkId);
-                        const label = check ? `Prescription #${check.checkNumber || check.id} — ${check.patientName}` : `Prescription Check #${chkId}`;
-                        return (
-                          <div
-                            key={`chk-${idx}`}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-xs font-bold text-teal-800"
+                  <span className="text-lg font-bold text-teal-800 block leading-tight">
+                    {activeKb.checks?.length || 0}
+                  </span>
+                  <span className="text-xs text-outline">Prior Regimens in Active KB</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3 Configured Knowledge Base Profiles */}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-on-surface flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[20px]">dataset</span>
+                    <span>Clinician Knowledge Base Profiles (3 Presets)</span>
+                  </h3>
+                  <p className="text-xs text-on-surface-variant">
+                    Select <strong>one active knowledge base</strong> to enforce during Prescription AI Safety Checks. You can customize, synchronize, or clear each one independently.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {multiKbState.knowledgeBases.map((kb, idx) => {
+                  const isActive = kb.id === multiKbState.activeKbId;
+                  const totalSources = (kb.docs?.length || 0) + (kb.checks?.length || 0) + (kb.rules?.length || 0);
+                  const isEditingThis = editingKbId === kb.id;
+
+                  return (
+                    <div
+                      key={kb.id}
+                      className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                        isActive
+                          ? 'bg-primary/5 border-primary shadow-sm ring-1 ring-primary/30'
+                          : 'bg-surface-container-lowest border-surface-container-high/70 hover:border-outline/40 shadow-xs'
+                      }`}
+                    >
+                      {/* Card Top Row: Badge & Active Selection */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-surface-container text-on-surface-variant">
+                          Slot {idx + 1}
+                        </span>
+                        {isActive ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Active in AI Check
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextState = setActiveKnowledgeBase(kb.id);
+                              setMultiKbState(nextState);
+                              showConfirmation(`"${kb.name}" is now the active Knowledge Base for AI Safety Checks`, 'success');
+                            }}
+                            className="text-[11px] font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
                           >
-                            <span className="material-symbols-outlined text-[14px]">receipt_long</span>
-                            <span>{label}</span>
-                            <span className="text-[10px] text-teal-600 font-normal">Cross-Screened</span>
+                            <span>Select to Use</span>
+                            <span className="material-symbols-outlined text-[14px]">radio_button_unchecked</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Title & Description */}
+                      <div>
+                        {isEditingThis ? (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <input
+                              type="text"
+                              value={editingKbName}
+                              onChange={(e) => setEditingKbName(e.target.value)}
+                              className="text-xs font-bold px-2 py-1 rounded-lg border border-primary text-on-surface bg-surface-container-lowest w-full focus:outline-none"
+                              placeholder="Knowledge Base Name"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editingKbName.trim()) {
+                                  const nextState = renameKnowledgeBase(kb.id, editingKbName.trim());
+                                  setMultiKbState(nextState);
+                                  showConfirmation(`Renamed to "${editingKbName.trim()}"`, 'success');
+                                }
+                                setEditingKbId(null);
+                              }}
+                              className="p-1 rounded bg-primary text-white text-xs font-bold cursor-pointer hover:bg-primary-hover"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">check</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingKbId(null)}
+                              className="p-1 rounded bg-surface-container text-outline text-xs font-bold cursor-pointer hover:text-on-surface"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">close</span>
+                            </button>
                           </div>
-                        );
-                      })}
+                        ) : (
+                          <div className="flex items-center justify-between gap-1 group">
+                            <h4 className="text-sm font-bold text-on-surface line-clamp-1">{kb.name}</h4>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingKbId(kb.id);
+                                setEditingKbName(kb.name);
+                              }}
+                              className="text-outline hover:text-primary transition-colors p-1 rounded-md opacity-60 hover:opacity-100 cursor-pointer"
+                              title="Rename Knowledge Base"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">edit</span>
+                            </button>
+                          </div>
+                        )}
+                        <p className="text-xs text-outline line-clamp-2 mt-1">{kb.description}</p>
+                      </div>
+
+                      {/* Counts */}
+                      <div className="flex items-center gap-2 text-xs text-on-surface-variant pt-1 border-t border-surface-container-high/50">
+                        <span className="font-semibold text-on-surface">{kb.docs?.length || 0}</span> History Docs •{' '}
+                        <span className="font-semibold text-on-surface">{kb.checks?.length || 0}</span> Prior Regimens
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetSyncKbId(kb.id);
+                            setIsSyncModalOpen(true);
+                          }}
+                          className="flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-colors flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">sync</span>
+                          <span>Sync Sources</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={totalSources === 0}
+                          onClick={() => {
+                            const nextState = clearKnowledgeBase(kb.id);
+                            setMultiKbState(nextState);
+                            showConfirmation(`Cleared all knowledge sources from "${kb.name}"`, 'info');
+                          }}
+                          className="py-1.5 px-2.5 rounded-xl text-xs font-bold border border-error/30 text-error hover:bg-error/10 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer flex items-center gap-1"
+                          title="Clear all knowledge sources in this slot"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
+                          <span>Clear</span>
+                        </button>
+                      </div>
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Active Knowledge Sources Dashboard Card */}
+            <div className="bg-surface-container-lowest rounded-2xl shadow-xs border border-surface-container-high/60 overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-surface-container flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <h3 className="text-sm font-bold text-on-surface">
+                      Active AI Knowledge Context: {activeKb.name}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    The clinical conditions and prior prescription regimens from this selected Knowledge Base currently evaluated by the AI engine.
+                  </p>
                 </div>
 
-                {/* Information Callout */}
-                <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container flex items-start gap-2.5 text-xs text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">verified_user</span>
-                  <div className="leading-relaxed">
-                    <strong className="text-on-surface font-semibold">Strict AI Enforced Scope:</strong> When you run a prescription check in <span className="font-semibold text-primary">New Safety Check</span>, the AI engine evaluates drug interactions strictly against the synchronized conditions and regimens above. To activate or deactivate items, click <span className="font-semibold text-on-surface cursor-pointer underline" onClick={() => setIsSyncModalOpen(true)}>Synchronize Knowledge Base</span>.
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetSyncKbId(activeKb.id);
+                      setIsSyncModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary-hover transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">sync</span>
+                    <span>Synchronize Active KB</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={activeTotalSources === 0}
+                    onClick={() => {
+                      const nextState = clearKnowledgeBase(activeKb.id);
+                      setMultiKbState(nextState);
+                      showConfirmation(`Cleared active knowledge base "${activeKb.name}"`, 'info');
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-error/30 text-error text-xs font-bold hover:bg-error/10 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
+                    <span>Clear Active KB</span>
+                  </button>
+                </div>
+              </div>
+
+              {activeTotalSources === 0 ? (
+                <div className="p-12 flex flex-col items-center justify-center text-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-surface-container text-outline flex items-center justify-center shadow-xs">
+                    <span className="material-symbols-outlined text-3xl">account_tree</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-on-surface">0 Knowledge Sources in Active KB</h4>
+                  <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
+                    No active clinical history or prescription regimens have been synchronized into &ldquo;{activeKb.name}&rdquo;. Click below to select which conditions (e.g. Kidney, Liver) and prior prescriptions to feed into the Safety Checker.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetSyncKbId(activeKb.id);
+                      setIsSyncModalOpen(true);
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-primary-hover"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">sync</span>
+                    <span>Synchronize Active KB</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 sm:p-6 flex flex-col gap-5">
+                  {/* Active Clinical Conditions */}
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-outline mb-2.5 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-emerald-600">medical_services</span>
+                      <span>Synchronized Clinical Conditions ({activeKb.conditions?.length || 0})</span>
+                    </h4>
+                    {!activeKb.conditions || activeKb.conditions.length === 0 ? (
+                      <p className="text-xs text-outline italic">No medical conditions currently selected in this Knowledge Base.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {activeKb.conditions.map((cond, idx) => (
+                          <div
+                            key={`cond-${idx}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                            <span>{cond}</span>
+                            <span className="text-[10px] text-emerald-600 font-normal">Active in AI</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Active Prior Prescription Regimens */}
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-outline mb-2.5 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-teal-600">fact_check</span>
+                      <span>Synchronized Prescription Regimens ({activeKb.checks?.length || 0})</span>
+                    </h4>
+                    {!activeKb.checks || activeKb.checks.length === 0 ? (
+                      <p className="text-xs text-outline italic">No prior prescriptions currently selected in this Knowledge Base.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {activeKb.checks.map((chkId, idx) => {
+                          const check = VirtualDb.getCheckById(chkId);
+                          const label = check ? `Prescription #${check.checkNumber || check.id} — ${check.patientName}` : `Prescription Check #${chkId}`;
+                          return (
+                            <div
+                              key={`chk-${idx}`}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-xs font-bold text-teal-800"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                              <span>{label}</span>
+                              <span className="text-[10px] text-teal-600 font-normal">Cross-Screened</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Information Callout */}
+                  <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-container flex items-start gap-2.5 text-xs text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">verified_user</span>
+                    <div className="leading-relaxed">
+                      <strong className="text-on-surface font-semibold">Strict AI Enforced Scope:</strong> When you run a prescription check in <span className="font-semibold text-primary">New Safety Check</span>, the AI engine evaluates drug interactions strictly against <span className="font-semibold text-primary">&ldquo;{activeKb.name}&rdquo;</span> (and excludes all other unselected protocols). To switch knowledge bases, click &ldquo;Select to Use&rdquo; above.
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
-
-
+        );
+      })()}
 
       {/* Inspect Rule AST Modal */}
       {typeof document !== 'undefined' && createPortal(
@@ -2202,6 +2399,7 @@ export default function RulesAdmin() {
       {/* Sync Knowledge Modal */}
       <SyncKnowledgeModal
         isOpen={isSyncModalOpen}
+        targetKbId={targetSyncKbId}
         onClose={() => setIsSyncModalOpen(false)}
         onSyncComplete={() => {
           setLastSyncText('Just now');

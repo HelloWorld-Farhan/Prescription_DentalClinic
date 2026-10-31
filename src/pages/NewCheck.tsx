@@ -13,6 +13,13 @@ import { uploadToR2, deleteDocumentRecord, saveDocumentRecord } from '../service
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
 import { executePrescriptionSafetyCheck } from '../services/cloudSyncService';
+import {
+  getMultiKnowledgeBaseState,
+  getActiveKnowledgeBase,
+  setActiveKnowledgeBase,
+  MultiKnowledgeBaseState,
+  KnowledgeBaseProfile,
+} from '../services/knowledgeBaseService';
 import { generatePatientMRN, generatePrescriptionCheckNumber, cleanDocumentPrescriptionTag } from '../utils/patientKeyUtils';
 
 interface AllergyDetailInfo {
@@ -274,42 +281,23 @@ export default function NewCheck() {
   const hasDocumentedAllergies = parsedAllergies.length > 0;
   const allergySummary = hasDocumentedAllergies ? parsedAllergies.join(', ') : 'None documented (NKDA)';
 
-  // Knowledge Base Sync State & Active Medical History Conditions
+  // Multi-Profile Knowledge Base State (1 Active Enforced in AI Checks)
+  const [multiKbState, setMultiKbState] = useState<MultiKnowledgeBaseState>(() => getMultiKnowledgeBaseState());
+  const activeKb = multiKbState.knowledgeBases.find((k) => k.id === multiKbState.activeKbId) || multiKbState.knowledgeBases[0];
 
-  const [syncedDocs, setSyncedDocs] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('smileclinic_synced_active_docs');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  });
-  const [syncedChecks, setSyncedChecks] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('smileclinic_synced_active_checks');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  });
-  const [syncedConditions, setSyncedConditions] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('smileclinic_synced_active_conditions');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return [];
-  });
+  const [syncedDocs, setSyncedDocs] = useState<string[]>(() => activeKb.docs || []);
+  const [syncedChecks, setSyncedChecks] = useState<string[]>(() => activeKb.checks || []);
+  const [syncedConditions, setSyncedConditions] = useState<string[]>(() => activeKb.conditions || []);
 
   useEffect(() => {
-    const handleSyncUpdate = (e?: any) => {
+    const handleSyncUpdate = () => {
       try {
-        const rawDocs = localStorage.getItem('smileclinic_synced_active_docs');
-        if (rawDocs) setSyncedDocs(JSON.parse(rawDocs));
-        const rawChecks = localStorage.getItem('smileclinic_synced_active_checks');
-        if (rawChecks) setSyncedChecks(JSON.parse(rawChecks));
-        const rawConds = localStorage.getItem('smileclinic_synced_active_conditions');
-        if (rawConds) setSyncedConditions(JSON.parse(rawConds));
+        const fresh = getMultiKnowledgeBaseState();
+        setMultiKbState(fresh);
+        const curr = fresh.knowledgeBases.find((k) => k.id === fresh.activeKbId) || fresh.knowledgeBases[0];
+        setSyncedDocs(curr.docs || []);
+        setSyncedChecks(curr.checks || []);
+        setSyncedConditions(curr.conditions || []);
       } catch (err) {
         console.warn('Failed to parse synced knowledge sources', err);
       }
@@ -317,6 +305,18 @@ export default function NewCheck() {
     window.addEventListener('smileclinic_knowledge_synced', handleSyncUpdate);
     return () => window.removeEventListener('smileclinic_knowledge_synced', handleSyncUpdate);
   }, []);
+
+  const handleSwitchActiveKb = (kbId: string) => {
+    const nextState = setActiveKnowledgeBase(kbId);
+    setMultiKbState(nextState);
+    const switched = nextState.knowledgeBases.find((k) => k.id === kbId);
+    if (switched) {
+      setSyncedDocs(switched.docs || []);
+      setSyncedChecks(switched.checks || []);
+      setSyncedConditions(switched.conditions || []);
+      showConfirmation(`Prescription AI safety check context switched to "${switched.name}"`, 'success');
+    }
+  };
 
   // Modal State for inspecting individual allergy safety details
   const [inspectingAllergy, setInspectingAllergy] = useState<string | null>(null);
@@ -728,6 +728,8 @@ export default function NewCheck() {
         rules: VirtualDb.getRules(),
         clinical_inquiries: questionsToEvaluate,
         knowledge_sources: {
+          active_kb_id: activeKb.id,
+          active_kb_name: activeKb.name,
           synced_documents: syncedDocs,
           synced_checks: syncedChecks,
           synced_conditions: syncedConditions,
@@ -2177,61 +2179,100 @@ export default function NewCheck() {
               </div>
 
               {/* SYNCHRONIZED KNOWLEDGE BASE CONTEXT CARD (READ-ONLY IN SAFETY CHECK) */}
-              <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="material-symbols-outlined text-[18px]">account_tree</span>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-on-surface">Active Clinical Knowledge Base (AI Enforced)</span>
-                      <span className="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
-                        {syncedDocs.length + syncedConditions.length + syncedChecks.length} Active Sources
-                      </span>
+              <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/25 flex flex-col gap-3 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="material-symbols-outlined text-[18px]">account_tree</span>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-                      {syncedDocs.length > 0 ? (
-                        syncedDocs.map((doc, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-container-lowest border border-primary/25 text-primary shadow-2xs"
-                            title={doc}
-                          >
-                            <span className="material-symbols-outlined text-[13px] text-primary">description</span>
-                            <span className="truncate max-w-[180px] font-semibold">{doc}</span>
-                          </span>
-                        ))
-                      ) : syncedConditions.length > 0 ? (
-                        syncedConditions.map((cond, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-container-lowest border border-primary/25 text-primary shadow-2xs"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                            <span className="truncate max-w-[200px]">{cond}</span>
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-[11px] text-outline italic">Default Universal Clinical Safety Protocol</span>
-                      )}
-                      {syncedChecks.length > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20">
-                          +{syncedChecks.length} prior check{syncedChecks.length === 1 ? '' : 's'}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-on-surface">Active Knowledge Base:</span>
+                        <span className="text-xs font-bold text-primary truncate max-w-[240px]">
+                          {activeKb.name}
                         </span>
-                      )}
+                        <span className="text-[10px] font-semibold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                          <span>AI Enforced</span>
+                        </span>
+                        <span className="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                          {syncedDocs.length + syncedConditions.length + syncedChecks.length} Sources
+                        </span>
+                      </div>
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/rules?tab=knowledge&sync=open')}
+                    className="px-3.5 py-1.5 rounded-xl border border-primary/30 text-primary hover:bg-primary hover:text-white font-bold text-[11px] transition-all flex items-center gap-1.5 shrink-0 self-start sm:self-center cursor-pointer shadow-2xs"
+                    title="Configure and synchronize knowledge sources in History & Data Governance"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">settings_suggest</span>
+                    <span>Manage in History &amp; Data →</span>
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => navigate('/rules?tab=knowledge&sync=open')}
-                  className="px-3.5 py-1.5 rounded-xl border border-primary/30 text-primary hover:bg-primary hover:text-white font-bold text-[11px] transition-all flex items-center gap-1.5 shrink-0 self-end sm:self-center cursor-pointer shadow-2xs"
-                  title="Configure and synchronize knowledge sources in History & Data Governance"
-                >
-                  <span className="material-symbols-outlined text-[15px]">settings_suggest</span>
-                  <span>Manage in History &amp; Data →</span>
-                </button>
+                {/* Quick 1-Click Knowledge Base Switcher (3 Slots) */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-primary/10">
+                  <span className="text-[11px] font-semibold text-outline mr-1">Switch KB:</span>
+                  {multiKbState.knowledgeBases.map((kb, idx) => {
+                    const isSelected = kb.id === multiKbState.activeKbId;
+                    return (
+                      <button
+                        key={kb.id}
+                        type="button"
+                        onClick={() => handleSwitchActiveKb(kb.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-primary text-white shadow-2xs ring-1 ring-primary/40'
+                            : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-surface-container-high'
+                        }`}
+                        title={kb.name}
+                      >
+                        {isSelected ? (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                        ) : (
+                          <span className="w-1.5 h-1.5 rounded-full bg-outline/40 shrink-0" />
+                        )}
+                        <span className="truncate max-w-[130px]">Slot {idx + 1}: {kb.name.split(' ')[0]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Active sources preview chips */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {syncedDocs.length > 0 ? (
+                    syncedDocs.map((doc, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-container-lowest border border-primary/25 text-primary shadow-2xs"
+                        title={doc}
+                      >
+                        <span className="material-symbols-outlined text-[13px] text-primary">description</span>
+                        <span className="truncate max-w-[180px] font-semibold">{doc}</span>
+                      </span>
+                    ))
+                  ) : syncedConditions.length > 0 ? (
+                    syncedConditions.map((cond, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-container-lowest border border-primary/25 text-primary shadow-2xs"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                        <span className="truncate max-w-[200px]">{cond}</span>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-outline italic">0 Sources configured in this Knowledge Base.</span>
+                  )}
+                  {syncedChecks.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20">
+                      +{syncedChecks.length} prior check{syncedChecks.length === 1 ? '' : 's'}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* PRIMARY START ACTION BUTTON */}

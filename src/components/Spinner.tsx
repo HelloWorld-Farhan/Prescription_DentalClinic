@@ -40,3 +40,4 @@ export function Spinner({ size = 'sm', className = '', color = 'text-white' }: S
 }
 
 export default Spinner;
+
