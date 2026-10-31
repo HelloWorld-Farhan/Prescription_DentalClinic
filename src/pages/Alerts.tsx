@@ -177,6 +177,10 @@ export default function Alerts() {
     showConfirmation('SMS Alert Service: Coming Soon (DLT Telecom Carrier gateway verification in progress)', 'info');
   };
 
+  const handleEmailNotice = () => {
+    showConfirmation('Email Alert Service: Coming Soon (Regimen notification service temporarily on hold)', 'info');
+  };
+
   const handleOverride = (alertId: string, reason: string) => {
     let targetCheckId = activeDrawerCheckId;
     if (!targetCheckId) {
@@ -348,64 +352,19 @@ export default function Alerts() {
             </span>
           </button>
 
-          {/* Merged Unified Email Alert Control (Action Button + ON/OFF Master Toggle in One) */}
-          <div className="inline-flex items-center rounded-xl border border-surface-container-high bg-surface-container-lowest shadow-xs overflow-hidden">
-            {/* Click to send/preview alert email */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!masterEmailAlertsEnabled) {
-                  showConfirmation(
-                    'Email alerts are currently turned OFF. Turn the toggle ON to dispatch emails.',
-                    'warning'
-                  );
-                  return;
-                }
-                setEmailModalCheck(null);
-                setIsEmailModalOpen(true);
-              }}
-              disabled={allActiveMedications.length === 0}
-              className={`px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${
-                masterEmailAlertsEnabled
-                  ? 'bg-primary text-white hover:bg-primary-hover'
-                  : 'bg-surface-container text-outline hover:text-on-surface'
-              }`}
-              title={
-                masterEmailAlertsEnabled
-                  ? 'Dispatch unified medication alert email for all active prescriptions'
-                  : 'Email alerts are paused. Toggle switch to turn ON.'
-              }
-            >
-              <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span>
-              <span>{masterEmailAlertsEnabled ? 'Send Alert Email' : 'Email Alerts: OFF'}</span>
-            </button>
-
-            {/* Integrated Master ON/OFF Switch */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-container-low border-l border-surface-container-high">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  masterEmailAlertsEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
-                }`}
-                title={masterEmailAlertsEnabled ? 'Email sending active' : 'Email sending paused'}
-              />
-              <button
-                type="button"
-                onClick={toggleMasterEmail}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  masterEmailAlertsEnabled ? 'bg-primary' : 'bg-slate-300'
-                }`}
-                role="switch"
-                aria-checked={masterEmailAlertsEnabled}
-                title={`Click to turn email alerts ${masterEmailAlertsEnabled ? 'OFF' : 'ON'}`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                    masterEmailAlertsEnabled ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
+          {/* Email Alert (Coming Soon) */}
+          <button
+            type="button"
+            onClick={handleEmailNotice}
+            className="px-3 py-2 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container text-outline hover:text-on-surface text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer opacity-85"
+            title="Email Alerts: Coming Soon (Daily Timetable Dispatch in Progress)"
+          >
+            <span className="material-symbols-outlined text-[16px] text-teal-600">mail</span>
+            <span>Email Alert</span>
+            <span className="px-1.5 py-0.5 bg-teal-100 text-teal-900 border border-teal-300/70 rounded text-[9px] font-extrabold uppercase tracking-wide">
+              Coming Soon
+            </span>
+          </button>
         </div>
       </div>
 
@@ -559,25 +518,21 @@ export default function Alerts() {
                       <span>PDF Report</span>
                     </button>
 
-                    {/* Send Alert Email for this Prescription */}
+                    {/* Send Alert Email for this Prescription (Coming Soon) */}
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!masterEmailAlertsEnabled) {
-                          showConfirmation(
-                            'Automated email alerts are currently turned OFF. Enable the top toggle first.',
-                            'warning'
-                          );
-                          return;
-                        }
-                        setEmailModalCheck(c);
-                        setIsEmailModalOpen(true);
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEmailNotice();
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
-                      title="Send Daily Medication Timetable Email"
+                      className="px-3 py-1.5 rounded-xl bg-surface-container text-outline hover:text-on-surface font-bold text-xs transition-colors flex items-center gap-1.5 border border-surface-container-high shadow-2xs cursor-pointer"
+                      title="Send Daily Medication Timetable Email (Coming Soon)"
                     >
-                      <span className="material-symbols-outlined text-[15px]">send</span>
+                      <span className="material-symbols-outlined text-[15px] text-teal-600">mail</span>
                       <span>Send Email</span>
+                      <span className="px-1 py-0.2 bg-teal-100 text-teal-900 rounded text-[9px] font-extrabold uppercase">
+                        Soon
+                      </span>
                     </button>
 
                     {/* Expand/Collapse Caret */}
@@ -717,21 +672,18 @@ export default function Alerts() {
 
                                 {/* Right: Per-Medicine Email Toggle & SMS Notice */}
                                 <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
-                                  {/* Individual Medicine Email Alert Toggle */}
+                                  {/* Individual Medicine Email Alert Indicator (Coming Soon) */}
                                   <button
                                     type="button"
-                                    onClick={() => toggleMedEmailAlert(uniqueKey, drugName)}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
-                                      isEmailEnabled
-                                        ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
-                                        : 'bg-surface-container-low border-surface-container-high text-outline hover:text-on-surface'
-                                    }`}
-                                    title={`Click to turn ${isEmailEnabled ? 'OFF' : 'ON'} email alerts for ${drugName}`}
+                                    onClick={handleEmailNotice}
+                                    className="px-2.5 py-1.5 rounded-xl border border-surface-container-high bg-surface-container-lowest text-outline hover:text-on-surface text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    title="Email Alert Service for this Medication (Coming Soon)"
                                   >
-                                    <span className="material-symbols-outlined text-[15px]">
-                                      {isEmailEnabled ? 'mail' : 'mail_off'}
+                                    <span className="material-symbols-outlined text-[15px] text-teal-600">mail</span>
+                                    <span>Email</span>
+                                    <span className="px-1 py-0.2 bg-teal-100 text-teal-900 rounded text-[9px] font-extrabold uppercase">
+                                      Soon
                                     </span>
-                                    <span>{isEmailEnabled ? 'Email: ON' : 'Email: OFF'}</span>
                                   </button>
 
                                   {/* Per-Medicine SMS Alert Indicator (Coming Soon) */}
