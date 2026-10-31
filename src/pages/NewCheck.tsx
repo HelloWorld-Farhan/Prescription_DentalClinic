@@ -171,6 +171,8 @@ export default function NewCheck() {
     extractedCount: number;
     previewUrl?: string | null;
     extractedPatient?: ExtractedPatientMetadata;
+    totalPrescribedCount?: number;
+    supportiveTherapies?: string[];
   } | null>(null);
   const [extractedMedicines, setExtractedMedicines] = useState<PrescriptionItem[]>([]);
   const [emptyQueueAlertOpen, setEmptyQueueAlertOpen] = useState(false);
@@ -496,9 +498,19 @@ export default function NewCheck() {
   const extractPrescriptionsFromDocument = async (
     file: File,
     source: 'upload' | 'camera'
-  ): Promise<{ medicines: PrescriptionItem[]; patient?: ExtractedPatientMetadata }> => {
+  ): Promise<{
+    medicines: PrescriptionItem[];
+    patient?: ExtractedPatientMetadata;
+    totalPrescribedCount?: number;
+    supportiveTherapies?: string[];
+  }> => {
     const result = await extractPrescriptionData(file, source);
-    return { medicines: result.medicines, patient: result.patient };
+    return {
+      medicines: result.medicines,
+      patient: result.patient,
+      totalPrescribedCount: result.totalPrescribedCount,
+      supportiveTherapies: result.supportiveTherapies,
+    };
   };
 
   // Main file processing handler: Uploads to Cloudflare R2 and extracts medicines
@@ -514,10 +526,13 @@ export default function NewCheck() {
     const currentUserId = storedUser?.id || 'clinician-user';
     try {
       // 1. Concurrently run Cloudflare R2 upload and multimodal AI extraction for ultra-fast processing
-      const [r2Result, { medicines: extracted, patient: extractedPatient }] = await Promise.all([
+      const [r2Result, extractResult] = await Promise.all([
         uploadToR2(file, currentUserId, prescriberDisplayName, undefined, false),
         extractPrescriptionsFromDocument(file, source),
       ]);
+
+      const extracted = extractResult.medicines;
+      const extractedPatient = extractResult.patient;
 
       setUploadedFileName(r2Result.filename);
       const sizeStr =
@@ -545,6 +560,8 @@ export default function NewCheck() {
         extractedCount: extracted.length,
         previewUrl,
         extractedPatient,
+        totalPrescribedCount: extractResult.totalPrescribedCount || extracted.length,
+        supportiveTherapies: extractResult.supportiveTherapies || [],
       });
       setExtractedMedicines(extracted);
 
@@ -1989,7 +2006,7 @@ export default function NewCheck() {
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-on-surface">
-                    Prescribed Medication Queue ({prescriptions.length} {prescriptions.length === 1 ? 'item' : 'items'} to cross-check):
+                    Prescribed Medication Queue ({prescriptions.length} {prescriptions.length === 1 ? 'item' : 'items'} to cross-check{extractedMeta?.totalPrescribedCount && extractedMeta.totalPrescribedCount > prescriptions.length ? ` • ${extractedMeta.totalPrescribedCount} Total Prescribed` : ''}):
                   </span>
                   {prescriptions.length > 0 && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
@@ -2030,13 +2047,17 @@ export default function NewCheck() {
                             <span className="text-outline font-normal">({rx.genericName})</span>
                           </div>
                           <div className="text-[11px] text-outline flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="font-semibold text-primary">{rx.dosage}</span>
-                            <span>•</span>
-                            <span>{rx.frequency}</span>
+                            <span className="font-semibold text-primary bg-primary/5 px-2 py-0.5 rounded-md">
+                              Dosage / Schedule: {rx.dosage ? `${rx.dosage} • ` : ''}{rx.frequency}{rx.duration ? ` × ${rx.duration}` : ''}
+                            </span>
                             <span>•</span>
                             <span>{rx.route}</span>
-                            <span>•</span>
-                            <span className="text-emerald-700 font-medium">{rx.indication}</span>
+                            {rx.indication && (
+                              <>
+                                <span>•</span>
+                                <span className="text-emerald-700 font-medium">{rx.indication}</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2053,6 +2074,16 @@ export default function NewCheck() {
                   ))
                 )}
               </div>
+
+              {extractedMeta?.supportiveTherapies && extractedMeta.supportiveTherapies.length > 0 && (
+                <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high text-[11px] text-on-surface-variant flex items-start gap-2.5 shadow-2xs">
+                  <span className="material-symbols-outlined text-[17px] text-primary shrink-0 mt-0.5">medical_information</span>
+                  <div>
+                    <span className="font-bold text-on-surface">Prescribed Supportive &amp; Adjunct Regimen: </span>
+                    <span className="text-on-surface-variant">{extractedMeta.supportiveTherapies.join(' • ')}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
               {/* Patient Chart Linker */}

@@ -18,6 +18,8 @@ export interface PrescriptionExtractionResult {
   patient: ExtractedPatientMetadata;
   medicines: PrescriptionItem[];
   rules: InteractionRule[];
+  totalPrescribedCount?: number;
+  supportiveTherapies?: string[];
   rawText?: string;
 }
 
@@ -29,6 +31,8 @@ interface DemoProfile {
   patient: ExtractedPatientMetadata;
   medicines: Omit<PrescriptionItem, 'id'>[];
   rules: Omit<InteractionRule, 'id'>[];
+  totalPrescribedCount?: number;
+  supportiveTherapies?: string[];
 }
 
 const DEMO_PRESCRIPTION_PROFILES: DemoProfile[] = [
@@ -414,7 +418,7 @@ const DEMO_PRESCRIPTION_PROFILES: DemoProfile[] = [
   },
   {
     id: 'rx-07-dr-debashish-roy',
-    keywords: ['prescription_7', 'prescription 7', 'prescription-7', 'rx7', 'rx-7', 'angan', 'sarkar', 'debashish', 'cerom', 'pyrigesic', 'pantop', 'ascoril', 'emilukast', 'new medlife', 'habra'],
+    keywords: ['prescription_7', 'prescription 7', 'prescription-7', 'rx7', 'rx-7', 'angan', 'sarkar', 'debashish', 'cerom', 'pyrigesic', 'pantop', 'ascoril', 'emilukast', 'emlukast', 'new medlife', 'habra'],
     documentType: 'Consultant Clinical Rx (Dr. Debashish Roy)',
     patient: {
       name: 'Mr. Angan Sarkar',
@@ -425,51 +429,57 @@ const DEMO_PRESCRIPTION_PROFILES: DemoProfile[] = [
       diagnosis: 'Pain in throat + productive cough, chest clear',
       vitals: 'BP 121/95; Pulse 90/min; Temp (N)',
     },
+    totalPrescribedCount: 7,
+    supportiveTherapies: [
+      'Steam Inhalation with XL Vapo (Three times daily / TDS × 7 days)',
+      'Betadine Mouth Gargle / Water 1:1 (Three times daily / TDS × 5 days)',
+      'Rest for 7 days',
+    ],
     medicines: [
       {
         drugName: 'Tab. Cerom-CV 500',
         genericName: 'Cefuroxime Axetil 500 mg + Potassium Clavulanate 125 mg',
-        dosage: '625 mg',
+        dosage: '500mg',
         frequency: '1 tab Twice Daily after meals (BD PC)',
         duration: '10 days',
         route: 'Oral (PO)',
-        indication: 'Acute Bacterial Pharyngitis & Bronchial Infection',
+        indication: 'Acute Bacterial Pharyngitis & Throat Infection',
       },
       {
         drugName: 'Tab. Pyrigesic 650',
         genericName: 'Paracetamol 650 mg',
-        dosage: '650 mg',
+        dosage: '650mg',
         frequency: '1 tab Thrice Daily after meals (TDS PC)',
         duration: '5 days',
         route: 'Oral (PO)',
-        indication: 'Pain in throat & Febrile Malaise',
+        indication: 'Pain / Fever',
       },
       {
         drugName: 'Tab. Pantop 40',
         genericName: 'Pantoprazole Sodium 40 mg',
-        dosage: '40 mg',
-        frequency: '1 tab Before Breakfast (BBF)',
+        dosage: '40mg',
+        frequency: '1 tab Before Breakfast (BBF / OD AC)',
         duration: '10 days',
         route: 'Oral (PO)',
         indication: 'Gastric Mucosal Protection',
       },
       {
         drugName: 'Syp. Ascoril LS',
-        genericName: 'Levosalbutamol + Ambroxol + Guaiphenesin',
-        dosage: '5 mL',
-        frequency: '5 mL Thrice Daily (TDS)',
+        genericName: 'Ambroxol + Levosalbutamol + Guaifenesin',
+        dosage: '5 ml',
+        frequency: '5 ml Three Times Daily (TDS)',
         duration: '7 days',
         route: 'Oral (PO)',
-        indication: 'Mucolytic Expectorant for Productive Cough',
+        indication: 'Cough / Productive cough',
       },
       {
-        drugName: 'Tab. Emilukast Fx',
+        drugName: 'Tab. Emlukast FX',
         genericName: 'Montelukast 10 mg + Fexofenadine 120 mg',
-        dosage: '10/120 mg',
-        frequency: '1 tab at 7 PM',
+        dosage: 'Standard',
+        frequency: '1 tab Once Daily at 7:00 PM (or HS)',
         duration: '10 days',
         route: 'Oral (PO)',
-        indication: 'Allergic Airway Hyperreactivity',
+        indication: 'Allergic rhinitis / Cough',
       },
     ],
     rules: [
@@ -617,6 +627,8 @@ export async function extractPrescriptionData(
         },
         medicines,
         rules,
+        totalPrescribedCount: data.totalPrescribedCount || medicines.length,
+        supportiveTherapies: data.supportiveTherapies || [],
         rawText: JSON.stringify(data, null, 2),
       };
     } else {
@@ -648,6 +660,8 @@ export async function extractPrescriptionData(
         patient: { ...directMatch.patient },
         medicines,
         rules,
+        totalPrescribedCount: directMatch.totalPrescribedCount || medicines.length,
+        supportiveTherapies: directMatch.supportiveTherapies || [],
         rawText: fileTextContent,
       };
     }
@@ -678,6 +692,8 @@ export async function extractPrescriptionData(
         patient: { ...profile.patient },
         medicines,
         rules,
+        totalPrescribedCount: profile.totalPrescribedCount || medicines.length,
+        supportiveTherapies: profile.supportiveTherapies || [],
         rawText: fileTextContent,
       };
     }
