@@ -1,5 +1,6 @@
 import { PrescriptionItem, SafetyCheckRecord, DrugInteractionAlert } from '../types';
 import { API_BASE_URL, GOOGLE_APPS_SCRIPT_URL } from '../config/api';
+import { syncSavedDoctorsToCloud } from './cloudSyncService';
 
 export interface MedicationScheduleItem {
   id: string;
@@ -364,7 +365,8 @@ export function saveDoctorContact(
 
     const key = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
     localStorage.setItem(key, JSON.stringify(updated));
-    // Scoped exclusively per clinician
+    // Sync immediately across all devices
+    syncSavedDoctorsToCloud(updated);
     return updated;
   } catch {
     return DEFAULT_DOCTORS;
@@ -385,6 +387,7 @@ export async function dispatchDoctorConsultEmail(payload: {
   rationale: string;
   clinician_name?: string;
   clinician_email?: string;
+  clinician_phone?: string;
   cc_user_email?: string;
   notary_hash?: string;
   portal_url?: string;
@@ -414,6 +417,7 @@ export async function dispatchDoctorConsultEmail(payload: {
           to_doctor_email: cleanDocEmail,
           doctor_name: cleanDocName,
           clinician_email: userCc,
+          clinician_phone: payload.clinician_phone || '',
           pdf_url: directPdfUrl,
         }),
         signal: controller.signal,
@@ -468,8 +472,15 @@ export async function dispatchDoctorConsultEmail(payload: {
             📎 View Original Uploaded Prescription Slip (Direct Link)
           </a>
         </div>` : ''}
+        <div style="background: #f0fdfa; border: 1.5px solid #005c65; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;">
+          <strong style="color: #005c65; font-size: 11px; text-transform: uppercase;">Attending Clinician Direct Contact (Call / Follow-Up):</strong>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #0f172a; line-height: 1.5;">
+            <strong>${payload.clinician_name || 'Smile Clinic Prescriber'}</strong><br>
+            ${payload.clinician_phone ? `Telephone: <strong>${payload.clinician_phone}</strong><br>` : ''}
+            Email: <strong>${userCc || 'support.smileclinic@gmail.com'}</strong>
+          </p>
+        </div>
         <div style="border-top: 1px solid #f1f5f9; padding-top: 12px; font-size: 11px; color: #64748b; line-height: 1.4;">
-          <strong>Consulting Clinician:</strong> ${payload.clinician_name || 'Smile Clinic Prescriber'}${userCc ? ` (${userCc})` : ''}<br>
           <strong>Check Identifier:</strong> #${payload.check_number || 'CHK-CURRENT'} | Smile Clinic Clinical Decision Support System
         </div>
       </div>

@@ -100,7 +100,7 @@ export default function PrescriptionCopyModal({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[110] overflow-y-auto flex items-center justify-center p-3 sm:p-5">
+      <div className="fixed inset-0 z-[110] overflow-y-auto flex items-center justify-center p-2.5 sm:p-4 md:p-6 overscroll-contain pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] pt-[max(0.625rem,env(safe-area-inset-top,0px))]">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -110,31 +110,31 @@ export default function PrescriptionCopyModal({
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm cursor-pointer"
         />
 
-        {/* Modal Window */}
+        {/* Modal Window Container */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 14 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 14 }}
           transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-3xl bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 sm:p-7 flex flex-col gap-5 z-10 max-h-[92vh] overflow-y-auto"
+          className="relative w-full max-w-3xl bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col z-10 max-h-[calc(100dvh-1.5rem)] sm:max-h-[88vh] overflow-hidden"
         >
-          {/* Header */}
-          <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center shrink-0 shadow-2xs">
-                <span className="material-symbols-outlined text-[24px]">receipt_long</span>
+          {/* Fixed / Sticky Header */}
+          <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-slate-100 flex items-start justify-between gap-3 bg-white shrink-0">
+            <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                <span className="material-symbols-outlined text-[20px] sm:text-[24px]">receipt_long</span>
               </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <h3 className="text-sm sm:text-base md:text-lg font-bold text-slate-900 leading-snug">
                     Uploaded Prescription Slip &amp; Clinical Review
                   </h3>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200 shrink-0">
                     {id}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-normal truncate max-w-lg">
                   Patient: <strong className="text-slate-800">{patientName}</strong> ({mrn}) • Clinician:{' '}
                   <strong className="text-slate-800">{clinician}</strong> • {timestamp}
                 </p>
@@ -144,163 +144,167 @@ export default function PrescriptionCopyModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              title="Close Modal"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
           </div>
 
-          {/* Section 1: Original Uploaded Prescription Copy */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs uppercase font-bold tracking-wider text-slate-500 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[15px] text-teal-700">document_scanner</span>
-                <span>Original Uploaded Prescription Slip</span>
-              </h4>
-              <button
-                type="button"
-                onClick={handleViewPrescriptionImage}
-                className="text-xs font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <span>View Full Resolution</span>
-                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-              </button>
-            </div>
-
-            {sourceUrl && isImage ? (
-              <div
-                onClick={() => setShowLightbox(true)}
-                className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/5 flex flex-col items-center justify-center p-3 max-h-[360px] cursor-pointer group"
-                title="Click to view full size image"
-              >
-                <img
-                  src={sourceUrl}
-                  alt="Original Uploaded Prescription Slip"
-                  className="w-full max-h-[300px] object-contain rounded-xl shadow-md border border-slate-200 bg-white group-hover:opacity-95 transition-opacity"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-                <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
-                  <span className="px-3.5 py-1.5 rounded-xl bg-white/95 text-slate-900 text-xs font-bold shadow-lg flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px]">zoom_in</span>
-                    Click to Enlarge Prescription
-                  </span>
-                </div>
-                <div className="mt-2.5 flex items-center justify-between w-full px-2 text-xs text-slate-500">
-                  <span className="flex items-center gap-1 font-mono text-[11px]">
-                    <span className="material-symbols-outlined text-[15px] text-teal-700">lock</span>
-                    Archived in Cloud Vault: {sourceName}
-                  </span>
-                  <span className="font-bold text-teal-700 flex items-center gap-1">
-                    <span>Full Resolution</span>
-                    <span className="material-symbols-outlined text-[13px]">open_in_new</span>
-                  </span>
-                </div>
-              </div>
-            ) : sourceUrl && isPdf ? (
-              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[28px]">picture_as_pdf</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-bold text-slate-900 block truncate max-w-sm">
-                      {sourceName}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      Multi-page PDF prescription slip archived in secure HIPAA vault
-                    </span>
-                  </div>
-                </div>
+          {/* Scrollable Body Container */}
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
+            {/* Section 1: Original Uploaded Prescription Copy */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <h4 className="uppercase font-bold tracking-wider text-slate-500 flex items-center gap-1.5 text-[11px] sm:text-xs">
+                  <span className="material-symbols-outlined text-[15px] text-teal-700">document_scanner</span>
+                  <span>Original Uploaded Prescription Slip</span>
+                </h4>
                 <button
                   type="button"
                   onClick={handleViewPrescriptionImage}
-                  className="px-4 py-2 rounded-xl bg-teal-800 text-white font-bold text-xs hover:bg-teal-900 transition-colors flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+                  className="font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1 cursor-pointer transition-colors text-[11px] sm:text-xs"
                 >
-                  <span className="material-symbols-outlined text-[16px]">visibility</span>
-                  <span>View Uploaded PDF</span>
+                  <span>View Full Resolution</span>
+                  <span className="material-symbols-outlined text-[14px]">open_in_new</span>
                 </button>
               </div>
-            ) : (
-              /* Stylized Digital Prescription Slip representation */
-              <div
-                onClick={() => setShowLightbox(true)}
-                className="p-5 rounded-2xl bg-gradient-to-b from-white to-slate-50/70 border-2 border-dashed border-teal-200 shadow-xs relative overflow-hidden cursor-pointer hover:border-teal-400 transition-colors group"
-                title="Click to view high-resolution prescription slip"
-              >
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[24px] text-teal-800">dentistry</span>
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
-                        Smile Clinic Health System
-                      </span>
-                      <span className="text-[10px] text-slate-500">Dental Operatory · Prescription Record Slip</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-600 border border-slate-200 group-hover:bg-teal-100 group-hover:text-teal-900 transition-colors">
-                    Rx Digital Slip • Click to View Image
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs py-1">
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-semibold">Patient</span>
-                    <span className="font-bold text-slate-800">{patientName}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-semibold">MRN</span>
-                    <span className="font-mono text-slate-800">{mrn}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-semibold">Date</span>
-                    <span className="text-slate-800">{timestamp}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-semibold">Attestation</span>
-                    <span className="font-semibold text-emerald-700">Digital Signed</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Section 2: Extracted Prescribed Medications List */}
-          <div className="space-y-2">
-            <h4 className="text-xs uppercase font-bold tracking-wider text-slate-500 flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[15px] text-teal-700">medication</span>
-              <span>Extracted Regimen Items ({prescriptions.length})</span>
-            </h4>
-
-            {prescriptions.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No medication items listed in this prescription.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {prescriptions.map((rx, idx) => (
-                  <div
-                    key={rx.id || idx}
-                    className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 shadow-2xs"
-                  >
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-slate-900 block truncate">
-                        {rx.drugName}
-                      </span>
-                      <span className="text-[11px] text-slate-500 block truncate">
-                        {rx.genericName || rx.drugName} · {rx.dosage || 'Standard'} · {rx.frequency}
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200/60 shrink-0">
-                      {rx.route || 'Oral'}
+              {sourceUrl && isImage ? (
+                <div
+                  onClick={() => setShowLightbox(true)}
+                  className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/5 flex flex-col items-center justify-center p-3 max-h-[300px] cursor-pointer group"
+                  title="Click to view full size image"
+                >
+                  <img
+                    src={sourceUrl}
+                    alt="Original Uploaded Prescription Slip"
+                    className="w-full max-h-[250px] object-contain rounded-xl shadow-md border border-slate-200 bg-white group-hover:opacity-95 transition-opacity"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
+                    <span className="px-3.5 py-1.5 rounded-xl bg-white/95 text-slate-900 text-xs font-bold shadow-lg flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">zoom_in</span>
+                      Click to Enlarge Prescription
                     </span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="mt-2 flex items-center justify-between w-full px-2 text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1 font-mono truncate max-w-[240px]">
+                      <span className="material-symbols-outlined text-[14px] text-teal-700">lock</span>
+                      Archived in Vault: {sourceName}
+                    </span>
+                    <span className="font-bold text-teal-700 flex items-center gap-1 shrink-0">
+                      <span>Full Resolution</span>
+                      <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                    </span>
+                  </div>
+                </div>
+              ) : sourceUrl && isPdf ? (
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3.5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[26px]">picture_as_pdf</span>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 block truncate max-w-sm">
+                        {sourceName}
+                      </span>
+                      <span className="text-[11px] sm:text-xs text-slate-500 block truncate">
+                        Multi-page PDF prescription slip archived in secure HIPAA vault
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleViewPrescriptionImage}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-teal-800 text-white font-bold text-xs hover:bg-teal-900 transition-colors flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">visibility</span>
+                    <span>View Uploaded PDF</span>
+                  </button>
+                </div>
+              ) : (
+                /* Stylized Digital Prescription Slip representation */
+                <div
+                  onClick={() => setShowLightbox(true)}
+                  className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-white to-slate-50/70 border-2 border-dashed border-teal-200 shadow-xs relative overflow-hidden cursor-pointer hover:border-teal-400 transition-colors group"
+                  title="Click to view high-resolution prescription slip"
+                >
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/80 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[22px] text-teal-800">dentistry</span>
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                          Smile Clinic Health System
+                        </span>
+                        <span className="text-[10px] text-slate-500">Dental Operatory · Prescription Record Slip</span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-600 border border-slate-200 group-hover:bg-teal-100 group-hover:text-teal-900 transition-colors">
+                      Rx Digital Slip
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs py-1">
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-400 block font-semibold">Patient</span>
+                      <span className="font-bold text-slate-800 truncate block">{patientName}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-400 block font-semibold">MRN</span>
+                      <span className="font-mono text-slate-800">{mrn}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-400 block font-semibold">Date</span>
+                      <span className="text-slate-800 truncate block">{timestamp}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-400 block font-semibold">Attestation</span>
+                      <span className="font-semibold text-emerald-700">Digital Signed</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section 2: Extracted Prescribed Medications List */}
+            <div className="space-y-2">
+              <h4 className="uppercase font-bold tracking-wider text-slate-500 flex items-center gap-1.5 text-[11px] sm:text-xs">
+                <span className="material-symbols-outlined text-[15px] text-teal-700">medication</span>
+                <span>Extracted Regimen Items ({prescriptions.length})</span>
+              </h4>
+
+              {prescriptions.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No medication items listed in this prescription.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+                  {prescriptions.map((rx, idx) => (
+                    <div
+                      key={rx.id || idx}
+                      className="p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 shadow-2xs"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-900 block truncate">
+                          {rx.drugName}
+                        </span>
+                        <span className="text-[11px] text-slate-500 block truncate">
+                          {rx.genericName || rx.drugName} · {rx.dosage || 'Standard'} · {rx.frequency}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200/60 shrink-0">
+                        {rx.route || 'Oral (PO)'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Section 3: Status & Modal Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Fixed / Sticky Modal Footer Actions */}
+          <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/80 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500">Screening Status:</span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
@@ -313,19 +317,18 @@ export default function PrescriptionCopyModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200/70 transition-colors cursor-pointer"
               >
                 Close
               </button>
 
-              {/* View Prescription Image button requested by user */}
               <button
                 type="button"
                 onClick={handleViewPrescriptionImage}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                 title="View original uploaded prescription slip or image"
               >
-                <span className="material-symbols-outlined text-[16px]">image</span>
+                <span className="material-symbols-outlined text-[15px]">image</span>
                 <span>View Prescription Image</span>
               </button>
 
@@ -335,9 +338,9 @@ export default function PrescriptionCopyModal({
                   onClose();
                   navigate(`/report?id=${check?.id || auditLog?.checkId || id}`);
                 }}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-800 text-white hover:bg-teal-900 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                className="px-4 sm:px-5 py-2 rounded-xl text-xs font-bold bg-teal-800 text-white hover:bg-teal-900 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">description</span>
+                <span className="material-symbols-outlined text-[15px]">description</span>
                 <span>Open Certified 2-Page CDS Report</span>
               </button>
             </div>

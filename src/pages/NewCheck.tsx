@@ -17,6 +17,7 @@ import {
   getMultiKnowledgeBaseState,
   getActiveKnowledgeBase,
   setActiveKnowledgeBase,
+  toggleActiveKnowledgeBase,
   getRulesForKnowledgeBase,
   MultiKnowledgeBaseState,
   KnowledgeBaseProfile,
@@ -282,13 +283,15 @@ export default function NewCheck() {
   const hasDocumentedAllergies = parsedAllergies.length > 0;
   const allergySummary = hasDocumentedAllergies ? parsedAllergies.join(', ') : 'None documented (NKDA)';
 
-  // Multi-Profile Knowledge Base State (1 Active Enforced in AI Checks)
+  // Multi-Profile Knowledge Base State (1 Active Enforced in AI Checks or null)
   const [multiKbState, setMultiKbState] = useState<MultiKnowledgeBaseState>(() => getMultiKnowledgeBaseState());
-  const activeKb = multiKbState.knowledgeBases.find((k) => k.id === multiKbState.activeKbId) || multiKbState.knowledgeBases[0];
+  const activeKb = multiKbState.activeKbId
+    ? multiKbState.knowledgeBases.find((k) => k.id === multiKbState.activeKbId) || null
+    : null;
 
-  const [syncedDocs, setSyncedDocs] = useState<string[]>(() => activeKb.docs || []);
-  const [syncedChecks, setSyncedChecks] = useState<string[]>(() => activeKb.checks || []);
-  const [syncedConditions, setSyncedConditions] = useState<string[]>(() => activeKb.conditions || []);
+  const [syncedDocs, setSyncedDocs] = useState<string[]>(() => activeKb?.docs || []);
+  const [syncedChecks, setSyncedChecks] = useState<string[]>(() => activeKb?.checks || []);
+  const [syncedConditions, setSyncedConditions] = useState<string[]>(() => activeKb?.conditions || []);
   const [isKbRulesExpanded, setIsKbRulesExpanded] = useState<boolean>(false);
 
   useEffect(() => {
@@ -296,10 +299,12 @@ export default function NewCheck() {
       try {
         const fresh = getMultiKnowledgeBaseState();
         setMultiKbState(fresh);
-        const curr = fresh.knowledgeBases.find((k) => k.id === fresh.activeKbId) || fresh.knowledgeBases[0];
-        setSyncedDocs(curr.docs || []);
-        setSyncedChecks(curr.checks || []);
-        setSyncedConditions(curr.conditions || []);
+        const curr = fresh.activeKbId
+          ? fresh.knowledgeBases.find((k) => k.id === fresh.activeKbId) || null
+          : null;
+        setSyncedDocs(curr?.docs || []);
+        setSyncedChecks(curr?.checks || []);
+        setSyncedConditions(curr?.conditions || []);
       } catch (err) {
         console.warn('Failed to parse synced knowledge sources', err);
       }
@@ -313,14 +318,19 @@ export default function NewCheck() {
   }, []);
 
   const handleSwitchActiveKb = (kbId: string) => {
-    const nextState = setActiveKnowledgeBase(kbId);
+    const nextState = toggleActiveKnowledgeBase(kbId);
     setMultiKbState(nextState);
     const switched = nextState.knowledgeBases.find((k) => k.id === kbId);
-    if (switched) {
+    if (nextState.activeKbId === kbId && switched) {
       setSyncedDocs(switched.docs || []);
       setSyncedChecks(switched.checks || []);
       setSyncedConditions(switched.conditions || []);
       showConfirmation(`Prescription AI safety check context switched to "${switched.name}"`, 'success');
+    } else {
+      setSyncedDocs([]);
+      setSyncedChecks([]);
+      setSyncedConditions([]);
+      showConfirmation(`Unselected Knowledge Base. Running in Standard Pharmacopeia Mode`, 'info');
     }
   };
 
@@ -762,8 +772,8 @@ export default function NewCheck() {
         rules: VirtualDb.getRules(),
         clinical_inquiries: questionsToEvaluate,
         knowledge_sources: {
-          active_kb_id: activeKb.id,
-          active_kb_name: activeKb.name,
+          active_kb_id: activeKb?.id || null,
+          active_kb_name: activeKb?.name || null,
           synced_documents: syncedDocs,
           synced_checks: syncedChecks,
           synced_conditions: syncedConditions,
@@ -2223,15 +2233,26 @@ export default function NewCheck() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-on-surface">Active Knowledge Base:</span>
                         <span className="text-xs font-bold text-primary truncate max-w-[240px]">
-                          {activeKb.name}
+                          {activeKb ? activeKb.name : 'None (Pure Pharmacopeia Mode)'}
                         </span>
-                        <span className="text-[10px] font-semibold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                          <span>AI Enforced</span>
-                        </span>
-                        <span className="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
-                          {syncedDocs.length + syncedConditions.length + syncedChecks.length} Sources
-                        </span>
+                        {activeKb ? (
+                          <>
+                            <span className="text-[10px] font-semibold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span>AI Enforced</span>
+                            </span>
+                            <span className="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                              {syncedDocs.length + syncedConditions.length + syncedChecks.length} Sources
+                            </span>
+                            <span className="text-[10px] font-semibold text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                              {activeKbRules.length} Rules
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-outline px-2 py-0.5 rounded-full bg-surface-container border border-surface-container-high">
+                            Standard Safety Rules
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2247,32 +2268,35 @@ export default function NewCheck() {
                   </button>
                 </div>
 
-                {/* Quick 1-Click Knowledge Base Switcher (3 Slots) */}
+                {/* Dynamic Knowledge Base Switcher (Select & Unselect / Toggle) */}
                 <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-primary/10">
                   <span className="text-[11px] font-semibold text-outline mr-1">Switch KB:</span>
-                  {multiKbState.knowledgeBases.map((kb, idx) => {
-                    const isSelected = kb.id === multiKbState.activeKbId;
-                    return (
-                      <button
-                        key={kb.id}
-                        type="button"
-                        onClick={() => handleSwitchActiveKb(kb.id)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          isSelected
-                            ? 'bg-primary text-white shadow-2xs ring-1 ring-primary/40'
-                            : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-surface-container-high'
-                        }`}
-                        title={kb.name}
-                      >
-                        {isSelected ? (
-                          <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                        ) : (
-                          <span className="w-1.5 h-1.5 rounded-full bg-outline/40 shrink-0" />
-                        )}
-                        <span className="truncate max-w-[130px]">Slot {idx + 1}: {kb.name.split(' ')[0]}</span>
-                      </button>
-                    );
-                  })}
+                  {multiKbState.knowledgeBases.length === 0 ? (
+                    <span className="text-[11px] text-outline italic">No custom knowledge bases created yet.</span>
+                  ) : (
+                    multiKbState.knowledgeBases.map((kb) => {
+                      const isSelected = kb.id === multiKbState.activeKbId;
+                      return (
+                        <button
+                          key={kb.id}
+                          type="button"
+                          onClick={() => handleSwitchActiveKb(kb.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-primary text-white shadow-2xs ring-1 ring-primary/40'
+                              : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-surface-container-high'
+                          }`}
+                          title={isSelected ? `Active: Click to unselect "${kb.name}"` : `Click to activate "${kb.name}"`}
+                        >
+                          <span className="material-symbols-outlined text-[13px]">
+                            {isSelected ? 'check_circle' : 'radio_button_unchecked'}
+                          </span>
+                          <span className="truncate max-w-[160px]">{kb.name}</span>
+                          {isSelected && <span className="text-[9px] opacity-75 font-normal">(Active)</span>}
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* Active sources preview chips */}
@@ -2327,7 +2351,7 @@ export default function NewCheck() {
                     <div className="mt-2.5 p-3 rounded-xl bg-surface-container-lowest border border-primary/20 space-y-2 max-h-60 overflow-y-auto">
                       {activeKbRules.length === 0 ? (
                         <p className="text-xs text-outline italic text-center py-2">
-                          No specific rules active in &ldquo;{activeKb.name}&rdquo;. Synchronize sources in History &amp; Data to import rules.
+                          No specific rules active in &ldquo;{activeKb ? activeKb.name : 'Knowledge Base'}&rdquo;. Synchronize sources in History &amp; Data to import rules.
                         </p>
                       ) : (
                         activeKbRules.map((kr, idx) => {

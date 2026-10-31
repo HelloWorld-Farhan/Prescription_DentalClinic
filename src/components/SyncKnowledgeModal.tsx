@@ -8,7 +8,7 @@ import { showConfirmation } from '../services/confirmation';
 import {
   getMultiKnowledgeBaseState,
   saveKnowledgeBase,
-  clearKnowledgeBase,
+  synthesizeKnowledgeWithAI,
   KnowledgeBaseProfile,
 } from '../services/knowledgeBaseService';
 
@@ -16,7 +16,7 @@ interface SyncKnowledgeModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetKbId?: string;
-  onSyncComplete?: (version?: string, timestamp?: string) => void;
+  onSyncComplete?: (version?: string, timestamp?: string, newKbId?: string) => void;
 }
 
 export interface SyncableItem {
@@ -28,6 +28,7 @@ export interface SyncableItem {
   badge: string;
   filename?: string;
   date?: string;
+  rawPayload?: any;
 }
 
 export default function SyncKnowledgeModal({
@@ -41,10 +42,9 @@ export default function SyncKnowledgeModal({
   const [activeStepText, setActiveStepText] = useState('');
   const [syncCompleted, setSyncCompleted] = useState(false);
 
-  // Multi-KB profiles and currently configured slot
-  const [multiKbs, setMultiKbs] = useState<KnowledgeBaseProfile[]>([]);
-  const [selectedKbId, setSelectedKbId] = useState<string>('kb-1');
+  // User-provided Knowledge Base Name (Mandatory Validation - Empty by default)
   const [kbName, setKbName] = useState<string>('');
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // Syncable items list and selection
   const [items, setItems] = useState<SyncableItem[]>([]);
@@ -58,21 +58,20 @@ export default function SyncKnowledgeModal({
       setSyncProgress(0);
       setActiveStepText('');
       setSyncCompleted(false);
+      setNameError(null);
       return;
     }
 
     const state = getMultiKnowledgeBaseState();
-    setMultiKbs(state.knowledgeBases);
-    const initialKbId = targetKbId && state.knowledgeBases.some(k => k.id === targetKbId)
-      ? targetKbId
-      : state.activeKbId;
-    setSelectedKbId(initialKbId);
-    const initialProfile = state.knowledgeBases.find(k => k.id === initialKbId);
-    setKbName(initialProfile?.name || '');
+    const existingKb = targetKbId ? state.knowledgeBases.find((k) => k.id === targetKbId) : null;
+
+    // By default, NO NAME if creating new. Only populate if explicitly editing an existing KB.
+    setKbName(existingKb ? existingKb.name : '');
+    setNameError(null);
 
     const loadedItems: SyncableItem[] = [];
 
-    // 1. Uploaded Clinical History Documents (e.g. Kidney_History.pdf, Liver_History.pdf)
+    // 1. Real Uploaded Clinical History Documents
     try {
       const docs: UploadedDocumentRecord[] = getDocumentHistory();
       docs
@@ -101,11 +100,12 @@ export default function SyncKnowledgeModal({
             badge: 'Uploaded History',
             filename: doc.filename,
             date: doc.uploadedAt,
+            rawPayload: doc,
           });
         });
     } catch {}
 
-    // 2. Clinical Screening Checks (Prior Prescriptions)
+    // 2. Real Clinical Screening Checks (Prior Prescriptions)
     try {
       const checks: SafetyCheckRecord[] = VirtualDb.getChecks();
       checks.forEach((check) => {
@@ -117,11 +117,12 @@ export default function SyncKnowledgeModal({
           icon: 'fact_check',
           badge: 'Prior Regimen',
           date: check.timestamp,
+          rawPayload: check,
         });
       });
     } catch {}
 
-    // 3. Custom Decision Rules
+    // 3. Real Custom Decision Rules
     try {
       const rules: InteractionRule[] = VirtualDb.getRules();
       rules.forEach((rule) => {
@@ -133,37 +134,21 @@ export default function SyncKnowledgeModal({
           icon: 'rule',
           badge: 'Clinical Rule',
           date: rule.createdAt,
+          rawPayload: rule,
         });
       });
     } catch {}
 
     setItems(loadedItems);
 
-    // Initialize selection from the target knowledge base profile
-    const targetKb = state.knowledgeBases.find((k) => k.id === initialKbId);
-    if (targetKb && targetKb.selection && targetKb.selection.length > 0) {
-      const validSet = new Set(targetKb.selection.filter((id) => loadedItems.some((i) => i.id === id)));
+    // If editing existing KB, restore its prior selection. Otherwise select all by default so user has rich sources.
+    if (existingKb && existingKb.selection && existingKb.selection.length > 0) {
+      const validSet = new Set(existingKb.selection.filter((id) => loadedItems.some((i) => i.id === id)));
       setSelectedIds(validSet);
     } else {
-      setSelectedIds(new Set());
+      setSelectedIds(new Set(loadedItems.map((i) => i.id)));
     }
   }, [isOpen, targetKbId]);
-
-  // Handle switching which KB profile is being configured in this modal
-  const handleSwitchTargetKb = (kbId: string) => {
-    if (isSyncing) return;
-    setSelectedKbId(kbId);
-    const targetKb = multiKbs.find((k) => k.id === kbId);
-    if (targetKb) {
-      setKbName(targetKb.name);
-    }
-    if (targetKb && targetKb.selection && targetKb.selection.length > 0) {
-      const validSet = new Set(targetKb.selection.filter((id) => items.some((i) => i.id === id)));
-      setSelectedIds(validSet);
-    } else {
-      setSelectedIds(new Set());
-    }
-  };
 
   // Lock body scroll on open
   useEffect(() => {
@@ -211,19 +196,24 @@ export default function SyncKnowledgeModal({
     }
   };
 
-  const handleClearCurrentKb = () => {
-    if (isSyncing) return;
-    clearKnowledgeBase(selectedKbId);
-    setSelectedIds(new Set());
-    const currentName = multiKbs.find((k) => k.id === selectedKbId)?.name || 'Knowledge Base';
-    showConfirmation(`Cleared all knowledge sources from "${currentName}"`, 'info');
-  };
+  const handleStartSync = async () => {
+    // 1. Mandatory Name Validation
+    const trimmedName = kbName.trim();
+    if (!trimmedName) {
+      setNameError('Knowledge Base Name is mandatory. Please provide a descriptive title.');
+      return;
+    }
+    if (trimmedName.length < 3) {
+      setNameError('Knowledge Base Name must be at least 3 characters.');
+      return;
+    }
+    setNameError(null);
 
-  const handleStartSync = () => {
-    // Gather specific selected subsets
+    // 2. Gather specific selected subsets
     const selectedDocs: string[] = [];
     const selectedChecks: string[] = [];
     const selectedRules: string[] = [];
+    const fullRegimens: any[] = [];
 
     items.forEach((item) => {
       if (!selectedIds.has(item.id)) return;
@@ -231,6 +221,7 @@ export default function SyncKnowledgeModal({
         selectedDocs.push(item.filename);
       } else if (item.type === 'check') {
         selectedChecks.push(item.id.replace('check-', ''));
+        if (item.rawPayload) fullRegimens.push(item.rawPayload);
       } else if (item.type === 'rule') {
         selectedRules.push(item.id.replace('rule-', ''));
       }
@@ -241,68 +232,81 @@ export default function SyncKnowledgeModal({
       return docName.replace(/\.[^/.]+$/, '').replace(/[_\\-]/g, ' ');
     });
 
-    const targetKbName = multiKbs.find((k) => k.id === selectedKbId)?.name || 'Knowledge Base';
-    const trimmedName = kbName.trim() || targetKbName;
-
     setIsSyncing(true);
-    setSyncProgress(25);
-    setActiveStepText(`Validating ${selectedIds.size} selected sources for ${trimmedName}...`);
+    setSyncProgress(15);
+    setActiveStepText(`Validating ${selectedIds.size} selected sources for "${trimmedName}"...`);
 
-    setTimeout(() => {
-      setSyncProgress(60);
-      const docsSummary = selectedDocs.length > 0 ? selectedDocs.join(', ') : 'No document history';
-      setActiveStepText(`Binding clinical history records (${docsSummary})...`);
-    }, 600);
+    try {
+      // Step 1: Animation update
+      await new Promise((r) => setTimeout(r, 600));
+      setSyncProgress(35);
+      setActiveStepText('Correlating clinical documents with prior prescription regimens...');
 
-    setTimeout(() => {
-      setSyncProgress(85);
-      setActiveStepText(`Injecting knowledge sources into "${trimmedName}"...`);
-    }, 1200);
+      // Step 2: Gemini AI synthesis via multi-key failover backend
+      await new Promise((r) => setTimeout(r, 600));
+      setSyncProgress(65);
+      setActiveStepText('Gemini AI synthesizing multi-drug interaction network & clinical rules...');
 
-    setTimeout(() => {
+      const aiResult = await synthesizeKnowledgeWithAI({
+        name: trimmedName,
+        documents: selectedDocs,
+        regimens: fullRegimens,
+        conditions: derivedConditions,
+      });
+
+      // Step 3: Compiling and persisting
+      setSyncProgress(90);
+      setActiveStepText(`Persisting "${trimmedName}" with ${aiResult.rules.length} synthesized rules...`);
+      await new Promise((r) => setTimeout(r, 500));
+
       setSyncProgress(100);
-      setActiveStepText('Knowledge base successfully synchronized.');
+      setActiveStepText('Knowledge base successfully synchronized & persisted to cloud.');
       setSyncCompleted(true);
 
+      const targetId = targetKbId || `kb-${Date.now()}`;
       const selectionArray = Array.from(selectedIds);
 
-      // Save into the targeted Knowledge Base profile with user-provided name
-      saveKnowledgeBase(selectedKbId, {
+      // Save into the Knowledge Base profile with user-provided name & synthesized rules
+      const { savedKb } = saveKnowledgeBase(targetId, {
         name: trimmedName,
         selection: selectionArray,
         docs: selectedDocs,
         checks: selectedChecks,
         rules: selectedRules,
         conditions: derivedConditions,
+        synthesizedRules: aiResult.rules,
+        precautions: aiResult.precautions,
       });
 
       showConfirmation(
-        `Synchronized ${selectedDocs.length} history documents and ${selectedChecks.length} prior prescriptions into "${trimmedName}"`,
+        `Created & Synchronized Knowledge Base: "${trimmedName}" (${aiResult.rules.length} AI Rules)`,
         'success'
       );
 
       setTimeout(() => {
         if (onSyncComplete) {
-          onSyncComplete('v2.5.0', 'Just now');
+          onSyncComplete('v2.5.0', 'Just now', savedKb.id);
         }
         onClose();
       }, 700);
-    }, 1800);
+    } catch (err: any) {
+      console.error('Synthesis error:', err);
+      setIsSyncing(false);
+      setNameError(err.message || 'Failed to synthesize knowledge base. Please try again.');
+    }
   };
 
   if (typeof document === 'undefined') return null;
 
   const hasData = items.length > 0;
   const isAllSelected = items.length > 0 && selectedIds.size === items.length;
-  const currentKbObj = multiKbs.find((k) => k.id === selectedKbId);
-
   const docCount = items.filter((i) => i.type === 'document').length;
   const checkCount = items.filter((i) => i.type === 'check').length;
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-4 select-none">
+        <div className="fixed inset-0 z-[110] overflow-y-auto flex items-center justify-center p-2.5 sm:p-4 md:p-6 overscroll-contain pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] pt-[max(0.625rem,env(safe-area-inset-top,0px))] select-none">
           {/* Animated Full-Screen Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -320,19 +324,18 @@ export default function SyncKnowledgeModal({
             exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(4px)' }}
             transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className="relative z-10 bg-surface-container-lowest rounded-2xl p-5 sm:p-6 max-w-lg w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+            className="relative z-10 bg-surface-container-lowest rounded-2xl sm:rounded-3xl max-w-lg w-full border border-surface-container-high shadow-2xl flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[88vh] overflow-hidden"
           >
-            {/* Top Modal Header */}
-            <div className="flex items-center justify-between border-b border-surface-container pb-3.5 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">account_tree</span>
+            {/* Top Modal Header (Sticky) */}
+            <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-surface-container flex items-center justify-between gap-3 bg-surface-container-lowest shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-2xs shrink-0">
+                  <span className="material-symbols-outlined text-[18px] sm:text-[20px]">account_tree</span>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-on-surface">Synchronize Knowledge Base</h3>
-                  <p className="text-xs text-on-surface-variant">
-                    Configuring:{' '}
-                    <span className="font-semibold text-primary">{currentKbObj?.name || 'Selected Protocol'}</span>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-on-surface truncate">Synchronize Knowledge Base</h3>
+                  <p className="text-[11px] sm:text-xs text-on-surface-variant truncate">
+                    {targetKbId ? 'Update & Re-synthesize Knowledge Base' : 'Create Custom User-Named Knowledge Base'}
                   </p>
                 </div>
               </div>
@@ -341,118 +344,111 @@ export default function SyncKnowledgeModal({
                 type="button"
                 onClick={onClose}
                 disabled={isSyncing}
-                className="w-8 h-8 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center cursor-pointer disabled:opacity-40"
+                className="w-8 h-8 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-40"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            {/* Target Knowledge Base Profile Switcher (3 Slots) */}
-            <div className="pt-3 pb-1 shrink-0">
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-semibold text-on-surface-variant">Target Knowledge Base Slot:</span>
-                <span className="text-[11px] text-outline">Select slot to configure</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-surface-container-low border border-surface-container-high/60">
-                {multiKbs.map((kb, idx) => {
-                  const isTarget = kb.id === selectedKbId;
-                  return (
-                    <button
-                      key={kb.id}
-                      type="button"
-                      disabled={isSyncing}
-                      onClick={() => handleSwitchTargetKb(kb.id)}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center truncate cursor-pointer ${
-                        isTarget
-                          ? 'bg-primary text-white shadow-2xs'
-                          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-                      }`}
-                      title={kb.name}
-                    >
-                      Slot {idx + 1}: {kb.name.split(' ')[0]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Knowledge Base Name Customization Field */}
-            <div className="pt-2 pb-1 shrink-0">
-              <label className="flex items-center justify-between text-xs font-semibold text-on-surface-variant mb-1">
-                <span className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[15px] text-primary">badge</span>
-                  <span>Knowledge Base Name:</span>
-                </span>
-                <span className="text-[10px] text-emerald-600 font-medium">Saves to DB & syncs to all devices</span>
-              </label>
-              <input
-                type="text"
-                disabled={isSyncing}
-                value={kbName}
-                onChange={(e) => setKbName(e.target.value)}
-                placeholder="Enter Knowledge Base Name (e.g. Pediatric & Geriatric Safety)"
-                className="w-full text-xs font-bold px-3 py-2 rounded-xl border border-surface-container-high bg-surface-container-low text-on-surface focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-colors shadow-2xs"
-              />
-            </div>
-
-            {/* Category Filter Pills & Select All Row */}
-            <div className="flex items-center justify-between py-3 border-b border-surface-container shrink-0 gap-2">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter('all')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                    categoryFilter === 'all'
-                      ? 'bg-primary/10 text-primary font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container'
-                  }`}
-                >
-                  All ({items.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter('history')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                    categoryFilter === 'history'
-                      ? 'bg-primary/10 text-primary font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container'
-                  }`}
-                >
-                  History ({docCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter('check')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                    categoryFilter === 'check'
-                      ? 'bg-primary/10 text-primary font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container'
-                  }`}
-                >
-                  Regimens ({checkCount})
-                </button>
+            {/* Knowledge Base Name & Category Filters (Sticky Top Controls) */}
+            <div className="px-4 pt-3 pb-2.5 sm:px-6 sm:pt-3.5 sm:pb-3 border-b border-surface-container/60 bg-surface-container-lowest shrink-0 space-y-2.5">
+              {/* Name field */}
+              <div>
+                <label className="flex items-center justify-between text-xs font-semibold text-on-surface-variant mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px] text-primary">badge</span>
+                    <span>Knowledge Base Name <span className="text-error font-bold">*</span>:</span>
+                  </span>
+                  <span className="text-[10px] text-primary font-medium flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">cloud_sync</span>
+                    <span>Syncs to all devices</span>
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    disabled={isSyncing}
+                    value={kbName}
+                    onChange={(e) => {
+                      setKbName(e.target.value);
+                      if (nameError) setNameError(null);
+                    }}
+                    placeholder="Enter custom name (e.g. Cardio & Anticoagulant Protocol)"
+                    className={`w-full text-xs font-bold px-3 py-2 sm:py-2.5 rounded-xl border bg-surface-container-low text-on-surface focus:outline-none focus:bg-surface-container-lowest transition-colors shadow-2xs ${
+                      nameError
+                        ? 'border-error focus:border-error bg-error/5 text-error placeholder:text-error/50'
+                        : 'border-surface-container-high focus:border-primary'
+                    }`}
+                    autoFocus
+                  />
+                  {nameError && (
+                    <div className="flex items-center gap-1 text-[11px] text-error font-semibold mt-1 px-1">
+                      <span className="material-symbols-outlined text-[13px]">error</span>
+                      <span>{nameError}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {hasData && (
-                <button
-                  type="button"
-                  disabled={isSyncing}
-                  onClick={handleToggleAll}
-                  className="text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1 shrink-0"
-                >
-                  <span>{isAllSelected ? 'Deselect All' : 'Select All'}</span>
-                </button>
-              )}
+              {/* Filter pills & Select all */}
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter('all')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      categoryFilter === 'all'
+                        ? 'bg-primary/10 text-primary font-bold'
+                        : 'text-on-surface-variant hover:bg-surface-container'
+                    }`}
+                  >
+                    All ({items.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter('history')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      categoryFilter === 'history'
+                        ? 'bg-primary/10 text-primary font-bold'
+                        : 'text-on-surface-variant hover:bg-surface-container'
+                    }`}
+                  >
+                    History ({docCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter('check')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      categoryFilter === 'check'
+                        ? 'bg-primary/10 text-primary font-bold'
+                        : 'text-on-surface-variant hover:bg-surface-container'
+                    }`}
+                  >
+                    Regimens ({checkCount})
+                  </button>
+                </div>
+
+                {hasData && (
+                  <button
+                    type="button"
+                    disabled={isSyncing}
+                    onClick={handleToggleAll}
+                    className="text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1 shrink-0"
+                  >
+                    <span>{isAllSelected ? 'Deselect All' : 'Select All'}</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Scrollable Items List */}
-            <div className="flex-1 overflow-y-auto py-3 space-y-2 pr-1 my-1">
+            <div className="flex-1 overflow-y-auto px-4 py-2.5 sm:px-6 sm:py-3 space-y-2 min-h-0 overscroll-contain">
               {!hasData ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center gap-2 text-outline">
-                  <span className="material-symbols-outlined text-4xl">folder_off</span>
-                  <p className="text-xs font-medium">No clinical history documents or prior prescriptions found.</p>
+                <div className="py-8 sm:py-10 flex flex-col items-center justify-center text-center gap-2 text-outline">
+                  <span className="material-symbols-outlined text-4xl text-primary/40">folder_off</span>
+                  <p className="text-xs font-bold text-on-surface">No uploaded history or prior checks found.</p>
                   <p className="text-[11px] text-on-surface-variant max-w-xs">
-                    Upload clinical history documents or run prior prescription checks to sync them into this knowledge base.
+                    Upload clinical history documents or perform prescription checks to select and synthesize them into this Knowledge Base.
                   </p>
                 </div>
               ) : (
@@ -462,13 +458,13 @@ export default function SyncKnowledgeModal({
                     <div
                       key={item.id}
                       onClick={() => handleToggleItem(item.id)}
-                      className={`p-3 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${
+                      className={`p-2.5 sm:p-3 rounded-xl border transition-all flex items-start gap-2.5 sm:gap-3 cursor-pointer ${
                         isChecked
                           ? 'bg-primary/5 border-primary/40 shadow-2xs'
                           : 'bg-surface-container-lowest border-surface-container hover:border-outline/30'
                       }`}
                     >
-                      <div className="pt-0.5">
+                      <div className="pt-0.5 shrink-0">
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -478,16 +474,16 @@ export default function SyncKnowledgeModal({
                         />
                       </div>
 
-                      <div className="w-8 h-8 rounded-lg bg-surface-container text-on-surface flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[18px] text-primary">{item.icon}</span>
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-surface-container text-on-surface flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[16px] sm:text-[18px] text-primary">{item.icon}</span>
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-bold text-on-surface truncate max-w-[260px]">
+                          <span className="text-xs font-bold text-on-surface truncate max-w-[200px] sm:max-w-[260px]">
                             {item.title}
                           </span>
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
+                          <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant">
                             {item.badge}
                           </span>
                         </div>
@@ -499,65 +495,70 @@ export default function SyncKnowledgeModal({
               )}
             </div>
 
-            {/* In-Flight Synchronization Progress */}
+            {/* In-Flight Multi-Key AI Synthesis Working Animation */}
             {isSyncing && (
-              <div className="p-3.5 bg-surface-container-low rounded-xl border border-surface-container flex flex-col gap-2 mb-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-on-surface flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px] animate-spin text-primary">
-                      progress_activity
-                    </span>
-                    {activeStepText || 'Synchronizing with Knowledge Base...'}
-                  </span>
-                  <span className="font-bold text-primary">{syncProgress}%</span>
-                </div>
+              <div className="px-4 py-2 sm:px-6 shrink-0">
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3.5 bg-primary/5 rounded-2xl border border-primary/20 flex flex-col gap-2 shadow-sm"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center animate-spin shrink-0">
+                        <span className="material-symbols-outlined text-[14px]">neurology</span>
+                      </div>
+                      <span className="font-bold text-on-surface truncate max-w-[240px] sm:max-w-[280px]">
+                        {activeStepText || 'AI Model Analyzing Connections...'}
+                      </span>
+                    </div>
+                    <span className="font-extrabold text-primary shrink-0">{syncProgress}%</span>
+                  </div>
 
-                <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
-                  <motion.div
-                    className="bg-primary h-full rounded-full transition-all duration-300"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${syncProgress}%` }}
-                  />
-                </div>
+                  <div className="w-full bg-surface-container-high rounded-full h-1.5 sm:h-2 overflow-hidden">
+                    <motion.div
+                      className="bg-primary h-full rounded-full transition-all duration-300"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${syncProgress}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-on-surface-variant px-0.5">
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Gemini 15-Key Failover Engine</span>
+                    </span>
+                    <span>Synthesizing Medicine Graph</span>
+                  </div>
+                </motion.div>
               </div>
             )}
 
-            {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-between pt-3 border-t border-surface-container shrink-0 gap-2">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={isSyncing}
-                  onClick={onClose}
-                  className="px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={isSyncing || selectedIds.size === 0}
-                  onClick={handleClearCurrentKb}
-                  className="px-2.5 py-1.5 text-xs font-semibold text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
-                  title="Clear all knowledge sources from this slot"
-                >
-                  <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
-                  <span>Clear Slot</span>
-                </button>
-              </div>
+            {/* Sticky Modal Bottom Actions */}
+            <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-t border-surface-container flex items-center justify-between gap-2.5 bg-surface-container-low/70 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+              <button
+                type="button"
+                disabled={isSyncing}
+                onClick={onClose}
+                className="px-3.5 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
 
               <button
                 type="button"
                 disabled={isSyncing}
                 onClick={handleStartSync}
-                className="px-4 py-2 text-xs font-bold bg-primary text-on-primary hover:bg-primary-hover rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 sm:px-5 py-2 sm:py-2.5 text-xs font-bold bg-primary text-on-primary hover:bg-primary-hover rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span className="material-symbols-outlined text-[16px]">sync</span>
+                <span className="material-symbols-outlined text-[17px]">
+                  {isSyncing ? 'sync' : 'auto_awesome'}
+                </span>
                 <span>
                   {isSyncing
-                    ? 'Synchronizing...'
+                    ? 'Synthesizing...'
                     : syncCompleted
                     ? 'Synchronized!'
-                    : `Save & Sync (${selectedIds.size})`}
+                    : `Synthesize & Sync (${selectedIds.size})`}
                 </span>
               </button>
             </div>

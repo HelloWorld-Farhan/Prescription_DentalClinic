@@ -146,6 +146,35 @@ export default function Dashboard() {
 
   }, [checks, selectedCheckId]);
 
+  const selectedCheckIsOverridden = useMemo(() => {
+    if (!selectedCheck) return false;
+    const active = (selectedCheck.alerts || []).filter((a: any) => !a.overridden);
+    return (
+      selectedCheck.overallStatus === 'Doctor Notified' ||
+      selectedCheck.overallStatus === 'Overridden' ||
+      selectedCheck.status === 'overridden' ||
+      ((selectedCheck.alerts || []).length > 0 && active.length === 0)
+    );
+  }, [selectedCheck]);
+
+  const selectedCheckDoc = useMemo(() => {
+    if (!selectedCheck) return null;
+    if ((selectedCheck as any).doctorName) {
+      return { name: (selectedCheck as any).doctorName, email: (selectedCheck as any).doctorEmail || '' };
+    }
+    const withDoc = (selectedCheck.alerts || []).find((a: any) => (a as any).doctorName || a.overrideReason);
+    if (withDoc) {
+      if ((withDoc as any).doctorName) {
+        return { name: (withDoc as any).doctorName, email: (withDoc as any).doctorEmail || '' };
+      }
+      const m = (withDoc.overrideReason || '').match(/Dr\.\s*([^(\]]+)(?:\s*\(([^)]+)\))?/i);
+      if (m) {
+        return { name: m[1].trim(), email: m[2] ? m[2].trim() : '' };
+      }
+    }
+    return null;
+  }, [selectedCheck]);
+
 
 
   // Live ticking Indian Standard Time (IST) clock
@@ -1308,9 +1337,13 @@ export default function Dashboard() {
 
                   paginatedChecks.map((check) => {
 
-                    const hasContra = check.alerts.some(a => a.severity === 'contraindicated');
+                    const activeAlerts = (check.alerts || []).filter(a => !a.overridden);
 
-                    const hasMajor = check.alerts.some(a => a.severity === 'major');
+                    const isOverridden = check.overallStatus === 'Doctor Notified' || check.overallStatus === 'Overridden' || check.status === 'overridden' || ((check.alerts || []).length > 0 && activeAlerts.length === 0);
+
+                    const hasContra = !isOverridden && activeAlerts.some(a => a.severity === 'contraindicated');
+
+                    const hasMajor = !isOverridden && activeAlerts.some(a => a.severity === 'major');
 
                     const isSelected = selectedCheck?.id === check.id;
 
@@ -1422,7 +1455,17 @@ export default function Dashboard() {
 
                         <td className="py-2.5 px-3 whitespace-nowrap">
 
-                          {hasContra ? (
+                          {isOverridden ? (
+
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold shadow-2xs whitespace-nowrap" title="Prescribing doctor notified">
+
+                              <span className="material-symbols-outlined text-[12px]">send</span>
+
+                              Doctor Notified
+
+                            </span>
+
+                          ) : hasContra ? (
 
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[#FFDAD6] text-[#BA1A1A] font-bold shadow-2xs whitespace-nowrap">
 
@@ -1701,14 +1744,18 @@ export default function Dashboard() {
             <div className="flex items-center justify-between pb-3 border-b border-surface-container shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
-                  selectedCheck?.overallStatus === 'Contraindicated'
+                  selectedCheckIsOverridden
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : selectedCheck?.overallStatus === 'Contraindicated'
                     ? 'bg-[#FFDAD6] text-[#BA1A1A]'
                     : selectedCheck?.overallStatus === 'Requires Review'
                     ? 'bg-[#FEF3C7] text-[#975A16]'
                     : 'bg-emerald-100 text-emerald-800'
                 }`}>
                   <span className="material-symbols-outlined text-[18px]">
-                    {selectedCheck?.overallStatus === 'Contraindicated'
+                    {selectedCheckIsOverridden
+                      ? 'mark_email_read'
+                      : selectedCheck?.overallStatus === 'Contraindicated'
                       ? 'warning'
                       : selectedCheck?.overallStatus === 'Requires Review'
                       ? 'rate_review'
@@ -1721,15 +1768,29 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                selectedCheck?.overallStatus === 'Contraindicated'
-                  ? 'bg-[#FFDAD6] text-[#BA1A1A]'
-                  : selectedCheck?.overallStatus === 'Requires Review'
-                  ? 'bg-[#FEF3C7] text-[#975A16]'
-                  : 'bg-emerald-100 text-emerald-800'
-              }`}>
-                {selectedCheck ? (selectedCheck.overallStatus || 'Safe to Dispense') : 'All Clear'}
-              </span>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                  selectedCheckIsOverridden
+                    ? 'bg-emerald-100 text-emerald-800 flex items-center gap-1'
+                    : selectedCheck?.overallStatus === 'Contraindicated'
+                    ? 'bg-[#FFDAD6] text-[#BA1A1A]'
+                    : selectedCheck?.overallStatus === 'Requires Review'
+                    ? 'bg-[#FEF3C7] text-[#975A16]'
+                    : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  {selectedCheckIsOverridden && <span className="material-symbols-outlined text-[12px]">send</span>}
+                  {selectedCheckIsOverridden
+                    ? 'Doctor Notified'
+                    : selectedCheck
+                    ? (selectedCheck.overallStatus || 'Safe to Dispense')
+                    : 'All Clear'}
+                </span>
+                {selectedCheckIsOverridden && selectedCheckDoc && (
+                  <span className="text-[10px] text-emerald-700 font-semibold truncate max-w-[170px]" title={`Dr. ${selectedCheckDoc.name} (${selectedCheckDoc.email})`}>
+                    Dr. {selectedCheckDoc.name}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Check Selector Dropdown (Clean, compact picker allowing instant switching) */}
@@ -1766,8 +1827,10 @@ export default function Dashboard() {
                       </div>
                       {checks.map((chk) => {
                         const isChkSelected = chk.id === selectedCheck.id;
-                        const isContra = chk.overallStatus === 'Contraindicated';
-                        const isReview = chk.overallStatus === 'Requires Review';
+                        const chkActive = (chk.alerts || []).filter(a => !a.overridden);
+                        const chkOverridden = chk.overallStatus === 'Doctor Notified' || chk.overallStatus === 'Overridden' || chk.status === 'overridden' || ((chk.alerts || []).length > 0 && chkActive.length === 0);
+                        const isContra = !chkOverridden && chkActive.some(a => a.severity === 'contraindicated');
+                        const isReview = !chkOverridden && (chk.overallStatus === 'Requires Review' || chkActive.length > 0);
                         return (
                           <button
                             key={chk.id}
@@ -1787,13 +1850,15 @@ export default function Dashboard() {
                               <span className="text-outline truncate">· {chk.patientName || chk.patientKey || chk.mrn}</span>
                             </div>
                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ml-1 shrink-0 ${
-                              isContra
+                              chkOverridden
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : isContra
                                 ? 'bg-[#FFDAD6] text-[#BA1A1A]'
                                 : isReview
                                 ? 'bg-[#FEF3C7] text-[#975A16]'
                                 : 'bg-emerald-100 text-emerald-800'
                             }`}>
-                              {chk.overallStatus || 'Safe'}
+                              {chkOverridden ? 'Doctor Notified' : (chk.overallStatus || 'Safe')}
                             </span>
                           </button>
                         );
@@ -1812,9 +1877,16 @@ export default function Dashboard() {
                   {selectedCheck.alerts && selectedCheck.alerts.length > 0 ? (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-rose-600 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">warning</span>
+                        <span className={`text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 ${
+                          selectedCheckIsOverridden ? 'text-emerald-700' : 'text-rose-600'
+                        }`}>
+                          <span className="material-symbols-outlined text-[14px]">
+                            {selectedCheckIsOverridden ? 'task_alt' : 'warning'}
+                          </span>
                           Clinical CDS Flags ({selectedCheck.alerts.length})
+                          {selectedCheckIsOverridden && (
+                            <span className="text-[10px] font-normal text-emerald-600 lowercase">(notified)</span>
+                          )}
                         </span>
                         <span className="text-[10px] font-mono text-outline">
                           {selectedCheck.unit || 'Dental Operatory'}
@@ -1823,6 +1895,9 @@ export default function Dashboard() {
 
                       <div className="space-y-2">
                         {selectedCheck.alerts.map((alert: any, aIdx: number) => {
+                          const isAlertOverridden = Boolean(alert.overridden || selectedCheckIsOverridden);
+                          const alertDocName = alert.doctorName || selectedCheckDoc?.name;
+                          const alertDocEmail = alert.doctorEmail || selectedCheckDoc?.email;
                           const alertSeverity = ((alert.severity || 'major') as string).toLowerCase();
                           const isContra = alertSeverity === 'contraindicated' || alertSeverity === 'critical';
                           const isMaj = alertSeverity === 'major' || alertSeverity === 'high';
@@ -1837,6 +1912,61 @@ export default function Dashboard() {
                             alert.clinicalImpact ||
                             alert.finding ||
                             'Clinical safety warning flagged during automated cross-check.';
+
+                          if (isAlertOverridden) {
+                            return (
+                              <div
+                                key={alert.id || `alt-${aIdx}`}
+                                className="rounded-xl p-3 flex flex-col gap-2 border bg-emerald-50/70 border-emerald-200 text-emerald-950 shadow-2xs"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className="material-symbols-outlined text-[16px] text-emerald-700 shrink-0">check_circle</span>
+                                    <span className="font-bold text-xs leading-snug">{alertTitle}</span>
+                                  </div>
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0 bg-emerald-700 text-white flex items-center gap-0.5">
+                                    <span className="material-symbols-outlined text-[10px]">send</span>
+                                    Notified
+                                  </span>
+                                </div>
+
+                                <div className="p-2 rounded-lg bg-emerald-100/70 border border-emerald-200/80 text-[11px] text-emerald-900 flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1 font-semibold">
+                                    <span className="material-symbols-outlined text-[13px] text-emerald-800">stethoscope</span>
+                                    <span>Prescribing Doctor Notified:</span>
+                                    <span className="font-bold text-emerald-950">
+                                      {alertDocName ? `Dr. ${alertDocName}` : 'Attending Prescriber'}
+                                    </span>
+                                  </div>
+                                  {alertDocEmail && (
+                                    <div className="flex items-center gap-1 text-[10px] text-emerald-800 font-mono pl-4">
+                                      <span className="material-symbols-outlined text-[11px]">mail</span>
+                                      <span>{alertDocEmail}</span>
+                                    </div>
+                                  )}
+                                  {alert.overrideReason && (
+                                    <div className="text-[10px] text-emerald-800 mt-1 pl-4 italic line-clamp-2">
+                                      "{alert.overrideReason}"
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center justify-between pt-1 border-t border-emerald-200/60 mt-0.5">
+                                  <span className="text-[10px] text-emerald-700 font-semibold">
+                                    {alert.category || 'Drug-Drug'} · Resolution Dispatched
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => navigate(`/report?id=${selectedCheck.id}`)}
+                                    className="text-xs font-bold text-emerald-800 hover:text-emerald-950 hover:underline cursor-pointer flex items-center gap-0.5"
+                                  >
+                                    <span>View Directive PDF</span>
+                                    <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
 
                           return (
                             <div
@@ -1934,7 +2064,9 @@ export default function Dashboard() {
                         <span className="material-symbols-outlined text-[13px] text-secondary">person_check</span>
                         <span>{selectedCheck.reviewerName || selectedCheck.prescriberName || 'Active Clinician'}</span>
                       </span>
-                      <span className="font-semibold text-slate-700">{selectedCheck.overallStatus || 'Attested'}</span>
+                      <span className={`font-semibold ${selectedCheckIsOverridden ? 'text-emerald-800' : 'text-slate-700'}`}>
+                        {selectedCheckIsOverridden ? 'Doctor Notified' : (selectedCheck.overallStatus || 'Attested')}
+                      </span>
                     </div>
                   </div>
                 </>

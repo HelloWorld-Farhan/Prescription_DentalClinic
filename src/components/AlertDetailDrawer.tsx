@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DrugInteractionAlert } from '../types';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
-import { getClinicianEmail } from '../services/cloudSyncService';
+import { getClinicianEmail, getClinicianPhone } from '../services/cloudSyncService';
 import { showConfirmation } from '../services/confirmation';
 import {
   dispatchDoctorConsultEmail,
@@ -125,10 +125,20 @@ export default function AlertDetailDrawer({
 
   const alternativeAvailable = alert?.alternativeSuggestion || (alert?.alternatives && alert.alternatives[0]) || '';
 
-  // Load user's saved doctors on mount or user change
+  // Load user's saved doctors on mount or user change, and listen for cross-device cloud sync
   useEffect(() => {
     const list = getSavedDoctors(loggedEmail);
     setSavedDoctors(list);
+
+    const handleSync = (e: any) => {
+      if (e?.detail && Array.isArray(e.detail)) {
+        setSavedDoctors(e.detail);
+      } else {
+        setSavedDoctors(getSavedDoctors(loggedEmail));
+      }
+    };
+    window.addEventListener('smileclinic_saved_doctors_synced', handleSync);
+    return () => window.removeEventListener('smileclinic_saved_doctors_synced', handleSync);
   }, [loggedEmail]);
 
   // Pre-fill alternative medication once
@@ -153,17 +163,23 @@ export default function AlertDetailDrawer({
                        alert.overrideReason.match(/\[(?:Dr\.|Prescriber:)?\s*([^(\]]+)(?:\s*\(([^)]+)\))?\]/i);
       const doctor = docMatch ? docMatch[1].trim() : (alert.overrideAuthor || 'Consulted Doctor');
       const email = docMatch && docMatch[2] ? docMatch[2].trim() : 'Email Dispatched';
+      let recordTime = 'Logged in Database';
+      if ((alert as any)?.overriddenAt) {
+        try {
+          recordTime = new Date((alert as any).overriddenAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch {}
+      }
       return {
         doctor,
         email,
-        time: 'Logged in Database',
+        time: recordTime,
         note: alert.overrideReason
       };
     }
-    const logs = VirtualDb.getAuditLogs();
-    const match = logs.find(l =>
+    const rawLogs = typeof (VirtualDb as any).getRawAuditLogs === 'function' ? (VirtualDb as any).getRawAuditLogs() : VirtualDb.getAuditLogs();
+    const match = rawLogs.find((l: any) =>
       (l.checkId === effectiveCheckId || l.patientMrn === patientMrn) &&
-      (l.action === 'Alert Overridden' || (l.details && l.details.includes('Doctor consultation email dispatched'))) &&
+      (l.action === 'Alert Overridden' || l.action === 'Doctor Consulted & Regimen Modified' || (l.details && l.details.includes('Doctor consultation email dispatched')) || (l.details && l.details.includes('Clinical alert for'))) &&
       (l.details?.includes(drugA) || l.details?.includes(alert?.title || '') || (alert?.title && alert.title.includes(drugA)))
     );
     if (match) {
@@ -177,6 +193,16 @@ export default function AlertDetailDrawer({
     }
     return null;
   }, [sentEventInfo, alert, effectiveCheckId, patientMrn, drugA]);
+
+// Autofill previously consulted doctor contact details into inputs if currently empty
+  useEffect(() => {
+    if (historicalRecord?.doctor && !doctorName) {
+      setDoctorName(historicalRecord.doctor);
+    }
+    if (historicalRecord?.email && historicalRecord.email.includes('@') && !doctorEmail) {
+      setDoctorEmail(historicalRecord.email);
+    }
+  }, [historicalRecord]);
 
   // Lock body scroll on open
   useEffect(() => {
@@ -291,7 +317,8 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
         rationale: aiClinicalDirective,
         clinician_name: loggedClinician,
         clinician_email: loggedEmail,
-        cc_user_email: undefined,
+        clinician_phone: getClinicianPhone(),
+        cc_user_email: loggedEmail,
         pdf_url: effectivePdfUrl,
         source_document_url: effectiveSourceDocumentUrl,
         source_document_name: effectiveSourceDocumentName,

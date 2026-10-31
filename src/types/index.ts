@@ -91,6 +91,8 @@ export interface DrugInteractionAlert {
   overrideReason?: string;
 
   overrideAuthor?: string;
+  doctorName?: string;
+  doctorEmail?: string;
 
   timestamp: string;
 
@@ -126,13 +128,15 @@ export interface SafetyCheckRecord {
 
   alerts: DrugInteractionAlert[];
 
-  overallStatus: 'Safe to Dispense' | 'Requires Review' | 'Contraindicated' | 'Overridden';
+  overallStatus: 'Safe to Dispense' | 'Requires Review' | 'Contraindicated' | 'Overridden' | 'Doctor Notified' | string;
 
   prescriberName: string;
 
   prescriberNpi: string;
 
   reviewerName?: string;
+  doctorName?: string;
+  doctorEmail?: string;
 
   status?: string;
 

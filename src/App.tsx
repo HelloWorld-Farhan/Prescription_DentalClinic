@@ -4,22 +4,23 @@ import { MotionConfig, AnimatePresence, motion } from 'framer-motion';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from './components/Layout';
 import { initAutoSync, pullFromCloud, purgeAllClinicalLocalStorage } from './services/cloudSyncService';
+import { lazyRetry } from './utils/lazyRetry';
 
-// Lazy-load clinical route pages
-const Login = lazy(() => import('./pages/Login'));
-const Signup = lazy(() => import('./pages/Signup'));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const NewCheck = lazy(() => import('./pages/NewCheck'));
-const Alerts = lazy(() => import('./pages/Alerts'));
-const AuditLog = lazy(() => import('./pages/AuditLog'));
-const RulesAdmin = lazy(() => import('./pages/RulesAdmin'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Report = lazy(() => import('./pages/Report'));
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
-const TermsOfService = lazy(() => import('./pages/TermsOfService'));
-const PatientRights = lazy(() => import('./pages/PatientRights'));
-const Support = lazy(() => import('./pages/Support'));
+// Resilient lazy-load clinical route pages with auto-recovery on new deployments
+const Login = lazyRetry(() => import('./pages/Login'), 'Login');
+const Signup = lazyRetry(() => import('./pages/Signup'), 'Signup');
+const ForgotPassword = lazyRetry(() => import('./pages/ForgotPassword'), 'ForgotPassword');
+const Dashboard = lazyRetry(() => import('./pages/Dashboard'), 'Dashboard');
+const NewCheck = lazyRetry(() => import('./pages/NewCheck'), 'NewCheck');
+const Alerts = lazyRetry(() => import('./pages/Alerts'), 'Alerts');
+const AuditLog = lazyRetry(() => import('./pages/AuditLog'), 'AuditLog');
+const RulesAdmin = lazyRetry(() => import('./pages/RulesAdmin'), 'RulesAdmin');
+const Settings = lazyRetry(() => import('./pages/Settings'), 'Settings');
+const Report = lazyRetry(() => import('./pages/Report'), 'Report');
+const PrivacyPolicy = lazyRetry(() => import('./pages/PrivacyPolicy'), 'PrivacyPolicy');
+const TermsOfService = lazyRetry(() => import('./pages/TermsOfService'), 'TermsOfService');
+const PatientRights = lazyRetry(() => import('./pages/PatientRights'), 'PatientRights');
+const Support = lazyRetry(() => import('./pages/Support'), 'Support');
 
 function RouteSkeleton() {
   return (

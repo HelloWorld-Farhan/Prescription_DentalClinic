@@ -967,16 +967,29 @@ export class ClinicalDecisionSupport {
       a.title === alertId || 
       (a.title && alertId && a.title.toLowerCase() === alertId.toLowerCase())
     );
+    const docMatch = reason.match(/Dr\.\s*([^(\]]+)(?:\s*\(([^)]+)\))?/i) ||
+                     reason.match(/\[(?:Dr\.|Prescriber:)?\s*([^(\]]+)(?:\s*\(([^)]+)\))?\]/i);
+
     if (alert) {
       alert.overridden = true;
       alert.overrideReason = reason;
       alert.overrideAuthor = author;
+      (alert as any).overriddenAt = new Date().toISOString();
+      if (docMatch) {
+        (alert as any).doctorName = docMatch[1].trim();
+        if (docMatch[2]) (alert as any).doctorEmail = docMatch[2].trim();
+      }
     }
 
     const hasUnresolved = (check.alerts || []).some(a => !a.overridden);
     if (!hasUnresolved) {
-      check.overallStatus = 'Overridden';
+      check.overallStatus = 'Doctor Notified';
       check.status = 'overridden';
+    }
+    if (docMatch) {
+      (check as any).doctorName = docMatch[1].trim();
+      if (docMatch[2]) (check as any).doctorEmail = docMatch[2].trim();
+      (check as any).consultedDoctor = `Dr. ${docMatch[1].trim()}${docMatch[2] ? ` (${docMatch[2].trim()})` : ''}`;
     }
 
     saveLocalBackup('smileclinic_checks_v3', _cachedChecks);
@@ -1012,6 +1025,10 @@ export class ClinicalDecisionSupport {
       severity: alert?.severity || 'major',
       hash: auditHash
     });
+  }
+
+  static getRawAuditLogs(): AuditLogEntry[] {
+    return [..._cachedAuditLogs];
   }
 
   static getAuditLogs(): AuditLogEntry[] {

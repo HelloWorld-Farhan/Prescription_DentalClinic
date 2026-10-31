@@ -61,6 +61,7 @@ export function purgeAllClinicalLocalStorage(): void {
       'smileclinic_synced_active_rules',
       'smileclinic_multi_knowledge_bases',
       'smileclinic_active_kb_id',
+      'smileclinic_doctors',
     ]);
     // Immediately remove legacy un-scoped clinical keys to prevent cross-account contamination
     [
@@ -110,6 +111,25 @@ export function getClinicianEmail(): string {
       localStorage.getItem('smileclinic_user_email') ||
       ''
     ).trim().toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+export function getClinicianPhone(): string {
+  try {
+    const rawUser = localStorage.getItem('smileclinic_auth_user') || sessionStorage.getItem('smileclinic_auth_user');
+    if (rawUser) {
+      try {
+        const u = JSON.parse(rawUser);
+        if (u?.phone) return u.phone.trim();
+      } catch { }
+    }
+    return (
+      sessionStorage.getItem('rxguard_prescriber_phone') ||
+      localStorage.getItem('rxguard_prescriber_phone') ||
+      ''
+    ).trim();
   } catch {
     return '';
   }
@@ -402,62 +422,51 @@ export async function pullFromCloud(): Promise<boolean> {
           const kActive = getUserScopedKey('smileclinic_active_kb_id', email);
 
           let multiKbToSave = sk.multiKb;
-          if (!multiKbToSave || !Array.isArray(multiKbToSave.knowledgeBases) || multiKbToSave.knowledgeBases.length !== 3) {
+          if (!multiKbToSave || !Array.isArray(multiKbToSave.knowledgeBases)) {
             const rawLocal = kMulti ? localStorage.getItem(kMulti) : null;
             if (rawLocal) {
               try {
                 const parsed = JSON.parse(rawLocal);
-                if (Array.isArray(parsed) && parsed.length === 3) {
-                  multiKbToSave = { activeKbId: 'kb-1', knowledgeBases: parsed };
+                if (Array.isArray(parsed)) {
+                  multiKbToSave = { activeKbId: parsed[0]?.id || null, knowledgeBases: parsed };
                 }
-              } catch {}
+              } catch { }
             }
             if (!multiKbToSave) {
+              const hasLegacyData = (sk.selection && sk.selection.length > 0) || (sk.docs && sk.docs.length > 0);
               multiKbToSave = {
-                activeKbId: 'kb-1',
-                knowledgeBases: [
-                  {
-                    id: 'kb-1',
-                    name: 'Primary Clinical & Prescription Protocol',
-                    description: 'Comprehensive evaluation cross-screening patient history documents and prior prescription checks.',
-                    selection: sk.selection || [],
-                    docs: sk.docs || [],
-                    checks: sk.checks || [],
-                    rules: sk.rules || [],
-                    conditions: sk.conditions || [],
-                    updatedAt: new Date().toISOString(),
-                  },
-                  {
-                    id: 'kb-2',
-                    name: 'Renal & Hepatic Impairment Protocol',
-                    description: 'Targeted safety screening focused on organ clearance, dosage adjustments, and nephro/hepatotoxic risks.',
-                    selection: [],
-                    docs: [],
-                    checks: [],
-                    rules: [],
-                    conditions: [],
-                    updatedAt: new Date().toISOString(),
-                  },
-                  {
-                    id: 'kb-3',
-                    name: 'Custom Dental Operatory Protocol',
-                    description: 'Specialized dental procedures, local anesthetic interactions, and antibiotic stewardship protocols.',
-                    selection: [],
-                    docs: [],
-                    checks: [],
-                    rules: [],
-                    conditions: [],
-                    updatedAt: new Date().toISOString(),
-                  },
-                ],
+                activeKbId: hasLegacyData ? 'kb-1' : null,
+                knowledgeBases: hasLegacyData
+                  ? [
+                    {
+                      id: 'kb-1',
+                      name: 'Clinical Safety Protocol',
+                      description: 'Synchronized patient history and prior prescription checks.',
+                      selection: sk.selection || [],
+                      docs: sk.docs || [],
+                      checks: sk.checks || [],
+                      rules: sk.rules || [],
+                      conditions: sk.conditions || [],
+                      updatedAt: new Date().toISOString(),
+                    },
+                  ]
+                  : [],
               };
             }
           }
 
           if (kMulti && multiKbToSave) localStorage.setItem(kMulti, JSON.stringify(multiKbToSave.knowledgeBases));
-          if (kActive && multiKbToSave?.activeKbId) localStorage.setItem(kActive, multiKbToSave.activeKbId);
+          if (kActive) {
+            if (multiKbToSave?.activeKbId) {
+              localStorage.setItem(kActive, multiKbToSave.activeKbId);
+            } else {
+              localStorage.removeItem(kActive);
+            }
+          }
 
-          const activeKb = (multiKbToSave?.knowledgeBases || []).find((k: any) => k.id === multiKbToSave.activeKbId) || multiKbToSave?.knowledgeBases?.[0];
+          const activeKb = multiKbToSave?.activeKbId
+            ? (multiKbToSave?.knowledgeBases || []).find((k: any) => k.id === multiKbToSave.activeKbId) || null
+            : null;
 
           const kSel = getUserScopedKey('smileclinic_synced_knowledge_selection', email);
           if (kSel) localStorage.setItem(kSel, JSON.stringify(activeKb?.selection || sk.selection || []));
@@ -506,10 +515,31 @@ export async function pullFromCloud(): Promise<boolean> {
               checks: activeKb.checks || [],
               rules: activeKb.rules || [],
               docs: activeKb.docs || [],
-              multiKb: { activeKbId: 'kb-1', knowledgeBases: parsed },
-            } as any).catch(() => {});
+              multiKb: { activeKbId: activeKb.id || null, knowledgeBases: parsed },
+            } as any).catch(() => { });
           }
-        } catch {}
+        } catch { }
+      }
+
+      // 10. Reconcile Cross-Device Saved Doctors Autofill Directory
+      if (Array.isArray(data.savedDoctors)) {
+        try {
+          const scopedKey = getUserScopedKey('smileclinic_doctors', email);
+          const localRaw = scopedKey ? localStorage.getItem(scopedKey) : null;
+          const localList = localRaw ? JSON.parse(localRaw) : [];
+          const map = new Map<string, any>();
+          if (Array.isArray(localList)) {
+            localList.forEach((d: any) => { if (d?.email) map.set(d.email.toLowerCase(), d); });
+          }
+          data.savedDoctors.forEach((d: any) => { if (d?.email) map.set(d.email.toLowerCase(), d); });
+          const merged = Array.from(map.values()).sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+          if (scopedKey) localStorage.setItem(scopedKey, JSON.stringify(merged));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('smileclinic_saved_doctors_synced', { detail: merged }));
+          }
+        } catch (e) {
+          console.warn('[CloudSync] Failed to reconcile saved doctors:', e);
+        }
       }
 
       return true;
@@ -584,6 +614,17 @@ export function syncAuditLogToCloud(auditLog: AuditLogEntry) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, auditLog }),
   }).catch((err) => console.warn('[CloudSync] Failed to sync audit log:', err));
+}
+
+export function syncSavedDoctorsToCloud(savedDoctors: any[]) {
+  const email = getClinicianEmail();
+  if (!email || !API_BASE_URL) return;
+
+  fetch(`${API_BASE_URL}/api/v1/sync/saved-doctors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, savedDoctors }),
+  }).catch((err) => console.warn('[CloudSync] Failed to sync saved doctors:', err));
 }
 
 export function syncDocumentToCloud(document: UploadedDocumentRecord) {

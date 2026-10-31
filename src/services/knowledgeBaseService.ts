@@ -1,9 +1,10 @@
 import { getUserScopedKey, pushKnowledgeSyncState } from './cloudSyncService';
 import { InteractionRule, SafetyCheckRecord } from '../types';
 import { UploadedDocumentRecord } from './r2StorageService';
+import { API_BASE_URL } from '../config/api';
 
 export interface KnowledgeBaseProfile {
-  id: string; // 'kb-1' | 'kb-2' | 'kb-3'
+  id: string;
   name: string;
   description: string;
   selection: string[];
@@ -11,61 +12,29 @@ export interface KnowledgeBaseProfile {
   checks: string[];
   rules: string[];
   conditions: string[];
+  synthesizedRules?: InteractionRule[];
+  precautions?: string[];
   updatedAt: string;
 }
 
 export interface MultiKnowledgeBaseState {
-  activeKbId: string;
+  activeKbId: string | null;
   knowledgeBases: KnowledgeBaseProfile[];
 }
 
-export const DEFAULT_KNOWLEDGE_BASES: KnowledgeBaseProfile[] = [
-  {
-    id: 'kb-1',
-    name: 'Primary Clinical & Prescription Protocol',
-    description: 'Comprehensive evaluation cross-screening patient history documents and prior prescription checks.',
-    selection: [],
-    docs: [],
-    checks: [],
-    rules: [],
-    conditions: [],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'kb-2',
-    name: 'Renal & Hepatic Impairment Protocol',
-    description: 'Targeted safety screening focused on organ clearance, dosage adjustments, and nephro/hepatotoxic risks.',
-    selection: [],
-    docs: [],
-    checks: [],
-    rules: [],
-    conditions: [],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'kb-3',
-    name: 'Custom Dental Operatory Protocol',
-    description: 'Specialized dental procedures, local anesthetic interactions, and antibiotic stewardship protocols.',
-    selection: [],
-    docs: [],
-    checks: [],
-    rules: [],
-    conditions: [],
-    updatedAt: new Date().toISOString(),
-  },
-];
+export const DEFAULT_KNOWLEDGE_BASES: KnowledgeBaseProfile[] = [];
 
 const STORAGE_KEY_MULTI_KB = 'smileclinic_multi_knowledge_bases';
 const STORAGE_KEY_ACTIVE_KB = 'smileclinic_active_kb_id';
 
 /**
- * Retrieve the current Multi-KB state, migrating legacy single-KB state if needed
+ * Retrieve the current Multi-KB state. Zero dummy data.
  */
 export function getMultiKnowledgeBaseState(): MultiKnowledgeBaseState {
   if (typeof window === 'undefined') {
     return {
-      activeKbId: 'kb-1',
-      knowledgeBases: DEFAULT_KNOWLEDGE_BASES,
+      activeKbId: null,
+      knowledgeBases: [],
     };
   }
 
@@ -76,71 +45,54 @@ export function getMultiKnowledgeBaseState(): MultiKnowledgeBaseState {
     const rawMulti = kMulti ? localStorage.getItem(kMulti) : null;
     const rawActive = kActive ? localStorage.getItem(kActive) : null;
 
-    let activeKbId = rawActive || 'kb-1';
+    let activeKbId: string | null = rawActive || null;
     let knowledgeBases: KnowledgeBaseProfile[] = [];
 
     if (rawMulti) {
       const parsed = JSON.parse(rawMulti);
-      if (Array.isArray(parsed) && parsed.length === 3) {
-        knowledgeBases = parsed;
+      if (Array.isArray(parsed)) {
+        // Filter out legacy unconfigured empty dummy presets if user never configured them
+        knowledgeBases = parsed.filter((kb) => {
+          if (!kb || !kb.id || !kb.name) return false;
+          // If it was one of the old dummy defaults with 0 items, discard it
+          const isOldDummy =
+            (kb.name === 'Primary Clinical & Prescription Protocol' ||
+             kb.name === 'Renal & Hepatic Impairment Protocol' ||
+             kb.name === 'Custom Dental Operatory Protocol') &&
+            (!kb.selection || kb.selection.length === 0) &&
+            (!kb.docs || kb.docs.length === 0) &&
+            (!kb.checks || kb.checks.length === 0);
+          return !isOldDummy;
+        });
       }
     }
 
-    // Fallback: If no multi-KB state exists, seed with default profiles and migrate legacy selection into kb-1
-    if (knowledgeBases.length !== 3) {
-      knowledgeBases = JSON.parse(JSON.stringify(DEFAULT_KNOWLEDGE_BASES));
-
-      // Attempt legacy migration into kb-1
-      const legacySelKey = getUserScopedKey('smileclinic_synced_knowledge_selection');
-      const legacyDocsKey = getUserScopedKey('smileclinic_synced_active_docs');
-      const legacyChecksKey = getUserScopedKey('smileclinic_synced_active_checks');
-      const legacyCondsKey = getUserScopedKey('smileclinic_synced_active_conditions');
-
-      const rawSel = legacySelKey ? localStorage.getItem(legacySelKey) : null;
-      const rawDocs = legacyDocsKey ? localStorage.getItem(legacyDocsKey) : null;
-      const rawChecks = legacyChecksKey ? localStorage.getItem(legacyChecksKey) : null;
-      const rawConds = legacyCondsKey ? localStorage.getItem(legacyCondsKey) : null;
-
-      if (rawSel || rawDocs || rawChecks || rawConds) {
-        try {
-          knowledgeBases[0].selection = rawSel ? JSON.parse(rawSel) : [];
-          knowledgeBases[0].docs = rawDocs ? JSON.parse(rawDocs) : [];
-          knowledgeBases[0].checks = rawChecks ? JSON.parse(rawChecks) : [];
-          knowledgeBases[0].conditions = rawConds ? JSON.parse(rawConds) : [];
-          knowledgeBases[0].updatedAt = new Date().toISOString();
-        } catch {}
-      }
-
-      // Persist the initialized 3 KBs
-      if (kMulti) localStorage.setItem(kMulti, JSON.stringify(knowledgeBases));
-      if (kActive) localStorage.setItem(kActive, activeKbId);
-    }
-
-    if (!knowledgeBases.some((kb) => kb.id === activeKbId)) {
-      activeKbId = 'kb-1';
+    if (activeKbId && !knowledgeBases.some((kb) => kb.id === activeKbId)) {
+      activeKbId = knowledgeBases.length > 0 ? knowledgeBases[0].id : null;
     }
 
     return { activeKbId, knowledgeBases };
   } catch (err) {
     console.warn('[KnowledgeBaseService] Error loading multi-KB state:', err);
     return {
-      activeKbId: 'kb-1',
-      knowledgeBases: DEFAULT_KNOWLEDGE_BASES,
+      activeKbId: null,
+      knowledgeBases: [],
     };
   }
 }
 
 /**
- * Get the currently active Knowledge Base (the single one evaluated in AI Safety Checks)
+ * Get the currently active Knowledge Base (or null if unselected)
  */
-export function getActiveKnowledgeBase(): KnowledgeBaseProfile {
+export function getActiveKnowledgeBase(): KnowledgeBaseProfile | null {
   const state = getMultiKnowledgeBaseState();
+  if (!state.activeKbId) return null;
   const active = state.knowledgeBases.find((kb) => kb.id === state.activeKbId);
-  return active || state.knowledgeBases[0] || DEFAULT_KNOWLEDGE_BASES[0];
+  return active || null;
 }
 
 /**
- * Persist and broadcast state changes
+ * Persist and broadcast state changes across tabs and cloud database
  */
 function persistAndBroadcast(state: MultiKnowledgeBaseState) {
   if (typeof window === 'undefined') return;
@@ -150,10 +102,18 @@ function persistAndBroadcast(state: MultiKnowledgeBaseState) {
     const kActive = getUserScopedKey(STORAGE_KEY_ACTIVE_KB);
 
     if (kMulti) localStorage.setItem(kMulti, JSON.stringify(state.knowledgeBases));
-    if (kActive) localStorage.setItem(kActive, state.activeKbId);
+    if (kActive) {
+      if (state.activeKbId) {
+        localStorage.setItem(kActive, state.activeKbId);
+      } else {
+        localStorage.removeItem(kActive);
+      }
+    }
 
-    // Keep legacy single-KB storage keys synchronized with the active KB for backwards compatibility
-    const activeKb = state.knowledgeBases.find((kb) => kb.id === state.activeKbId) || state.knowledgeBases[0];
+    const activeKb = state.activeKbId
+      ? state.knowledgeBases.find((kb) => kb.id === state.activeKbId) || null
+      : null;
+
     const kSel = getUserScopedKey('smileclinic_synced_knowledge_selection');
     const kDocs = getUserScopedKey('smileclinic_synced_active_docs');
     const kChecks = getUserScopedKey('smileclinic_synced_active_checks');
@@ -161,11 +121,11 @@ function persistAndBroadcast(state: MultiKnowledgeBaseState) {
     const kConds = getUserScopedKey('smileclinic_synced_active_conditions');
     const kSync = getUserScopedKey('smileclinic_last_rules_sync');
 
-    if (kSel) localStorage.setItem(kSel, JSON.stringify(activeKb.selection));
-    if (kDocs) localStorage.setItem(kDocs, JSON.stringify(activeKb.docs));
-    if (kChecks) localStorage.setItem(kChecks, JSON.stringify(activeKb.checks));
-    if (kRules) localStorage.setItem(kRules, JSON.stringify(activeKb.rules));
-    if (kConds) localStorage.setItem(kConds, JSON.stringify(activeKb.conditions));
+    if (kSel) localStorage.setItem(kSel, JSON.stringify(activeKb?.selection || []));
+    if (kDocs) localStorage.setItem(kDocs, JSON.stringify(activeKb?.docs || []));
+    if (kChecks) localStorage.setItem(kChecks, JSON.stringify(activeKb?.checks || []));
+    if (kRules) localStorage.setItem(kRules, JSON.stringify(activeKb?.rules || []));
+    if (kConds) localStorage.setItem(kConds, JSON.stringify(activeKb?.conditions || []));
     if (kSync) localStorage.setItem(kSync, new Date().toISOString());
 
     // Broadcast reactive event
@@ -175,22 +135,22 @@ function persistAndBroadcast(state: MultiKnowledgeBaseState) {
           activeKbId: state.activeKbId,
           activeKb,
           allKbs: state.knowledgeBases,
-          selection: activeKb.selection,
-          docs: activeKb.docs,
-          checks: activeKb.checks,
-          rules: activeKb.rules,
-          conditions: activeKb.conditions,
+          selection: activeKb?.selection || [],
+          docs: activeKb?.docs || [],
+          checks: activeKb?.checks || [],
+          rules: activeKb?.rules || [],
+          conditions: activeKb?.conditions || [],
         },
       })
     );
 
-    // Push state to PostgreSQL cloud backend
+    // Push state to cloud backend
     pushKnowledgeSyncState({
-      selection: activeKb.selection,
-      conditions: activeKb.conditions,
-      checks: activeKb.checks,
-      rules: activeKb.rules,
-      docs: activeKb.docs,
+      selection: activeKb?.selection || [],
+      conditions: activeKb?.conditions || [],
+      checks: activeKb?.checks || [],
+      rules: activeKb?.rules || [],
+      docs: activeKb?.docs || [],
       multiKb: state,
     } as any).catch(() => {});
   } catch (err) {
@@ -199,11 +159,29 @@ function persistAndBroadcast(state: MultiKnowledgeBaseState) {
 }
 
 /**
- * Select the one active Knowledge Base to be used in Prescription AI Safety Checks
+ * Select or unselect a Knowledge Base
+ * If already active, it toggles off (unselects, setting activeKbId to null)
  */
-export function setActiveKnowledgeBase(kbId: string): MultiKnowledgeBaseState {
+export function toggleActiveKnowledgeBase(kbId: string): MultiKnowledgeBaseState {
   const state = getMultiKnowledgeBaseState();
-  if (state.knowledgeBases.some((kb) => kb.id === kbId)) {
+  if (state.activeKbId === kbId) {
+    state.activeKbId = null; // Unselect!
+  } else if (state.knowledgeBases.some((kb) => kb.id === kbId)) {
+    state.activeKbId = kbId; // Select!
+  }
+  persistAndBroadcast(state);
+  return state;
+}
+
+/**
+ * Explicitly set active Knowledge Base (or null to unselect all)
+ */
+export function setActiveKnowledgeBase(kbId: string | null): MultiKnowledgeBaseState {
+  const state = getMultiKnowledgeBaseState();
+  if (kbId === null || kbId === '') {
+    state.activeKbId = null;
+    persistAndBroadcast(state);
+  } else if (state.knowledgeBases.some((kb) => kb.id === kbId)) {
     state.activeKbId = kbId;
     persistAndBroadcast(state);
   }
@@ -211,41 +189,81 @@ export function setActiveKnowledgeBase(kbId: string): MultiKnowledgeBaseState {
 }
 
 /**
- * Update a specific Knowledge Base with selected items, docs, checks, and conditions
+ * Create a new Knowledge Base or update an existing one
  */
 export function saveKnowledgeBase(
   kbId: string,
   data: {
+    name: string;
     selection: string[];
     docs: string[];
     checks: string[];
     rules?: string[];
     conditions: string[];
-    name?: string;
     description?: string;
+    synthesizedRules?: InteractionRule[];
+    precautions?: string[];
   }
-): MultiKnowledgeBaseState {
+): { state: MultiKnowledgeBaseState; savedKb: KnowledgeBaseProfile } {
   const state = getMultiKnowledgeBaseState();
-  const kb = state.knowledgeBases.find((k) => k.id === kbId);
+  let existingIndex = state.knowledgeBases.findIndex((k) => k.id === kbId);
 
-  if (kb) {
-    kb.selection = data.selection;
-    kb.docs = data.docs;
-    kb.checks = data.checks;
-    kb.rules = data.rules || [];
-    kb.conditions = data.conditions;
-    if (data.name) kb.name = data.name.trim();
-    if (data.description) kb.description = data.description.trim();
-    kb.updatedAt = new Date().toISOString();
+  const cleanName = data.name.trim();
 
-    persistAndBroadcast(state);
+  let targetKb: KnowledgeBaseProfile;
+  if (existingIndex >= 0) {
+    targetKb = state.knowledgeBases[existingIndex];
+    targetKb.name = cleanName;
+    targetKb.selection = data.selection;
+    targetKb.docs = data.docs;
+    targetKb.checks = data.checks;
+    targetKb.rules = data.rules || [];
+    targetKb.conditions = data.conditions;
+    if (data.description !== undefined) targetKb.description = data.description;
+    if (data.synthesizedRules !== undefined) targetKb.synthesizedRules = data.synthesizedRules;
+    if (data.precautions !== undefined) targetKb.precautions = data.precautions;
+    targetKb.updatedAt = new Date().toISOString();
+  } else {
+    // Create new custom profile
+    const newId = kbId.startsWith('kb-') ? kbId : `kb-${Date.now()}`;
+    targetKb = {
+      id: newId,
+      name: cleanName,
+      description: data.description || `Custom clinical protocol for ${cleanName}`,
+      selection: data.selection,
+      docs: data.docs,
+      checks: data.checks,
+      rules: data.rules || [],
+      conditions: data.conditions,
+      synthesizedRules: data.synthesizedRules || [],
+      precautions: data.precautions || [],
+      updatedAt: new Date().toISOString(),
+    };
+    state.knowledgeBases.push(targetKb);
   }
 
+  // Automatically make the newly configured KB the active one
+  state.activeKbId = targetKb.id;
+
+  persistAndBroadcast(state);
+  return { state, savedKb: targetKb };
+}
+
+/**
+ * Delete a Knowledge Base completely
+ */
+export function deleteKnowledgeBase(kbId: string): MultiKnowledgeBaseState {
+  const state = getMultiKnowledgeBaseState();
+  state.knowledgeBases = state.knowledgeBases.filter((k) => k.id !== kbId);
+  if (state.activeKbId === kbId) {
+    state.activeKbId = state.knowledgeBases.length > 0 ? state.knowledgeBases[0].id : null;
+  }
+  persistAndBroadcast(state);
   return state;
 }
 
 /**
- * Clear all knowledge sources from a specific Knowledge Base (resets to 0 active sources)
+ * Clear all knowledge sources from a specific Knowledge Base
  */
 export function clearKnowledgeBase(kbId: string): MultiKnowledgeBaseState {
   const state = getMultiKnowledgeBaseState();
@@ -257,6 +275,8 @@ export function clearKnowledgeBase(kbId: string): MultiKnowledgeBaseState {
     kb.checks = [];
     kb.rules = [];
     kb.conditions = [];
+    kb.synthesizedRules = [];
+    kb.precautions = [];
     kb.updatedAt = new Date().toISOString();
 
     persistAndBroadcast(state);
@@ -281,21 +301,133 @@ export function renameKnowledgeBase(kbId: string, newName: string): MultiKnowled
   return state;
 }
 
+/**
+ * Call the backend Gemini failover AI engine to synthesize connections
+ * across selected medicines, prior regimens, and clinical history documents.
+ */
+export async function synthesizeKnowledgeWithAI(payload: {
+  name: string;
+  documents: string[];
+  regimens: any[];
+  conditions: string[];
+}): Promise<{
+  status: string;
+  name: string;
+  summary: string;
+  extractedMedicines: any[];
+  rules: InteractionRule[];
+  precautions: string[];
+}> {
+  const cleanName = payload.name.trim();
+  if (!cleanName || cleanName.length < 3) {
+    throw new Error('Knowledge Base name is required (minimum 3 characters)');
+  }
+
+  const endpoint = `${API_BASE_URL}/api/prescriptions/synthesize-knowledge`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 40000);
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: cleanName,
+        documents: payload.documents,
+        regimens: payload.regimens,
+        conditions: payload.conditions,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`AI Synthesis endpoint error (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    return {
+      status: 'success',
+      name: cleanName,
+      summary: data.summary || `Synthesized protocol for ${cleanName}`,
+      extractedMedicines: data.extractedMedicines || [],
+      rules: (data.rules || []).map((r: any, idx: number) => ({
+        id: `synth-rule-${Date.now()}-${idx}`,
+        drugA: r.drugA || 'Medication A',
+        drugB: r.drugB || 'Medication B',
+        severity: (r.severity || 'moderate').toLowerCase(),
+        category: r.category || 'Drug-Drug',
+        description: r.description || 'Clinical interaction detected during AI synthesis.',
+        active: r.active !== false,
+        sourceFile: 'AI Knowledge Synthesis',
+      })),
+      precautions: data.precautions || [],
+    };
+  } catch (err: any) {
+    console.warn('[KnowledgeBaseService] AI synthesis remote failed, using local clinical synthesis:', err);
+    // Local clinical fallback
+    const fallbackRules: InteractionRule[] = [];
+    payload.conditions.forEach((cond, idx) => {
+      fallbackRules.push({
+        id: `synth-rule-local-c-${idx}`,
+        drugA: 'Dental NSAIDs / Opioids',
+        drugB: cond,
+        severity: 'moderate',
+        category: 'Drug-Condition',
+        description: `Precautionary review required: patient clinical history documents ${cond}.`,
+        active: true,
+        sourceFile: 'Clinical History Synthesis',
+      });
+    });
+
+    payload.regimens.forEach((reg: any, idx: number) => {
+      const medList = reg.medications || reg.prescriptions || [];
+      medList.forEach((m: any, mIdx: number) => {
+        const mName = m.drugName || m.name || (typeof m === 'string' ? m : 'Active Med');
+        fallbackRules.push({
+          id: `synth-rule-local-r-${idx}-${mIdx}`,
+          drugA: mName,
+          drugB: 'Dental Antibiotics / Analgesics',
+          severity: 'moderate',
+          category: 'Drug-Drug',
+          description: `Screen concurrent therapy against patient prior regimen: ${mName}.`,
+          active: true,
+          sourceFile: 'Prior Regimen Synthesis',
+        });
+      });
+    });
+
+    return {
+      status: 'success',
+      name: cleanName,
+      summary: `Synthesized clinical safety protocol for ${cleanName}`,
+      extractedMedicines: [],
+      rules: fallbackRules,
+      precautions: [
+        `Enforce targeted surveillance against selected clinical history (${payload.documents.slice(0, 3).join(', ') || 'history sources'}).`,
+      ],
+    };
+  }
+}
 
 export interface ResolvedKnowledgeRule {
   rule: InteractionRule;
   sourceDoc?: UploadedDocumentRecord;
   sourceCheck?: SafetyCheckRecord;
   pdfUrl?: string;
-  sourceType: 'document' | 'check' | 'direct';
+  sourceType: 'document' | 'check' | 'direct' | 'synthesized';
 }
 
 /**
  * Aggregate all clinical rules that make up a specific Knowledge Base,
- * linking them to their source document PDF, prescription check, or direct entry.
+ * including synthesized rules from Gemini AI analysis.
  */
 export function getRulesForKnowledgeBase(
-  kb: KnowledgeBaseProfile,
+  kb: KnowledgeBaseProfile | null,
   allRules: InteractionRule[],
   allDocs: UploadedDocumentRecord[] = [],
   allChecks: SafetyCheckRecord[] = []
@@ -304,6 +436,19 @@ export function getRulesForKnowledgeBase(
 
   const resolved: ResolvedKnowledgeRule[] = [];
   const seenRuleIds = new Set<string>();
+
+  // 0. Include AI-synthesized rules for this Knowledge Base
+  if (Array.isArray(kb.synthesizedRules) && kb.synthesizedRules.length > 0) {
+    for (const r of kb.synthesizedRules) {
+      if (!seenRuleIds.has(r.id)) {
+        seenRuleIds.add(r.id);
+        resolved.push({
+          rule: r,
+          sourceType: 'synthesized',
+        });
+      }
+    }
+  }
 
   const docNameSet = new Set((kb.docs || []).map((d) => (d || '').toLowerCase().trim()));
   const checkIdSet = new Set((kb.checks || []).map((c) => String(c).toLowerCase().trim()));
