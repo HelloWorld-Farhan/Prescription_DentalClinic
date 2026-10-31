@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
-import { pullFromCloud, pushAlertSettingsState } from '../services/cloudSyncService';
+import { pullFromCloud, pushAlertSettingsState, getUserScopedKey } from '../services/cloudSyncService';
 import { DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import EmailScheduleAlertModal from '../components/EmailScheduleAlertModal';
@@ -25,19 +25,21 @@ export default function Alerts() {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [emailModalCheck, setEmailModalCheck] = useState<SafetyCheckRecord | null>(null);
 
-  // Master Email Alerts Toggle state (persisted)
+  // Master Email Alerts Toggle state (persisted per user)
   const [masterEmailAlertsEnabled, setMasterEmailAlertsEnabled] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('smileclinic_master_email_alerts_enabled') !== 'false';
+      const k = getUserScopedKey('smileclinic_master_email_alerts_enabled');
+      return k ? localStorage.getItem(k) !== 'false' : true;
     } catch {
       return true;
     }
   });
 
-  // Disabled Medication IDs for email alerts (per-medicine toggle)
+  // Disabled Medication IDs for email alerts (per-medicine toggle per user)
   const [disabledMedAlertIds, setDisabledMedAlertIds] = useState<Set<string>>(() => {
     try {
-      const raw = localStorage.getItem('smileclinic_disabled_med_alert_ids');
+      const k = getUserScopedKey('smileclinic_disabled_med_alert_ids');
+      const raw = k ? localStorage.getItem(k) : null;
       return raw ? new Set(JSON.parse(raw)) : new Set();
     } catch {
       return new Set();
@@ -142,7 +144,7 @@ export default function Alerts() {
     const next = !masterEmailAlertsEnabled;
     setMasterEmailAlertsEnabled(next);
     try {
-      localStorage.setItem('smileclinic_master_email_alerts_enabled', String(next));
+      const k = getUserScopedKey('smileclinic_master_email_alerts_enabled'); if (k) localStorage.setItem(k, String(next));
     } catch {}
     pushAlertSettingsState({ masterEmailAlertsEnabled: next }).catch(() => {});
     showConfirmation(
@@ -166,7 +168,7 @@ export default function Alerts() {
       }
       const arr = Array.from(next);
       try {
-        localStorage.setItem('smileclinic_disabled_med_alert_ids', JSON.stringify(arr));
+        const k = getUserScopedKey('smileclinic_disabled_med_alert_ids'); if (k) localStorage.setItem(k, JSON.stringify(arr));
       } catch {}
       pushAlertSettingsState({ disabledMedAlertIds: arr }).catch(() => {});
       return next;

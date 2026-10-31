@@ -39,16 +39,44 @@ export interface UploadedDocumentRecord {
 
 
 
+function getScopedDocsKey(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const rawUser = localStorage.getItem('smileclinic_auth_user') || sessionStorage.getItem('smileclinic_auth_user');
+    let email = '';
+    if (rawUser) {
+      try {
+        email = JSON.parse(rawUser)?.email || '';
+      } catch {}
+    }
+    if (!email) {
+      email = localStorage.getItem('rxguard_prescriber_email') || '';
+    }
+    return email ? `smileclinic_docs_v3_${email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}` : '';
+  } catch {
+    return '';
+  }
+}
+
 function loadCachedDocs(): UploadedDocumentRecord[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('smileclinic_persistent_documents_v2');
+    const key = getScopedDocsKey();
+    if (!key) return [];
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
   } catch {}
   return [];
+}
+
+export function clearCachedDocs(): void {
+  _cachedDocs = [];
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
+  }
 }
 
 let _cachedDocs: UploadedDocumentRecord[] = loadCachedDocs();
@@ -62,7 +90,7 @@ export function setDocumentHistory(docs: UploadedDocumentRecord[]): void {
   );
   try {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('smileclinic_persistent_documents_v2', JSON.stringify(_cachedDocs));
+      const dk = getScopedDocsKey(); if (dk) localStorage.setItem(dk, JSON.stringify(_cachedDocs));
     }
   } catch {}
   if (typeof window !== 'undefined') {
@@ -407,7 +435,7 @@ export function saveDocumentRecord(record: UploadedDocumentRecord): void {
     syncDocumentToCloud(record);
     try {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('smileclinic_persistent_documents_v2', JSON.stringify(_cachedDocs));
+      const dk = getScopedDocsKey(); if (dk) localStorage.setItem(dk, JSON.stringify(_cachedDocs));
     }
   } catch {}
   if (typeof window !== 'undefined') {
@@ -426,7 +454,7 @@ export function updateDocumentExtractedCount(docUrl: string, count: number): voi
       target.status = 'analyzed';
       try {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('smileclinic_persistent_documents_v2', JSON.stringify(_cachedDocs));
+      const dk = getScopedDocsKey(); if (dk) localStorage.setItem(dk, JSON.stringify(_cachedDocs));
     }
   } catch {}
   if (typeof window !== 'undefined') {
@@ -455,7 +483,7 @@ export async function deleteDocumentRecord(
       }
       try {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('smileclinic_persistent_documents_v2', JSON.stringify(_cachedDocs));
+      const dk = getScopedDocsKey(); if (dk) localStorage.setItem(dk, JSON.stringify(_cachedDocs));
     }
   } catch {}
   if (typeof window !== 'undefined') {

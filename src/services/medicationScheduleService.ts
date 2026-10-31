@@ -329,7 +329,7 @@ export function getSavedDoctors(userEmail?: string): SavedDoctorContact[] {
   if (typeof window === 'undefined') return DEFAULT_DOCTORS;
   try {
     const key = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const raw = localStorage.getItem(key) || localStorage.getItem('smileclinic_saved_doctors_directory');
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -364,7 +364,7 @@ export function saveDoctorContact(
 
     const key = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
     localStorage.setItem(key, JSON.stringify(updated));
-    localStorage.setItem('smileclinic_saved_doctors_directory', JSON.stringify(updated));
+    // Scoped exclusively per clinician
     return updated;
   } catch {
     return DEFAULT_DOCTORS;

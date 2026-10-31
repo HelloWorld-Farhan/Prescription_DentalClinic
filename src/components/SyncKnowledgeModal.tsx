@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getDocumentHistory, UploadedDocumentRecord, isAvatarFile } from '../services/r2StorageService';
 import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
 import { InteractionRule, SafetyCheckRecord } from '../types';
-import { pushKnowledgeSyncState } from '../services/cloudSyncService';
+import { pushKnowledgeSyncState, getUserScopedKey } from '../services/cloudSyncService';
 import { showConfirmation } from '../services/confirmation';
 
 interface SyncKnowledgeModalProps {
@@ -114,7 +114,8 @@ export default function SyncKnowledgeModal({
 
     // Initialize selection: restore previously saved selection or select all by default
     try {
-      const rawSaved = localStorage.getItem('smileclinic_synced_knowledge_selection');
+      const skKey = getUserScopedKey('smileclinic_synced_knowledge_selection');
+      const rawSaved = skKey ? localStorage.getItem(skKey) : null;
       if (rawSaved) {
         const parsed = JSON.parse(rawSaved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -227,12 +228,19 @@ export default function SyncKnowledgeModal({
 
       // Persist locally for immediate AI inspection
       try {
-        localStorage.setItem('smileclinic_synced_knowledge_selection', JSON.stringify(selectionArray));
-        localStorage.setItem('smileclinic_synced_active_docs', JSON.stringify(selectedDocs));
-        localStorage.setItem('smileclinic_synced_active_checks', JSON.stringify(selectedChecks));
-        localStorage.setItem('smileclinic_synced_active_rules', JSON.stringify(selectedRules));
-        localStorage.setItem('smileclinic_synced_active_conditions', JSON.stringify(derivedConditions));
-        localStorage.setItem('smileclinic_last_rules_sync', nowIso);
+        const kSel = getUserScopedKey('smileclinic_synced_knowledge_selection');
+        const kDocs = getUserScopedKey('smileclinic_synced_active_docs');
+        const kChecks = getUserScopedKey('smileclinic_synced_active_checks');
+        const kRules = getUserScopedKey('smileclinic_synced_active_rules');
+        const kConds = getUserScopedKey('smileclinic_synced_active_conditions');
+        const kSync = getUserScopedKey('smileclinic_last_rules_sync');
+
+        if (kSel) localStorage.setItem(kSel, JSON.stringify(selectionArray));
+        if (kDocs) localStorage.setItem(kDocs, JSON.stringify(selectedDocs));
+        if (kChecks) localStorage.setItem(kChecks, JSON.stringify(selectedChecks));
+        if (kRules) localStorage.setItem(kRules, JSON.stringify(selectedRules));
+        if (kConds) localStorage.setItem(kConds, JSON.stringify(derivedConditions));
+        if (kSync) localStorage.setItem(kSync, nowIso);
       } catch {}
 
       // Push to PostgreSQL cloud backend

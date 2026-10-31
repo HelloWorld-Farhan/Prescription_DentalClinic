@@ -530,14 +530,42 @@ export const isDummyCheck = (c: any): boolean => {
 
 
 
-// Two-tier resilience: In-memory store with persistent local storage backup
-const CHECKS_BACKUP_KEY = 'smileclinic_persistent_checks_v2';
-const AUDIT_BACKUP_KEY = 'smileclinic_persistent_audit_v2';
-const RULES_BACKUP_KEY = 'smileclinic_persistent_rules_v2';
-const PATIENTS_BACKUP_KEY = 'smileclinic_persistent_patients_v2';
-
-function loadLocalBackup<T>(key: string): T[] {
+function getClinicianEmail(): string {
   try {
+    const rawUser = localStorage.getItem('smileclinic_auth_user') || sessionStorage.getItem('smileclinic_auth_user');
+    if (rawUser) {
+      try {
+        const u = JSON.parse(rawUser);
+        if (u?.email) return u.email.trim().toLowerCase();
+      } catch {}
+    }
+    return (
+      sessionStorage.getItem('rxguard_prescriber_email') ||
+      localStorage.getItem('rxguard_prescriber_email') ||
+      sessionStorage.getItem('smileclinic_user_email') ||
+      localStorage.getItem('smileclinic_user_email') ||
+      ''
+    ).trim().toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+// Two-tier resilience: In-memory store with strictly user-scoped persistent backup
+function getScopedBackupKey(baseKey: string): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const email = getClinicianEmail();
+    return email ? `${baseKey}_${email.replace(/[^a-z0-9]/g, '_')}` : '';
+  } catch {
+    return '';
+  }
+}
+
+function loadLocalBackup<T>(baseKey: string): T[] {
+  try {
+    const key = getScopedBackupKey(baseKey);
+    if (!key) return [];
     const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
@@ -547,18 +575,22 @@ function loadLocalBackup<T>(key: string): T[] {
   }
 }
 
-function saveLocalBackup<T>(key: string, data: T[]) {
+function saveLocalBackup<T>(baseKey: string, data: T[]) {
   try {
+    const key = getScopedBackupKey(baseKey);
+    if (!key) return;
     if (Array.isArray(data) && data.length > 0) {
       localStorage.setItem(key, JSON.stringify(data));
+    } else {
+      localStorage.removeItem(key);
     }
   } catch {}
 }
 
-let _cachedChecks: SafetyCheckRecord[] = loadLocalBackup<SafetyCheckRecord>(CHECKS_BACKUP_KEY);
-let _cachedAuditLogs: AuditLogEntry[] = loadLocalBackup<AuditLogEntry>(AUDIT_BACKUP_KEY);
-let _cachedRules: InteractionRule[] = loadLocalBackup<InteractionRule>(RULES_BACKUP_KEY);
-let _cachedPatients: Patient[] = loadLocalBackup<Patient>(PATIENTS_BACKUP_KEY);
+let _cachedChecks: SafetyCheckRecord[] = loadLocalBackup<SafetyCheckRecord>('smileclinic_checks_v3');
+let _cachedAuditLogs: AuditLogEntry[] = loadLocalBackup<AuditLogEntry>('smileclinic_audit_v3');
+let _cachedRules: InteractionRule[] = loadLocalBackup<InteractionRule>('smileclinic_rules_v3');
+let _cachedPatients: Patient[] = loadLocalBackup<Patient>('smileclinic_patients_v3');
 
 export const getActiveClinicianName = () => {
 
@@ -648,6 +680,19 @@ export class ClinicalDecisionSupport {
     return result;
   }
 
+  static clearAllMemoryCaches(): void {
+    _cachedChecks = [];
+    _cachedAuditLogs = [];
+    _cachedRules = [];
+    _cachedPatients = [];
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
+      window.dispatchEvent(new CustomEvent('smileclinic_audit_updated'));
+      window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
+      window.dispatchEvent(new CustomEvent('smileclinic_patients_updated'));
+    }
+  }
+
   static setChecks(checks: SafetyCheckRecord[]) {
     const valid = (checks || []).filter(c => !isDummyCheck(c));
     const deduped = this.deduplicateChecks(valid);
@@ -656,7 +701,7 @@ export class ClinicalDecisionSupport {
       return;
     }
     _cachedChecks = deduped;
-    saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
+    saveLocalBackup('smileclinic_checks_v3', _cachedChecks);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
     }
@@ -712,7 +757,7 @@ export class ClinicalDecisionSupport {
       return;
     }
     _cachedAuditLogs = deduped;
-    saveLocalBackup(AUDIT_BACKUP_KEY, _cachedAuditLogs);
+    saveLocalBackup('smileclinic_audit_v3', _cachedAuditLogs);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_audit_updated'));
     }
@@ -723,7 +768,7 @@ export class ClinicalDecisionSupport {
       return;
     }
     _cachedRules = rules || [];
-    saveLocalBackup(RULES_BACKUP_KEY, _cachedRules);
+    saveLocalBackup('smileclinic_rules_v3', _cachedRules);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
     }
@@ -816,6 +861,8 @@ export class ClinicalDecisionSupport {
     }
   }
 
+
+
   static getChecks(): SafetyCheckRecord[] {
     return _cachedChecks.filter(c => !isDummyCheck(c));
   }
@@ -854,7 +901,7 @@ export class ClinicalDecisionSupport {
     const idx = _cachedChecks.findIndex((c) => c.id === id || c.checkNumber === id);
     if (idx !== -1) {
       _cachedChecks[idx] = { ..._cachedChecks[idx], ...updates };
-      saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
+      saveLocalBackup('smileclinic_checks_v3', _cachedChecks);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
       }
@@ -874,7 +921,7 @@ export class ClinicalDecisionSupport {
     };
 
     _cachedChecks.unshift(enrichedRecord);
-    saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
+    saveLocalBackup('smileclinic_checks_v3', _cachedChecks);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
     }
@@ -932,7 +979,7 @@ export class ClinicalDecisionSupport {
       check.status = 'overridden';
     }
 
-    saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
+    saveLocalBackup('smileclinic_checks_v3', _cachedChecks);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
     }

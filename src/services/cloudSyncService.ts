@@ -10,7 +10,7 @@
  */
 
 import { SafetyCheckRecord, AuditLogEntry, InteractionRule, Patient } from '../types';
-import { UploadedDocumentRecord, setDocumentHistory } from './r2StorageService';
+import { UploadedDocumentRecord, setDocumentHistory, clearCachedDocs } from './r2StorageService';
 import { PrescriptionStorage, formatISTTime } from './prescriptionService';
 import { API_BASE_URL } from '../config/api';
 
@@ -18,6 +18,15 @@ import { API_BASE_URL } from '../config/api';
  * Strict LocalStorage Purge: Wipes all clinical data and retains ONLY
  * login session tokens, user profile picture / avatar, and profile flags.
  */
+/**
+ * Constructs a secure user-scoped key so cached state never bleeds between clinician accounts.
+ */
+export function getUserScopedKey(baseKey: string, emailOverride?: string): string {
+  if (typeof window === 'undefined') return '';
+  const email = (emailOverride || getClinicianEmail() || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+  return email ? `${baseKey}_${email}` : '';
+}
+
 export function purgeAllClinicalLocalStorage(): void {
   if (typeof window === 'undefined' || !window.localStorage) return;
   try {
@@ -50,12 +59,16 @@ export function purgeAllClinicalLocalStorage(): void {
       'smileclinic_synced_active_conditions',
       'smileclinic_synced_active_checks',
       'smileclinic_synced_active_rules',
+    ]);
+    // Immediately remove legacy un-scoped clinical keys to prevent cross-account contamination
+    [
       'smileclinic_persistent_checks_v2',
       'smileclinic_persistent_audit_v2',
       'smileclinic_persistent_rules_v2',
       'smileclinic_persistent_patients_v2',
       'smileclinic_persistent_documents_v2',
-    ]);
+      'smileclinic_saved_doctors_directory',
+    ].forEach((k) => localStorage.removeItem(k));
 
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -122,6 +135,15 @@ export async function pullFromCloud(): Promise<boolean> {
   activePullPromise = (async () => {
     try {
       isSyncing = true;
+      if (typeof window !== 'undefined') {
+        const lastEmailKey = 'smileclinic_last_synced_email';
+        const prevEmail = sessionStorage.getItem(lastEmailKey) || '';
+        if (prevEmail && prevEmail !== email) {
+          PrescriptionStorage.clearAllMemoryCaches();
+          clearCachedDocs();
+        }
+        sessionStorage.setItem(lastEmailKey, email);
+      }
       const res = await fetch(`${API_BASE_URL}/api/v1/sync/all?email=${encodeURIComponent(email)}`);
       if (!res.ok) return false;
 
@@ -318,18 +340,20 @@ export async function pullFromCloud(): Promise<boolean> {
       // 7. Reconcile Notification Read State from Backend PostgreSQL
       if (Array.isArray(data.readNotificationIds) || typeof data.notificationsReadAt === 'number') {
         try {
-          const localReadRaw = localStorage.getItem('smileclinic_read_notif_ids');
+          const scopedNotifKey = getUserScopedKey('smileclinic_read_notif_ids', email);
+          const localReadRaw = scopedNotifKey ? localStorage.getItem(scopedNotifKey) : null;
           const localReadSet = new Set<string>(localReadRaw ? JSON.parse(localReadRaw) : []);
           if (Array.isArray(data.readNotificationIds)) {
             data.readNotificationIds.forEach((id: string) => localReadSet.add(id));
           }
           const mergedArray = Array.from(localReadSet);
-          localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(mergedArray));
-          const localReadAt = parseInt(localStorage.getItem('smileclinic_notifications_read_at') || '0', 10);
+          if (scopedNotifKey) localStorage.setItem(scopedNotifKey, JSON.stringify(mergedArray));
+          const scopedReadAtKey = getUserScopedKey('smileclinic_notifications_read_at', email);
+          const localReadAt = scopedReadAtKey ? parseInt(localStorage.getItem(scopedReadAtKey) || '0', 10) : 0;
           const serverReadAt = typeof data.notificationsReadAt === 'number' ? data.notificationsReadAt : 0;
           const maxReadAt = Math.max(localReadAt, serverReadAt);
           if (maxReadAt > 0) {
-            localStorage.setItem('smileclinic_notifications_read_at', String(maxReadAt));
+            if (scopedReadAtKey) localStorage.setItem(scopedReadAtKey, String(maxReadAt));
           }
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('smileclinic_notifications_read_synced', {
@@ -348,10 +372,12 @@ export async function pullFromCloud(): Promise<boolean> {
       if (typeof data.masterEmailAlertsEnabled === 'boolean' || Array.isArray(data.disabledMedAlertIds)) {
         try {
           if (typeof data.masterEmailAlertsEnabled === 'boolean') {
-            localStorage.setItem('smileclinic_master_email_alerts_enabled', String(data.masterEmailAlertsEnabled));
+            const scopedAlertKey = getUserScopedKey('smileclinic_master_email_alerts_enabled', email);
+            if (scopedAlertKey) localStorage.setItem(scopedAlertKey, String(data.masterEmailAlertsEnabled));
           }
           if (Array.isArray(data.disabledMedAlertIds)) {
-            localStorage.setItem('smileclinic_disabled_med_alert_ids', JSON.stringify(data.disabledMedAlertIds));
+            const scopedDisKey = getUserScopedKey('smileclinic_disabled_med_alert_ids', email);
+            if (scopedDisKey) localStorage.setItem(scopedDisKey, JSON.stringify(data.disabledMedAlertIds));
           }
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('smileclinic_alert_settings_updated', {

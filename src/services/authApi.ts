@@ -1283,6 +1283,15 @@ export const authApi = {
 
   clearSession(): void {
     if (typeof window === 'undefined') return;
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smileclinic_checks_updated'));
+        window.dispatchEvent(new CustomEvent('smileclinic_audit_updated'));
+        window.dispatchEvent(new CustomEvent('smileclinic_rules_updated'));
+        window.dispatchEvent(new CustomEvent('smileclinic_documents_updated'));
+        sessionStorage.removeItem('smileclinic_last_synced_email');
+      }
+    } catch {}
     const authKeys = [
       'rxguard_authenticated',
       'rxguard_jwt_token',

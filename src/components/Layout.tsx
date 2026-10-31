@@ -10,7 +10,7 @@ import { SafetyCheckRecord } from '../types';
 import { ConfirmationEventDetail, showConfirmation } from '../services/confirmation';
 import { parseMedicationTiming } from '../services/medicationScheduleService';
 
-import { pushNotificationReadState, pullFromCloud } from '../services/cloudSyncService';
+import { pushNotificationReadState, pullFromCloud, getUserScopedKey } from '../services/cloudSyncService';
 
 interface NotificationItem {
   id: string;
@@ -368,7 +368,8 @@ export default function Layout() {
 
   const [notificationsReadAt, setNotificationsReadAt] = useState<number>(() => {
     try {
-      const raw = localStorage.getItem('smileclinic_notifications_read_at');
+      const k = getUserScopedKey('smileclinic_notifications_read_at');
+      const raw = k ? localStorage.getItem(k) : null;
       return raw ? parseInt(raw, 10) || 0 : 0;
     } catch {
       return 0;
@@ -377,7 +378,8 @@ export default function Layout() {
 
   const [readNotifIds, setReadNotifIds] = useState<Set<string>>(() => {
     try {
-      const raw = localStorage.getItem('smileclinic_read_notif_ids');
+      const k = getUserScopedKey('smileclinic_read_notif_ids');
+      const raw = k ? localStorage.getItem(k) : null;
       return raw ? new Set(JSON.parse(raw)) : new Set();
     } catch {
       return new Set();
@@ -403,7 +405,7 @@ export default function Layout() {
       const next = new Set(prev);
       next.add(id);
       try {
-        localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(Array.from(next)));
+        const k = getUserScopedKey('smileclinic_read_notif_ids'); if (k) localStorage.setItem(k, JSON.stringify(Array.from(next)));
       } catch {}
       return next;
     });
@@ -419,7 +421,7 @@ export default function Layout() {
     setReadNotifIds((prev) => {
       const next = new Set([...prev, ...allIds]);
       try {
-        localStorage.setItem('smileclinic_read_notif_ids', JSON.stringify(Array.from(next)));
+        const k = getUserScopedKey('smileclinic_read_notif_ids'); if (k) localStorage.setItem(k, JSON.stringify(Array.from(next)));
         localStorage.setItem('smileclinic_notifications_read_at', String(now));
       } catch {}
       return next;
