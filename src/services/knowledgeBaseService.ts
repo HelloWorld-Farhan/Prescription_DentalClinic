@@ -278,3 +278,4 @@ export function renameKnowledgeBase(kbId: string, newName: string): MultiKnowled
 
   return state;
 }
+

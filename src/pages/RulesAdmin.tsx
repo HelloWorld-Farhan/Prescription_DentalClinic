@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VirtualDb } from '../services/prescriptionService';
-import { InteractionRule, AlertSeverity, PrescriptionItem } from '../types';
+import { InteractionRule, AlertSeverity, PrescriptionItem, SafetyCheckRecord } from '../types';
+import PrescriptionCopyModal from '../components/PrescriptionCopyModal';
 import SyncKnowledgeModal from '../components/SyncKnowledgeModal';
 import {
   getMultiKnowledgeBaseState,
@@ -96,6 +97,58 @@ function getReconciledDocumentHistory(userId?: string): UploadedDocumentRecord[]
   }
 }
 
+function resolveSafetyCheckForDoc(
+  doc: UploadedDocumentRecord,
+  checks: SafetyCheckRecord[]
+): SafetyCheckRecord | undefined {
+  const docIdRaw = doc.id.startsWith('doc-chk-') ? doc.id.replace('doc-chk-', '') : doc.id;
+  return checks.find((c) => {
+    if (c.id === docIdRaw || c.checkNumber === docIdRaw) return true;
+    if (doc.storageUrl && (c.sourceDocumentUrl === doc.storageUrl || c.pdfUrl === doc.storageUrl)) return true;
+    if (doc.filename) {
+      const f1 = doc.filename.toLowerCase().trim();
+      const f2 = (c.sourceDocumentName || '').toLowerCase().trim();
+      if (f2 && (f1 === f2 || f1.includes(f2) || f2.includes(f1))) return true;
+      const b1 = f1.replace(/\.[^/.]+$/, '').trim();
+      const b2 = f2.replace(/\.[^/.]+$/, '').trim();
+      if (b1 && b2 && (b1 === b2 || b1.includes(b2) || b2.includes(b1))) return true;
+    }
+    return false;
+  });
+}
+
+function createSyntheticCheckFromDoc(
+  doc: UploadedDocumentRecord,
+  medicines: PrescriptionItem[],
+  alerts: any[],
+  currentClinician: string
+): SafetyCheckRecord {
+  const cleanId = doc.id.replace('doc-chk-', '');
+  return {
+    id: cleanId,
+    checkNumber: cleanId,
+    timestamp: doc.uploadedAt,
+    patientId: 'PT-' + cleanId.slice(-6),
+    patientName: doc.authorName || 'Prescription Dossier',
+    mrn: 'MRN-' + Math.abs(cleanId.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0) % 900000 + 100000),
+    unit: 'Dental Operatory Suite',
+    prescriptions: medicines,
+    alerts: alerts as any,
+    overallStatus: alerts.some((a) => a.severity === 'contraindicated')
+      ? 'Contraindicated'
+      : alerts.length > 0
+      ? 'Requires Review'
+      : 'Safe to Dispense',
+    prescriberName: doc.authorName || currentClinician,
+    prescriberNpi: 'NPI-19948201',
+    fhirSynced: false,
+    sourceDocumentUrl: doc.storageUrl,
+    sourceDocumentName: doc.filename,
+    sourceType: doc.filename.toLowerCase().includes('camera') ? 'camera' : 'upload',
+    pdfUrl: `/report?id=${cleanId}`,
+  };
+}
+
 export default function RulesAdmin() {
   // Read active logged-in user profile
   let storedUser: any = null;
@@ -177,6 +230,14 @@ export default function RulesAdmin() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isSavingStagedDoc, setIsSavingStagedDoc] = useState(false);
   const [inspectDocModal, setInspectDocModal] = useState<UploadedDocumentRecord | null>(null);
+  const [allChecks, setAllChecks] = useState<SafetyCheckRecord[]>(() => {
+    try {
+      return VirtualDb.getChecks();
+    } catch {
+      return [];
+    }
+  });
+  const [copyModalCheck, setCopyModalCheck] = useState<SafetyCheckRecord | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -223,6 +284,9 @@ export default function RulesAdmin() {
     const handleSync = () => {
       setRules(VirtualDb.getRules(currentUserId));
       setDocumentHistory(getReconciledDocumentHistory(currentUserId));
+      try {
+        setAllChecks(VirtualDb.getChecks());
+      } catch {}
     };
     const handleKnowledgeSync = () => {
       try {
@@ -253,13 +317,14 @@ export default function RulesAdmin() {
 
   // Lock body scroll and handle Escape key for active modals
   useEffect(() => {
-    if (!isAddModalOpen && !inspectRule && !isCameraModalOpen && !inspectDocModal) return;
+    if (!isAddModalOpen && !inspectRule && !isCameraModalOpen && !inspectDocModal && !copyModalCheck) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (inspectDocModal) setInspectDocModal(null);
+        if (copyModalCheck) setCopyModalCheck(null);
+        else if (inspectDocModal) setInspectDocModal(null);
         else if (isCameraModalOpen) setIsCameraModalOpen(false);
         else if (inspectRule) setInspectRule(null);
         else if (isAddModalOpen) handleCloseAddModal();
@@ -271,7 +336,7 @@ export default function RulesAdmin() {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isAddModalOpen, inspectRule, isCameraModalOpen, inspectDocModal, extractedFileMeta]);
+  }, [isAddModalOpen, inspectRule, isCameraModalOpen, inspectDocModal, copyModalCheck, extractedFileMeta]);
 
   const handleOpenAddModal = () => {
     setAddModalMode('select');
@@ -1105,35 +1170,22 @@ export default function RulesAdmin() {
                             <div className="flex items-center gap-3">
                               <button
                                 type="button"
-                                disabled={!doc.storageUrl}
-                                onClick={() => {
-                                  if (doc.storageUrl) setInspectDocModal(doc);
-                                }}
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all ${
-                                  doc.storageUrl
-                                    ? 'bg-primary/10 text-primary hover:bg-primary hover:text-white cursor-pointer shadow-2xs hover:scale-105'
-                                    : 'bg-primary/10 text-primary cursor-default'
-                                }`}
-                                title={doc.storageUrl ? 'Click to inspect document scan & OCR' : 'Form Stored'}
+                                onClick={() => setInspectDocModal(doc)}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all bg-primary/10 text-primary hover:bg-primary hover:text-white cursor-pointer shadow-2xs hover:scale-105"
+                                title="Click to inspect document, medicines & rules"
                               >
                                 <span className="material-symbols-outlined text-[18px]">
                                   {isCamera ? 'photo_camera' : isManual ? 'edit_note' : isPdf ? 'picture_as_pdf' : isWord ? 'description' : isCsv ? 'table_chart' : 'image'}
                                 </span>
                               </button>
                               <div className="min-w-0">
-                                {doc.storageUrl ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setInspectDocModal(doc)}
-                                    className="font-bold text-xs text-on-surface hover:text-primary text-left block truncate max-w-xs cursor-pointer transition-colors"
-                                  >
-                                    {doc.filename}
-                                  </button>
-                                ) : (
-                                  <span className="font-bold text-xs text-on-surface block truncate max-w-xs">
-                                    {doc.filename}
-                                  </span>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setInspectDocModal(doc)}
+                                  className="font-bold text-xs text-on-surface hover:text-primary text-left block truncate max-w-xs cursor-pointer transition-colors"
+                                >
+                                  {doc.filename}
+                                </button>
                                 <span className="text-[10px] text-outline">
                                   {doc.fileSize > 0 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : 'Direct Form Input'}
                                 </span>
@@ -1163,20 +1215,44 @@ export default function RulesAdmin() {
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-1.5">
-                              {doc.storageUrl ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setInspectDocModal(doc)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-primary/10 text-primary transition-colors text-[11px] font-bold border border-surface-container-high cursor-pointer shadow-2xs"
-                                  title="Inspect Document & OCR Extraction"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">visibility</span>
-                                  <span>Inspect</span>
-                                </button>
-                              ) : (
-                                <span className="text-[11px] text-outline italic">Form Stored</span>
-                              )}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => setInspectDocModal(doc)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-primary/10 text-primary transition-colors text-[11px] font-bold border border-surface-container-high cursor-pointer shadow-2xs"
+                                title="Inspect Document, Medicines & Rules"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">visibility</span>
+                                <span>Inspect</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const c = resolveSafetyCheckForDoc(doc, allChecks);
+                                  setCopyModalCheck(c || createSyntheticCheckFromDoc(doc, [], [], currentClinicianName));
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 transition-colors text-[11px] font-bold border border-teal-200 cursor-pointer shadow-2xs"
+                                title="View Prescription Copy Slip"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                                <span>Copy</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const c = resolveSafetyCheckForDoc(doc, allChecks);
+                                  const pUrl = c?.pdfUrl || `/report?id=${c?.id || c?.checkNumber || doc.id.replace('doc-chk-', '')}`;
+                                  window.open(pUrl, '_blank');
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-white transition-colors text-[11px] font-bold border border-primary/20 cursor-pointer shadow-2xs"
+                                title="Open CDS Safety Verification PDF Report"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+                                <span>PDF</span>
+                              </button>
+
                               {doc.storageUrl && (
                                 <a
                                   href={doc.storageUrl}
@@ -2627,157 +2703,463 @@ export default function RulesAdmin() {
       {/* ========================================================================= */}
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
-          {inspectDocModal && (
-            <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-5">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25 }}
-                onClick={() => setInspectDocModal(null)}
-                className="fixed inset-0 bg-black/75 backdrop-blur-md cursor-pointer"
-              />
+          {inspectDocModal && (() => {
+            const matchedCheck = resolveSafetyCheckForDoc(inspectDocModal, allChecks);
 
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 16 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: 12 }}
-                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-2xl bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl p-4 sm:p-6 flex flex-col gap-3.5 sm:gap-4 z-10 max-h-[88dvh] sm:max-h-[90vh] overflow-hidden my-auto"
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-surface-container pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[22px]">
-                        {inspectDocModal.filename.toLowerCase().includes('camera') ? 'photo_camera' : 'document_scanner'}
-                      </span>
+            interface ExtractedRuleDisplayItem {
+              id: string;
+              drugA: string;
+              drugB: string;
+              category?: string;
+              severity: AlertSeverity;
+              description: string;
+              recommendation?: string;
+            }
+
+            // 1. Gather all rules / safety alerts
+            const matchedRulesFromFile: ExtractedRuleDisplayItem[] = rules
+              .filter(
+                (r) =>
+                  r.sourceFile === inspectDocModal.filename ||
+                  (matchedCheck?.sourceDocumentName && r.sourceFile === matchedCheck.sourceDocumentName)
+              )
+              .map((r) => ({
+                id: r.id,
+                drugA: r.drugA,
+                drugB: r.drugB,
+                category: r.category,
+                severity: r.severity,
+                description: r.description,
+                recommendation: (r as any).recommendation,
+              }));
+
+            const alertRulesFromCheck: ExtractedRuleDisplayItem[] = (matchedCheck?.alerts || []).map((a, idx) => {
+              const dA = a.interactingDrugs?.[0] || (a as any).drugA || a.title || 'Prescribed Regimen';
+              const dB = a.interactingDrugs?.[1] || (a as any).drugB || (a as any).condition || (a as any).allergy || '';
+              return {
+                id: a.id || `chk-alert-${idx}-${dA}-${dB}`,
+                drugA: dA,
+                drugB: dB,
+                category: (a as any).category || 'Drug-Drug',
+                severity: a.severity || 'major',
+                description: a.description || a.clinicalImpact || a.mechanism || 'Clinical safety alert identified during prescription analysis.',
+                recommendation: a.recommendation,
+              };
+            });
+
+            const combinedRulesMap = new Map<string, ExtractedRuleDisplayItem>();
+            for (const r of [...matchedRulesFromFile, ...alertRulesFromCheck]) {
+              const key = `${(r.drugA || '').toLowerCase()}-${(r.drugB || '').toLowerCase()}-${(r.severity || '').toLowerCase()}`;
+              if (!combinedRulesMap.has(key)) {
+                combinedRulesMap.set(key, r);
+              }
+            }
+            const displayRules = Array.from(combinedRulesMap.values());
+
+            // 2. Gather medicines
+            let displayMedicines: PrescriptionItem[] = [];
+            if (matchedCheck?.prescriptions && matchedCheck.prescriptions.length > 0) {
+              displayMedicines = matchedCheck.prescriptions;
+            } else if (matchedCheck?.prescribedDrugs && matchedCheck.prescribedDrugs.length > 0) {
+              displayMedicines = matchedCheck.prescribedDrugs.map((name, i) => ({
+                id: `med-${i}`,
+                drugName: name,
+                genericName: name,
+                dosage: 'Standard Dose',
+                frequency: 'As Prescribed',
+                route: 'Oral',
+                duration: '7 Days',
+                indication: 'Dental Therapy',
+              }));
+            } else if (displayRules.length > 0) {
+              const uniqueNames = Array.from(
+                new Set(
+                  displayRules
+                    .flatMap((r) => [r.drugA, r.drugB])
+                    .filter(
+                      (d) =>
+                        d &&
+                        !d.toLowerCase().includes('history') &&
+                        !d.toLowerCase().includes('allergy') &&
+                        !d.toLowerCase().includes('renal') &&
+                        !d.toLowerCase().includes('impairment') &&
+                        !d.toLowerCase().includes('regimen')
+                    )
+                )
+              );
+              displayMedicines = uniqueNames.map((name, i) => ({
+                id: `med-inferred-${i}`,
+                drugName: name,
+                genericName: name,
+                dosage: 'Active In Prescription',
+                frequency: 'Under Monitoring',
+                route: 'Oral',
+                duration: 'Per Regimen',
+                indication: 'Clinical Protocol',
+              }));
+            }
+
+            const resolvedCheck =
+              matchedCheck ||
+              createSyntheticCheckFromDoc(inspectDocModal, displayMedicines, displayRules, currentClinicianName);
+
+            const pdfReportUrl =
+              matchedCheck?.pdfUrl ||
+              `/report?id=${matchedCheck?.id || matchedCheck?.checkNumber || inspectDocModal.id.replace('doc-chk-', '')}`;
+
+            const isPdf =
+              inspectDocModal.filename.toLowerCase().endsWith('.pdf') ||
+              inspectDocModal.storageUrl?.toLowerCase().includes('.pdf');
+            const isImage =
+              !isPdf &&
+              (inspectDocModal.filename.toLowerCase().match(/\.(jpg|jpeg|png|webp|avif|gif)$/i) ||
+                inspectDocModal.storageUrl?.toLowerCase().match(/\.(jpg|jpeg|png|webp|avif|gif)/i) ||
+                inspectDocModal.filename.toLowerCase().includes('camera'));
+
+            return (
+              <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-3 sm:p-5">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  onClick={() => setInspectDocModal(null)}
+                  className="fixed inset-0 bg-black/75 backdrop-blur-md cursor-pointer"
+                />
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative w-full max-w-3xl bg-surface-container-lowest border border-surface-container-high rounded-3xl shadow-2xl p-4 sm:p-6 flex flex-col gap-3.5 sm:gap-4 z-10 max-h-[90dvh] overflow-hidden my-auto"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-surface-container pb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">
+                          {isImage ? 'photo_camera' : isPdf ? 'picture_as_pdf' : 'document_scanner'}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-bold text-on-surface truncate">
+                          {inspectDocModal.filename}
+                        </h3>
+                        <p className="text-[11px] text-on-surface-variant flex items-center gap-2 flex-wrap">
+                          <span>Ingested {inspectDocModal.uploadedAt}</span>
+                          <span>•</span>
+                          <span className="font-semibold text-primary">{displayMedicines.length} medications</span>
+                          <span>•</span>
+                          <span className="font-semibold text-emerald-700">{displayRules.length} clinical rules</span>
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm sm:text-base font-bold text-on-surface truncate max-w-sm">
-                        {inspectDocModal.filename}
-                      </h3>
-                      <p className="text-[11px] text-on-surface-variant">
-                        Ingested {inspectDocModal.uploadedAt} · {inspectDocModal.extractedRulesCount} clinical rules active
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setInspectDocModal(null)}
-                    className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">close</span>
-                  </button>
-                </div>
-
-                {/* Body Content */}
-                <div className="space-y-4 overflow-y-auto flex-1 pr-1">
-                  {/* Optical Scan Display for Images */}
-                  {inspectDocModal.storageUrl && (
-                    <OpticalScanOverlay
-                      imageUrl={inspectDocModal.storageUrl}
-                      isScanning={false}
-                      title="Optical Scan Verified"
-                      className="max-h-[340px]"
-                    />
-                  )}
-
-                  {/* Associated Rules List */}
-                  <div>
-                    <h4 className="text-xs font-bold text-on-surface mb-2 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px] text-primary">rule</span>
-                      <span>Extracted Clinical Rules from this Document</span>
-                    </h4>
-
-                    {(() => {
-                      const matchedRules = rules.filter((r) => r.sourceFile === inspectDocModal.filename);
-                      if (matchedRules.length === 0) {
-                        return (
-                          <div className="p-3.5 rounded-xl bg-surface-container-low text-xs text-outline text-center">
-                            No rules currently linked to this exact document filename.
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                          {matchedRules.map((r) => (
-                            <div
-                              key={r.id}
-                              className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 flex items-start justify-between gap-3 text-xs"
-                            >
-                              <div className="min-w-0">
-                                <span className="font-bold text-on-surface">
-                                  {r.drugA} + {r.drugB}
-                                </span>
-                                <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-2">
-                                  {r.description}
-                                </p>
-                              </div>
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
-                                  r.severity === 'contraindicated'
-                                    ? 'bg-rose-100 text-rose-800'
-                                    : r.severity === 'major'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-blue-100 text-blue-800'
-                                }`}
-                              >
-                                {r.severity}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Footer Controls */}
-                <div className="flex items-center justify-between border-t border-surface-container pt-3">
-                  {inspectDocModal.storageUrl ? (
-                    <a
-                      href={inspectDocModal.storageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container-high hover:bg-primary/10 text-primary text-xs font-bold transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-                      <span>Open Original File</span>
-                    </a>
-                  ) : (
-                    <span />
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const target = inspectDocModal;
-                        setInspectDocModal(null);
-                        setDocToDelete(target);
-                      }}
-                      className="px-3.5 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">delete</span>
-                      <span>Delete Document</span>
-                    </button>
                     <button
                       type="button"
                       onClick={() => setInspectDocModal(null)}
-                      className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer shrink-0"
                     >
-                      Close
+                      <span className="material-symbols-outlined text-[18px]">close</span>
                     </button>
                   </div>
-                </div>
-              </motion.div>
-            </div>
-          )}
+
+                  {/* Body Content */}
+                  <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+                    {/* Clinical Patient & Document Verification Banner */}
+                    <div className="p-3.5 rounded-2xl bg-surface-container-low/80 border border-surface-container-high/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-700 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[18px]">badge</span>
+                        </div>
+                        <div>
+                          <div className="font-bold text-on-surface">
+                            {resolvedCheck.patientName} <span className="text-outline font-normal">({resolvedCheck.mrn})</span>
+                          </div>
+                          <div className="text-[11px] text-on-surface-variant">
+                            Prescriber: {resolvedCheck.prescriberName} · {resolvedCheck.unit}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            resolvedCheck.overallStatus === 'Contraindicated'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                              : resolvedCheck.overallStatus === 'Safe to Dispense'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-amber-100 text-amber-800 border border-amber-300'
+                          }`}
+                        >
+                          {resolvedCheck.overallStatus}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200">
+                          <span className="material-symbols-outlined text-[12px]">verified</span>
+                          <span>Vault Verified</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Document Preview (Image or PDF) */}
+                    {inspectDocModal.storageUrl && (
+                      <div className="rounded-2xl border border-surface-container-high bg-surface-container-low p-3 flex flex-col items-center justify-center gap-2">
+                        {isImage ? (
+                          <div className="relative group max-h-[220px] w-full flex items-center justify-center overflow-hidden rounded-xl bg-black/5">
+                            <img
+                              src={inspectDocModal.storageUrl}
+                              alt="Prescription Scan"
+                              className="max-h-[210px] w-auto object-contain rounded-lg shadow-2xs"
+                            />
+                            <a
+                              href={inspectDocModal.storageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/75 hover:bg-black text-white text-[10px] font-bold transition-all flex items-center gap-1 shadow-md"
+                            >
+                              <span className="material-symbols-outlined text-[13px]">fullscreen</span>
+                              <span>High-Res</span>
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="w-full flex items-center justify-between p-3 rounded-xl bg-white border border-surface-container-high/80">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
+                                <span className="material-symbols-outlined text-[22px]">picture_as_pdf</span>
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-on-surface truncate">
+                                  {inspectDocModal.filename}
+                                </div>
+                                <div className="text-[10px] text-outline">
+                                  Secure PDF Protocol Ingested & Indexed
+                                </div>
+                              </div>
+                            </div>
+                            <a
+                              href={inspectDocModal.storageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-primary/10 text-primary text-xs font-bold transition-colors flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+                              <span>Open PDF</span>
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Extracted Medications Section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-teal-600">medication</span>
+                          <span>Extracted Prescribed Medications</span>
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                          {displayMedicines.length} {displayMedicines.length === 1 ? 'Medication' : 'Medications'}
+                        </span>
+                      </div>
+
+                      {displayMedicines.length === 0 ? (
+                        <div className="p-3.5 rounded-xl bg-surface-container-low text-xs text-outline text-center border border-dashed border-surface-container-high">
+                          No specific medication items cataloged in this document record.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                          {displayMedicines.map((m, idx) => (
+                            <div
+                              key={m.id || idx}
+                              className="p-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60 flex items-start gap-2.5 text-xs"
+                            >
+                              <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-700 flex items-center justify-center shrink-0 mt-0.5">
+                                <span className="material-symbols-outlined text-[16px]">pill</span>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-bold text-on-surface truncate">
+                                  {m.drugName}
+                                </div>
+                                {m.genericName && m.genericName !== m.drugName && (
+                                  <div className="text-[10px] text-on-surface-variant truncate">
+                                    {m.genericName}
+                                  </div>
+                                )}
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {m.dosage && (
+                                    <span className="px-1.5 py-0.5 rounded bg-surface-container text-[10px] font-semibold text-on-surface">
+                                      {m.dosage}
+                                    </span>
+                                  )}
+                                  {m.frequency && (
+                                    <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] font-semibold text-primary">
+                                      {m.frequency}
+                                    </span>
+                                  )}
+                                  {m.route && (
+                                    <span className="px-1.5 py-0.5 rounded bg-surface-container text-[10px] font-semibold text-outline">
+                                      {m.route}
+                                    </span>
+                                  )}
+                                </div>
+                                {((m as any).instructions || m.duration) && (
+                                  <div className="text-[10px] text-outline mt-1 line-clamp-1 italic">
+                                    {(m as any).instructions || `Duration: ${m.duration}${m.indication ? ` · ${m.indication}` : ''}`}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Extracted Clinical Rules Section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-primary">rule</span>
+                          <span>Extracted Clinical Rules & Safety Alerts</span>
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                          {displayRules.length} {displayRules.length === 1 ? 'Rule' : 'Rules'} Active
+                        </span>
+                      </div>
+
+                      {displayRules.length === 0 ? (
+                        <div className="p-3.5 rounded-xl bg-surface-container-low text-xs text-outline text-center border border-dashed border-surface-container-high">
+                          No clinical interaction rules currently linked to this prescription document.
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                          {displayRules.map((r, idx) => (
+                            <div
+                              key={r.id || idx}
+                              className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 space-y-1.5 text-xs"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="font-bold text-on-surface flex items-center gap-1.5 flex-wrap">
+                                  <span>{r.drugA}{r.drugB ? ` + ${r.drugB}` : ''}</span>
+                                  {r.category && (
+                                    <span className="px-1.5 py-0.5 rounded bg-surface-container text-[10px] font-semibold text-outline">
+                                      {r.category}
+                                    </span>
+                                  )}
+                                </div>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                                    r.severity === 'contraindicated'
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                      : r.severity === 'major'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                      : r.severity === 'moderate'
+                                      ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                      : 'bg-teal-100 text-teal-800 border border-teal-300'
+                                  }`}
+                                >
+                                  {r.severity}
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                                {r.description}
+                              </p>
+
+                              {r.recommendation && (
+                                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-900 text-[11px] flex items-start gap-1.5">
+                                  <span className="material-symbols-outlined text-[14px] text-amber-700 shrink-0 mt-0.5">
+                                    tips_and_updates
+                                  </span>
+                                  <span><strong>Recommendation:</strong> {r.recommendation}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer Controls */}
+                  <div className="flex flex-wrap items-center justify-between border-t border-surface-container pt-3 gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Prescription Copy button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCopyModalCheck(resolvedCheck);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
+                        title="View Official High-Resolution Prescription Copy & Slip"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                        <span>Prescription Copy</span>
+                      </button>
+
+                      {/* PDF Report button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.open(pdfReportUrl, '_blank');
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/20 text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
+                        title="Open Clinical Decision Support PDF Verification Report"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                        <span>PDF Report</span>
+                      </button>
+
+                      {/* Open Original File */}
+                      {inspectDocModal.storageUrl && (
+                        <a
+                          href={inspectDocModal.storageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-container text-on-surface-variant text-xs font-bold transition-colors"
+                          title="Open original uploaded file from secure storage"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+                          <span>Original File</span>
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = inspectDocModal;
+                          setInspectDocModal(null);
+                          setDocToDelete(target);
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">delete</span>
+                        <span>Delete Document</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInspectDocModal(null)}
+                        className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition-colors cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            );
+          })()}
         </AnimatePresence>,
         document.body
       )}
+
+      {/* Prescription Copy Modal */}
+      <PrescriptionCopyModal
+        isOpen={!!copyModalCheck}
+        check={copyModalCheck}
+        onClose={() => setCopyModalCheck(null)}
+      />
     </div>
   );
 }
