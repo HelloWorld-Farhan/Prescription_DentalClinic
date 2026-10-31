@@ -166,15 +166,151 @@ export default function Dashboard() {
 
 
 
+  // State for interactive 6-day check activity bar hover
+  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
+
   // 1. Checks performed TODAY in Indian Standard Time (IST, UTC+5:30)
-
   // Automatically resets to 0 every day at 12:00 AM IST (midnight)
-
   const todayChecks = useMemo(() => {
-
     return checks.filter(c => isTodayIST(c.timestampMs || c.createdAt || c.id || c.timestamp));
-
   }, [checks]);
+
+  // Rolling 6-Day Clinical Safety Activity Summaries (IST, UTC+5:30)
+  // [Day -5, Day -4, Day -3, Day -2, Yesterday, Today]
+  // Automatically drops off the oldest day at 12:00 AM IST midnight
+  const sixDayCheckSummaries = useMemo(() => {
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    // Group user checks by IST date key YYYY-MM-DD
+    const checksByDateKey = new Map<string, SafetyCheckRecord[]>();
+    for (const c of checks) {
+      let ms = 0;
+      if (typeof c.timestampMs === 'number' && c.timestampMs > 0) {
+        ms = c.timestampMs;
+      } else if (c.createdAt) {
+        const parsed = new Date(c.createdAt).getTime();
+        if (!isNaN(parsed)) ms = parsed;
+      } else if (typeof c.timestamp === 'number' && c.timestamp > 0) {
+        ms = c.timestamp;
+      } else if (typeof c.id === 'string' && (c.id.startsWith('chk-') || c.id.startsWith('aud-'))) {
+        const num = parseInt(c.id.split('-')[1], 10);
+        if (!isNaN(num) && num > 1000000000000) ms = num;
+      }
+
+      if (ms > 0) {
+        const dIST = new Date(ms + IST_OFFSET_MS);
+        const key = `${dIST.getUTCFullYear()}-${String(dIST.getUTCMonth() + 1).padStart(2, '0')}-${String(dIST.getUTCDate()).padStart(2, '0')}`;
+        const list = checksByDateKey.get(key) || [];
+        list.push(c);
+        checksByDateKey.set(key, list);
+      }
+    }
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const daysOffsets = [5, 4, 3, 2, 1, 0];
+    const summaries = [];
+
+    for (const offset of daysOffsets) {
+      const targetIST = new Date(now + IST_OFFSET_MS - offset * 86400000);
+      const y = targetIST.getUTCFullYear();
+      const m = targetIST.getUTCMonth();
+      const d = targetIST.getUTCDate();
+      const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const monthStr = monthNames[m];
+      const fullDateLabel = `${d} ${monthStr} ${y}`;
+
+      let dayLabel = `${d} ${monthStr}`;
+      if (offset === 0) dayLabel = 'Today';
+      else if (offset === 1) dayLabel = 'Yesterday';
+
+      const dayChecks = checksByDateKey.get(dateKey) || [];
+      const patientSet = new Set<string>();
+      let totalAlerts = 0;
+      let worstSev = 'clear';
+
+      for (const ch of dayChecks) {
+        if (ch.patientName) patientSet.add(ch.patientName);
+        if (Array.isArray(ch.alerts)) {
+          totalAlerts += ch.alerts.length;
+          for (const al of ch.alerts) {
+            if (al.severity === 'contraindicated') worstSev = 'contraindicated';
+            else if (al.severity === 'major' && worstSev !== 'contraindicated') worstSev = 'major';
+            else if (al.severity === 'moderate' && worstSev === 'clear') worstSev = 'moderate';
+          }
+        }
+      }
+
+      summaries.push({
+        dayOffset: offset,
+        dateKey,
+        dayLabel,
+        fullDateLabel,
+        count: dayChecks.length,
+        checks: dayChecks,
+        patientNames: Array.from(patientSet),
+        alertsCount: totalAlerts,
+        highestSeverity: worstSev,
+        isToday: offset === 0,
+        heightPercent: 15,
+      });
+    }
+
+    const maxCount = Math.max(...summaries.map(s => s.count), 0);
+    return summaries.map(s => {
+      let pct = 15;
+      if (maxCount > 0 && s.count > 0) {
+        pct = Math.max(25, Math.round((s.count / maxCount) * 100));
+      }
+      return { ...s, heightPercent: pct };
+    });
+  }, [checks]);
+
+  // Delta comparison between Today and Yesterday
+  const deltaComparison = useMemo(() => {
+    const todaySummary = sixDayCheckSummaries.find(s => s.dayOffset === 0);
+    const yesterdaySummary = sixDayCheckSummaries.find(s => s.dayOffset === 1);
+    const todayCount = todaySummary?.count || 0;
+    const yesterdayCount = yesterdaySummary?.count || 0;
+
+    if (yesterdayCount === 0) {
+      if (todayCount === 0) {
+        return {
+          label: 'Resets 12 AM',
+          icon: 'schedule',
+          colorClass: 'text-primary font-bold',
+        };
+      }
+      return {
+        label: `+${todayCount * 100}% vs yesterday`,
+        icon: 'trending_up',
+        colorClass: 'text-primary font-bold',
+      };
+    }
+
+    const diff = todayCount - yesterdayCount;
+    const pct = Math.round((diff / yesterdayCount) * 100);
+
+    if (pct > 0) {
+      return {
+        label: `+${pct}% vs yesterday`,
+        icon: 'trending_up',
+        colorClass: 'text-emerald-600 dark:text-emerald-400 font-bold',
+      };
+    } else if (pct < 0) {
+      return {
+        label: `${pct}% vs yesterday`,
+        icon: 'trending_down',
+        colorClass: 'text-amber-600 dark:text-amber-400 font-bold',
+      };
+    } else {
+      return {
+        label: '0% vs yesterday',
+        icon: 'trending_flat',
+        colorClass: 'text-primary font-bold',
+      };
+    }
+  }, [sixDayCheckSummaries]);
 
 
 
@@ -666,54 +802,102 @@ export default function Dashboard() {
 
                 </span>
 
-                <span className="inline-flex items-center text-xs text-primary font-bold">
-
+                <span className={`inline-flex items-center text-xs ${deltaComparison.colorClass}`}>
                   <span className="material-symbols-outlined text-[14px]">
-
-                    {todayChecks.length > 0 ? 'trending_up' : 'schedule'}
-
+                    {deltaComparison.icon}
                   </span>
-
-                  {todayChecks.length > 0 ? '+100%' : 'Resets 12 AM'}
-
+                  {deltaComparison.label}
                 </span>
-
               </div>
-
             </div>
 
             <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors duration-200 shadow-2xs">
-
               <span className="material-symbols-outlined text-[22px]">fact_check</span>
-
             </div>
-
           </div>
 
           <div className="mt-4 pt-3 border-t border-surface-container">
+            {/* Dynamic 6-Day Rolling Clinical Safety Check Activity Bar Chart */}
+            <div
+              className="relative flex items-end gap-1.5 h-6 mb-2 pt-1"
+              onMouseLeave={() => setHoveredBarIndex(null)}
+            >
+              {sixDayCheckSummaries.map((day, idx) => {
+                const isHovered = hoveredBarIndex === idx;
+                return (
+                  <div
+                    key={day.dateKey}
+                    className="relative flex-1 h-full flex items-end cursor-pointer group/bar"
+                    onMouseEnter={() => setHoveredBarIndex(idx)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHoveredBarIndex(hoveredBarIndex === idx ? null : idx);
+                    }}
+                  >
+                    {/* Floating Tooltip above Bar */}
+                    {isHovered && (
+                      <div
+                        className="absolute bottom-full mb-1.5 z-30 pointer-events-none bg-surface-container-highest/95 backdrop-blur-md text-on-surface px-2.5 py-1.5 rounded-lg shadow-lg border border-surface-container-high text-[11px] whitespace-nowrap min-w-[135px] max-w-[200px]"
+                        style={{
+                          left: idx === 0 ? '0%' : idx === 5 ? '100%' : '50%',
+                          transform: idx === 0 ? 'translateX(0%)' : idx === 5 ? 'translateX(-100%)' : 'translateX(-50%)',
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-2 border-b border-surface-container-high/60 pb-1 mb-1 font-bold">
+                          <span className={day.isToday ? 'text-primary font-extrabold' : 'text-on-surface'}>
+                            {day.dayLabel}
+                          </span>
+                          <span className="text-[10px] text-outline font-mono">{day.fullDateLabel}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-on-surface">
+                          <span className={`w-1.5 h-1.5 rounded-full ${day.count > 0 ? (day.highestSeverity === 'contraindicated' ? 'bg-error' : day.highestSeverity === 'major' ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-outline/40'}`}></span>
+                          {day.count === 0 ? '0 Checks' : `${day.count} Safety Check${day.count > 1 ? 's' : ''}`}
+                        </div>
+                        {day.count > 0 ? (
+                          <div className="text-[10px] text-on-surface-variant truncate mt-0.5">
+                            {day.patientNames.length > 0 ? `Patient: ${day.patientNames.join(', ')}` : 'Screened prescription slip'}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-outline/80 mt-0.5">
+                            {day.isToday ? 'Awaiting checks today' : 'No checks on this day'}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-            <div className="flex items-end gap-1 h-5 mb-2 opacity-80">
-
-              <div className="w-full bg-primary-fixed-dim rounded-t" style={{ height: checks.length > 0 ? '40%' : '15%' }}></div>
-
-              <div className="w-full bg-primary-fixed-dim rounded-t" style={{ height: checks.length > 0 ? '60%' : '15%' }}></div>
-
-              <div className="w-full bg-primary-fixed-dim rounded-t" style={{ height: checks.length > 0 ? '55%' : '15%' }}></div>
-
-              <div className="w-full bg-primary-fixed-dim rounded-t" style={{ height: checks.length > 0 ? '80%' : '15%' }}></div>
-
-              <div className="w-full bg-primary-fixed-dim rounded-t" style={{ height: checks.length > 0 ? '70%' : '15%' }}></div>
-
-              <div className="w-full bg-primary-container rounded-t" style={{ height: checks.length > 0 ? '100%' : '15%' }}></div>
-
+                    {/* Bar Element */}
+                    <div
+                      className={`w-full rounded-t transition-all duration-200 ${
+                        day.isToday
+                          ? day.count > 0
+                            ? 'bg-primary group-hover/bar:bg-primary/90 shadow-2xs'
+                            : 'bg-primary/25 border-t border-x border-primary/40'
+                          : day.count > 0
+                            ? 'bg-primary-fixed-dim group-hover/bar:bg-primary/70'
+                            : 'bg-surface-container-high/70 group-hover/bar:bg-surface-container-highest'
+                      } ${isHovered ? 'scale-y-110 opacity-100 ring-1 ring-primary/40' : 'opacity-85'}`}
+                      style={{
+                        height: `${day.heightPercent}%`,
+                        minHeight: '4px',
+                      }}
+                      title={`${day.dayLabel} (${day.fullDateLabel}): ${day.count} checks`}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             <div className="flex items-center justify-between gap-1">
-
               <p className="text-[11px] text-on-surface-variant truncate">
-
-                {latestTodayCheckTime ? `Latest: ${latestTodayCheckTime} (${currentDateIST})` : `Today: ${currentDateIST} · Resets 12:00 AM IST`}
-
+                {hoveredBarIndex !== null && sixDayCheckSummaries[hoveredBarIndex] ? (
+                  <span>
+                    <strong className="text-on-surface">{sixDayCheckSummaries[hoveredBarIndex].dayLabel}:</strong> {sixDayCheckSummaries[hoveredBarIndex].count} check{sixDayCheckSummaries[hoveredBarIndex].count !== 1 ? 's' : ''} ({sixDayCheckSummaries[hoveredBarIndex].fullDateLabel})
+                  </span>
+                ) : latestTodayCheckTime ? (
+                  `Latest: ${latestTodayCheckTime} (${currentDateIST})`
+                ) : (
+                  `Today: ${currentDateIST} · Resets 12:00 AM IST`
+                )}
               </p>
 
               <button
