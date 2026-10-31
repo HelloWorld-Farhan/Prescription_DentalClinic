@@ -395,6 +395,7 @@ export default function Dashboard() {
 
     window.addEventListener('smileclinic_rules_updated', handleRulesSync);
     window.addEventListener('smileclinic_checks_updated', handleChecksSync);
+    window.addEventListener('smileclinic_documents_updated', handleChecksSync);
     window.addEventListener('smileclinic_audit_updated', handleAuditSync);
     window.addEventListener('smileclinic_knowledge_synced', handleKnowledgeSync);
     window.addEventListener('storage', handleRulesSync);
@@ -404,6 +405,7 @@ export default function Dashboard() {
       isMounted = false;
       window.removeEventListener('smileclinic_rules_updated', handleRulesSync);
       window.removeEventListener('smileclinic_checks_updated', handleChecksSync);
+      window.removeEventListener('smileclinic_documents_updated', handleChecksSync);
       window.removeEventListener('smileclinic_audit_updated', handleAuditSync);
       window.removeEventListener('smileclinic_knowledge_synced', handleKnowledgeSync);
       window.removeEventListener('storage', handleRulesSync);

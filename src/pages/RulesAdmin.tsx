@@ -306,12 +306,14 @@ export default function RulesAdmin() {
     window.addEventListener('smileclinic_checks_updated', handleSync);
     window.addEventListener('smileclinic_knowledge_synced', handleKnowledgeSync);
     window.addEventListener('storage', handleSync);
+    window.addEventListener('storage', handleKnowledgeSync);
     return () => {
       window.removeEventListener('smileclinic_rules_updated', handleSync);
       window.removeEventListener('smileclinic_documents_updated', handleSync);
       window.removeEventListener('smileclinic_checks_updated', handleSync);
       window.removeEventListener('smileclinic_knowledge_synced', handleKnowledgeSync);
       window.removeEventListener('storage', handleSync);
+      window.removeEventListener('storage', handleKnowledgeSync);
     };
   }, [currentUserId]);
 

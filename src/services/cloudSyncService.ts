@@ -398,43 +398,94 @@ export async function pullFromCloud(): Promise<boolean> {
       if (data.syncedKnowledge && typeof data.syncedKnowledge === 'object') {
         try {
           const sk = data.syncedKnowledge;
-          if (sk.multiKb && Array.isArray(sk.multiKb.knowledgeBases)) {
-            const kMulti = getUserScopedKey('smileclinic_multi_knowledge_bases');
-            const kActive = getUserScopedKey('smileclinic_active_kb_id');
-            if (kMulti) localStorage.setItem(kMulti, JSON.stringify(sk.multiKb.knowledgeBases));
-            if (kActive && sk.multiKb.activeKbId) localStorage.setItem(kActive, sk.multiKb.activeKbId);
+          const kMulti = getUserScopedKey('smileclinic_multi_knowledge_bases', email);
+          const kActive = getUserScopedKey('smileclinic_active_kb_id', email);
+
+          let multiKbToSave = sk.multiKb;
+          if (!multiKbToSave || !Array.isArray(multiKbToSave.knowledgeBases) || multiKbToSave.knowledgeBases.length !== 3) {
+            const rawLocal = kMulti ? localStorage.getItem(kMulti) : null;
+            if (rawLocal) {
+              try {
+                const parsed = JSON.parse(rawLocal);
+                if (Array.isArray(parsed) && parsed.length === 3) {
+                  multiKbToSave = { activeKbId: 'kb-1', knowledgeBases: parsed };
+                }
+              } catch {}
+            }
+            if (!multiKbToSave) {
+              multiKbToSave = {
+                activeKbId: 'kb-1',
+                knowledgeBases: [
+                  {
+                    id: 'kb-1',
+                    name: 'Primary Clinical & Prescription Protocol',
+                    description: 'Comprehensive evaluation cross-screening patient history documents and prior prescription checks.',
+                    selection: sk.selection || [],
+                    docs: sk.docs || [],
+                    checks: sk.checks || [],
+                    rules: sk.rules || [],
+                    conditions: sk.conditions || [],
+                    updatedAt: new Date().toISOString(),
+                  },
+                  {
+                    id: 'kb-2',
+                    name: 'Renal & Hepatic Impairment Protocol',
+                    description: 'Targeted safety screening focused on organ clearance, dosage adjustments, and nephro/hepatotoxic risks.',
+                    selection: [],
+                    docs: [],
+                    checks: [],
+                    rules: [],
+                    conditions: [],
+                    updatedAt: new Date().toISOString(),
+                  },
+                  {
+                    id: 'kb-3',
+                    name: 'Custom Dental Operatory Protocol',
+                    description: 'Specialized dental procedures, local anesthetic interactions, and antibiotic stewardship protocols.',
+                    selection: [],
+                    docs: [],
+                    checks: [],
+                    rules: [],
+                    conditions: [],
+                    updatedAt: new Date().toISOString(),
+                  },
+                ],
+              };
+            }
           }
-          if (Array.isArray(sk.selection)) {
-            const kSel = getUserScopedKey('smileclinic_synced_knowledge_selection');
-            if (kSel) localStorage.setItem(kSel, JSON.stringify(sk.selection));
-          }
-          if (Array.isArray(sk.docs)) {
-            const kDocs = getUserScopedKey('smileclinic_synced_active_docs');
-            if (kDocs) localStorage.setItem(kDocs, JSON.stringify(sk.docs));
-          }
-          if (Array.isArray(sk.checks)) {
-            const kChecks = getUserScopedKey('smileclinic_synced_active_checks');
-            if (kChecks) localStorage.setItem(kChecks, JSON.stringify(sk.checks));
-          }
-          if (Array.isArray(sk.rules)) {
-            const kRules = getUserScopedKey('smileclinic_synced_active_rules');
-            if (kRules) localStorage.setItem(kRules, JSON.stringify(sk.rules));
-          }
-          if (Array.isArray(sk.conditions)) {
-            const kConds = getUserScopedKey('smileclinic_synced_active_conditions');
-            if (kConds) localStorage.setItem(kConds, JSON.stringify(sk.conditions));
-          }
+
+          if (kMulti && multiKbToSave) localStorage.setItem(kMulti, JSON.stringify(multiKbToSave.knowledgeBases));
+          if (kActive && multiKbToSave?.activeKbId) localStorage.setItem(kActive, multiKbToSave.activeKbId);
+
+          const activeKb = (multiKbToSave?.knowledgeBases || []).find((k: any) => k.id === multiKbToSave.activeKbId) || multiKbToSave?.knowledgeBases?.[0];
+
+          const kSel = getUserScopedKey('smileclinic_synced_knowledge_selection', email);
+          if (kSel) localStorage.setItem(kSel, JSON.stringify(activeKb?.selection || sk.selection || []));
+
+          const kDocs = getUserScopedKey('smileclinic_synced_active_docs', email);
+          if (kDocs) localStorage.setItem(kDocs, JSON.stringify(activeKb?.docs || sk.docs || []));
+
+          const kChecks = getUserScopedKey('smileclinic_synced_active_checks', email);
+          if (kChecks) localStorage.setItem(kChecks, JSON.stringify(activeKb?.checks || sk.checks || []));
+
+          const kRules = getUserScopedKey('smileclinic_synced_active_rules', email);
+          if (kRules) localStorage.setItem(kRules, JSON.stringify(activeKb?.rules || sk.rules || []));
+
+          const kConds = getUserScopedKey('smileclinic_synced_active_conditions', email);
+          if (kConds) localStorage.setItem(kConds, JSON.stringify(activeKb?.conditions || sk.conditions || []));
+
           if (typeof window !== 'undefined') {
             window.dispatchEvent(
               new CustomEvent('smileclinic_knowledge_synced', {
                 detail: {
-                  multiKb: sk.multiKb,
-                  activeKbId: sk.multiKb?.activeKbId,
-                  selection: sk.selection || [],
-                  docs: sk.docs || [],
-                  checks: sk.checks || [],
-                  rules: sk.rules || [],
-                  conditions: sk.conditions || [],
+                  multiKb: multiKbToSave,
+                  activeKbId: multiKbToSave?.activeKbId,
+                  activeKb,
+                  selection: activeKb?.selection || sk.selection || [],
+                  docs: activeKb?.docs || sk.docs || [],
+                  checks: activeKb?.checks || sk.checks || [],
+                  rules: activeKb?.rules || sk.rules || [],
+                  conditions: activeKb?.conditions || sk.conditions || [],
                 },
               })
             );
@@ -442,6 +493,23 @@ export async function pullFromCloud(): Promise<boolean> {
         } catch (e) {
           console.warn('[CloudSync] Failed to reconcile synced knowledge state', e);
         }
+      } else if (!data.syncedKnowledge && email) {
+        try {
+          const kMulti = getUserScopedKey('smileclinic_multi_knowledge_bases', email);
+          const raw = kMulti ? localStorage.getItem(kMulti) : null;
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const activeKb = parsed[0] || {};
+            pushKnowledgeSyncState({
+              selection: activeKb.selection || [],
+              conditions: activeKb.conditions || [],
+              checks: activeKb.checks || [],
+              rules: activeKb.rules || [],
+              docs: activeKb.docs || [],
+              multiKb: { activeKbId: 'kb-1', knowledgeBases: parsed },
+            } as any).catch(() => {});
+          }
+        } catch {}
       }
 
       return true;

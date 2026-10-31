@@ -303,7 +303,11 @@ export default function NewCheck() {
       }
     };
     window.addEventListener('smileclinic_knowledge_synced', handleSyncUpdate);
-    return () => window.removeEventListener('smileclinic_knowledge_synced', handleSyncUpdate);
+    window.addEventListener('storage', handleSyncUpdate);
+    return () => {
+      window.removeEventListener('smileclinic_knowledge_synced', handleSyncUpdate);
+      window.removeEventListener('storage', handleSyncUpdate);
+    };
   }, []);
 
   const handleSwitchActiveKb = (kbId: string) => {
@@ -689,12 +693,29 @@ export default function NewCheck() {
       setActiveStageLog(`Cross-matching against ${activeMeds.length} active medications & dental operatory sedation protocols...`);
     }, 1500);
 
+    // Cross-match with active concurrent medications + prior prescription checks synchronized in this Knowledge Base
+    const priorPrescribedMeds: string[] = [];
+    if (syncedChecks && syncedChecks.length > 0) {
+      const allChecks = VirtualDb.getChecks();
+      for (const cid of syncedChecks) {
+        const chk = allChecks.find((c) => c.id === cid || c.checkNumber === cid);
+        if (chk && chk.prescriptions) {
+          chk.prescriptions.forEach((p) => {
+            if (p.drugName && !priorPrescribedMeds.includes(p.drugName) && !activeMeds.includes(p.drugName)) {
+              priorPrescribedMeds.push(p.drugName);
+            }
+          });
+        }
+      }
+    }
+    const combinedActiveMeds = Array.from(new Set([...activeMeds, ...priorPrescribedMeds]));
+
     try {
       const updatedPatient: Patient = {
         ...selectedPatient,
         weightKg: customWeight,
         egfr: customEgfr,
-        activeMedications: activeMeds,
+        activeMedications: combinedActiveMeds,
         allergies: parsedAllergies
       };
 
@@ -722,7 +743,7 @@ export default function NewCheck() {
           allergies: parsedAllergies,
           // AI CDS strictly screens ONLY against the synchronized medical conditions selected in Knowledge Base Sync
           conditions: (syncedConditions && syncedConditions.length > 0) ? syncedConditions : ((selectedPatient.conditions || []).map((cond: any) => typeof cond === 'string' ? cond : cond.name)),
-          current_medications: activeMeds,
+          current_medications: combinedActiveMeds,
         },
         prescriptions: prescriptions,
         rules: VirtualDb.getRules(),
@@ -863,7 +884,7 @@ export default function NewCheck() {
         ...selectedPatient,
         weightKg: customWeight,
         egfr: customEgfr,
-        activeMedications: activeMeds,
+        activeMedications: combinedActiveMeds,
         allergies: parsedAllergies
       };
 
