@@ -245,7 +245,7 @@ export default function NewCheck() {
   // Patient Context Selection
   const [selectedPatientId, setSelectedPatientId] = useState<string>(() => defaultPatient.id);
   const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || patients[0] || defaultPatient;
-  const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn ? `PT-${selectedPatient.mrn}` : 'PT-NEW-001');
+  const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn ? (selectedPatient.mrn.startsWith('PT-') ? selectedPatient.mrn : `PT-${selectedPatient.mrn}`) : 'PT-NEW-001');
   const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? userWeightNum);
   const [customEgfr, setCustomEgfr] = useState<number>(() => selectedPatient?.egfr ?? 90);
   const [activeMeds, setActiveMeds] = useState<string[]>(() => selectedPatient?.activeMedications ?? []);
@@ -369,7 +369,7 @@ export default function NewCheck() {
       setCustomEgfr(p.egfr);
       setActiveMeds(Array.isArray(p.activeMedications) ? p.activeMedications : []);
       setAllergies(p.allergies);
-      setPtKey('MRN-HASH-' + p.mrn.replace(/[^0-9]/g, '').slice(0, 4) + '-XF');
+      setPtKey(p.mrn.startsWith('PT-') ? p.mrn : `PT-${p.mrn}`);
     }
   };
 
