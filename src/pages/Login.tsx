@@ -42,6 +42,13 @@ export default function Login() {
 
   const [clinicalId, setClinicalId] = useState('');
   const [password, setPassword] = useState('');
+
+  // Clear inputs on mount to prevent stale values
+  useEffect(() => {
+    setClinicalId('');
+    setPassword('');
+    setRememberDevice(false);
+  }, []);
   const [clinicalIdTouched, setClinicalIdTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -469,7 +476,13 @@ export default function Login() {
                   )}
 
                   {/* Credentials Form */}
-                  <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4">
+                  <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4" autoComplete="off">
+                    {/* Decoy hidden inputs to divert aggressive browser password managers */}
+                    <div style={{ position: 'absolute', opacity: 0, height: 0, width: 0, zIndex: -1, pointerEvents: 'none', overflow: 'hidden' }} aria-hidden="true">
+                      <input type="text" name="fake_username_trap" tabIndex={-1} autoComplete="off" />
+                      <input type="password" name="fake_password_trap" tabIndex={-1} autoComplete="off" />
+                    </div>
+
                     {/* Clinical ID / Email */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-semibold text-on-surface" htmlFor="clinical-id">
@@ -481,8 +494,15 @@ export default function Login() {
                         </span>
                         <input
                           id="clinical-id"
-                          type="email"
+                          name="clinical_prescriber_access_id"
+                          type="text"
+                          inputMode="email"
                           autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          data-lpignore="true"
+                          data-1p-ignore="true"
                           value={clinicalId}
                           onBlur={() => setClinicalIdTouched(true)}
                           onChange={(e) => {
@@ -525,8 +545,11 @@ export default function Login() {
                         </span>
                         <input
                           id="clinical-password"
+                          name="clinical_prescriber_pass_token"
                           type={showPassword ? 'text' : 'password'}
                           autoComplete="new-password"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
                           value={password}
                           onBlur={() => setPasswordTouched(true)}
                           onChange={(e) => {
@@ -671,14 +694,17 @@ export default function Login() {
                             : 'bg-outline/20 text-on-surface/40 cursor-not-allowed'
                         }`}
                       >
-                        <span className={`material-symbols-outlined text-lg ${isLoading ? 'animate-spin' : ''}`}>
-                          {isLoading ? 'sync' : 'login'}
-                        </span>
-                        <span>
-                          {isLoading
-                            ? 'Authenticating...'
-                            : 'Sign In to Smile Clinic Portal'}
-                        </span>
+                        {isLoading ? (
+                          <>
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0"></span>
+                            <span>Authenticating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-lg">login</span>
+                            <span>Sign In to Smile Clinic Portal</span>
+                          </>
+                        )}
                       </motion.button>
 
                       {/* Divider */}
@@ -892,7 +918,7 @@ export default function Login() {
                   >
                     {isVerifyingLoginOtp ? (
                       <>
-                        <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0"></span>
                         <span>Verifying...</span>
                       </>
                     ) : (
