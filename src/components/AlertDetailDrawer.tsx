@@ -84,6 +84,7 @@ export default function AlertDetailDrawer({
   const effectiveCheckId = propCheckId || matchingCheck?.id || checkNumber;
   const effectiveSourceDocumentUrl = propSourceDocumentUrl || matchingCheck?.sourceDocumentUrl;
   const effectiveSourceDocumentName = propSourceDocumentName || matchingCheck?.sourceDocumentName || 'prescription_7.pdf';
+  const effectivePdfUrl = matchingCheck?.pdfUrl;
 
   // Accurately extract the two interacting drug names (Never "Primary drug" or "Secondary drug")
   const { drugA, drugB } = useMemo(() => {
@@ -291,6 +292,7 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
         clinician_name: loggedClinician,
         clinician_email: loggedEmail,
         cc_user_email: undefined,
+        pdf_url: effectivePdfUrl,
         source_document_url: effectiveSourceDocumentUrl,
         source_document_name: effectiveSourceDocumentName,
       });

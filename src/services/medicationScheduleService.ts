@@ -388,6 +388,7 @@ export async function dispatchDoctorConsultEmail(payload: {
   cc_user_email?: string;
   notary_hash?: string;
   portal_url?: string;
+  pdf_url?: string;
   source_document_url?: string;
   source_document_name?: string;
 }): Promise<{ status: string; message: string; delivered: boolean }> {
@@ -397,6 +398,7 @@ export async function dispatchDoctorConsultEmail(payload: {
   const userCc = payload.cc_user_email?.trim() || payload.clinician_email?.trim() || '';
   const cleanMrn = payload.patient_mrn?.startsWith('PS-') ? payload.patient_mrn : (payload.patient_mrn ? `PS-${payload.patient_mrn.replace(/^PT-(?:NEW-)?/i, 'FK-')}` : 'PS-FK-001');
   const cleanCheckNum = payload.check_number?.startsWith('PS-') ? payload.check_number : (payload.check_number ? `${cleanMrn}-${payload.check_number.replace(/^CHK-2026-?/i, 'Prescription_7')}` : `${cleanMrn}-Prescription_7`);
+  const directPdfUrl = payload.pdf_url || (API_BASE_URL ? `${API_BASE_URL}/api/v1/sync/report-pdf?id=${cleanCheckNum}` : `https://dental-backend-production.up.railway.app/api/v1/sync/report-pdf?id=${cleanCheckNum}`);
 
   // 1. Try FastAPI Backend with 7s timeout
   if (API_BASE_URL) {
@@ -412,6 +414,7 @@ export async function dispatchDoctorConsultEmail(payload: {
           to_doctor_email: cleanDocEmail,
           doctor_name: cleanDocName,
           clinician_email: userCc,
+          pdf_url: directPdfUrl,
         }),
         signal: controller.signal,
       });
@@ -454,8 +457,19 @@ export async function dispatchDoctorConsultEmail(payload: {
           <strong style="color: #005c65; font-size: 12px; text-transform: uppercase;">AI Consultation Directive:</strong>
           <p style="margin: 6px 0 0; font-size: 12.5px; color: #115e59; line-height: 1.5; white-space: pre-wrap;">${payload.rationale}</p>
         </div>
+        <div style="text-align: center; margin: 24px 0 16px;">
+          <a href="${directPdfUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #005c65; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: bold; padding: 13px 26px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 92, 101, 0.25);">
+            📄 Open Certified Clinical Dossier &amp; Prescription (PDF) &rarr;
+          </a>
+        </div>
+        ${payload.source_document_url ? `
+        <div style="text-align: center; margin-bottom: 20px;">
+          <a href="${payload.source_document_url}" target="_blank" rel="noopener noreferrer" style="color: #007782; font-size: 12px; font-weight: 600; text-decoration: underline;">
+            📎 View Original Uploaded Prescription Slip (Direct Link)
+          </a>
+        </div>` : ''}
         <div style="border-top: 1px solid #f1f5f9; padding-top: 12px; font-size: 11px; color: #64748b; line-height: 1.4;">
-          <strong>Consulting Clinician:</strong> ${payload.clinician_name || 'Authorized Clinician'} (${userCc})<br>
+          <strong>Consulting Clinician:</strong> ${payload.clinician_name || 'Smile Clinic Prescriber'}${userCc ? ` (${userCc})` : ''}<br>
           <strong>Check Identifier:</strong> #${payload.check_number || 'CHK-CURRENT'} | Smile Clinic Clinical Decision Support System
         </div>
       </div>
