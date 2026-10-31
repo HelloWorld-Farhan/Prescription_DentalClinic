@@ -76,3 +76,4 @@ export function generatePrescriptionCheckNumber(patientMrn: string, rawFileName?
   const tag = cleanDocumentPrescriptionTag(rawFileName, fallbackIndex);
   return `${cleanMrn}-${tag}`;
 }
+

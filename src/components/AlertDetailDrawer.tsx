@@ -50,7 +50,7 @@ export default function AlertDetailDrawer({
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSentSuccess, setEmailSentSuccess] = useState(false);
-  const [sendUserCopy, setSendUserCopy] = useState(true);
+  const [sendUserCopy, setSendUserCopy] = useState(false);
   const [sentEventInfo, setSentEventInfo] = useState<{ doctor: string; email: string; time: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -262,7 +262,8 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
     const cleanDocName = doctorName.trim();
 
     try {
-      await dispatchDoctorConsultEmail({
+      const minSpinnerPromise = new Promise((resolve) => setTimeout(resolve, 850));
+      const emailPromise = dispatchDoctorConsultEmail({
         to_doctor_email: cleanDocEmail,
         doctor_name: cleanDocName,
         patient_name: patientName,
@@ -281,8 +282,9 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
         rationale: aiClinicalDirective,
         clinician_name: loggedClinician,
         clinician_email: loggedEmail,
-        cc_user_email: sendUserCopy ? loggedEmail : undefined,
+        cc_user_email: undefined,
       });
+      await Promise.all([emailPromise, minSpinnerPromise]);
 
       // Save doctor contact in local directory for future 1-click suggestions
       const updatedList = saveDoctorContact(
@@ -680,16 +682,7 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
                       </div>
                     </div>
 
-                    {/* CC User Checkbox */}
-                    <label className="flex items-center gap-2 text-xs text-on-surface cursor-pointer select-none pt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={sendUserCopy}
-                        onChange={(e) => setSendUserCopy(e.target.checked)}
-                        className="w-4 h-4 text-primary accent-primary rounded"
-                      />
-                      <span>Also send a verified confirmation copy to my email (<strong className="font-mono text-primary">{loggedEmail}</strong>)</span>
-                    </label>
+
 
                     {/* Substituted / New Medication */}
                     <div>
@@ -758,7 +751,26 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
                         >
                           {isSendingEmail ? (
                             <>
-                              <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                              <svg
+                                className="animate-spin h-4 w-4 text-white shrink-0"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                />
+                              </svg>
                               <span>Sending Email to Doctor...</span>
                             </>
                           ) : emailSentSuccess ? (
