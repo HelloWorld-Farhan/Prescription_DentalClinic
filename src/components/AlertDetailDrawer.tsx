@@ -129,6 +129,46 @@ export default function AlertDetailDrawer({
     }
   }, [alternativeAvailable]);
 
+  // Dynamic cross-device historical audit trail for this alert
+  const historicalRecord = useMemo(() => {
+    if (sentEventInfo) {
+      return {
+        doctor: sentEventInfo.doctor,
+        email: sentEventInfo.email,
+        time: sentEventInfo.time,
+        note: `Doctor consultation email dispatched to Dr. ${sentEventInfo.doctor} (${sentEventInfo.email}). Regimen modification requested. Hazard marked as completed/overridden.`
+      };
+    }
+    if (alert?.overridden && alert?.overrideReason) {
+      const docMatch = alert.overrideReason.match(/Dr\.\s*([^(\]]+)(?:\s*\(([^)]+)\))?/i) ||
+                       alert.overrideReason.match(/\[(?:Dr\.|Prescriber:)?\s*([^(\]]+)(?:\s*\(([^)]+)\))?\]/i);
+      const doctor = docMatch ? docMatch[1].trim() : (alert.overrideAuthor || 'Consulted Doctor');
+      const email = docMatch && docMatch[2] ? docMatch[2].trim() : 'Email Dispatched';
+      return {
+        doctor,
+        email,
+        time: 'Logged in Database',
+        note: alert.overrideReason
+      };
+    }
+    const logs = VirtualDb.getAuditLogs();
+    const match = logs.find(l =>
+      (l.checkId === effectiveCheckId || l.patientMrn === patientMrn) &&
+      (l.action === 'Alert Overridden' || (l.details && l.details.includes('Doctor consultation email dispatched'))) &&
+      (l.details?.includes(drugA) || l.details?.includes(alert?.title || '') || (alert?.title && alert.title.includes(drugA)))
+    );
+    if (match) {
+      const docMatch = match.details?.match(/Dr\.\s*([^(\]]+)(?:\s*\(([^)]+)\))?/i);
+      return {
+        doctor: docMatch ? docMatch[1].trim() : (match.clinicianName || 'Consulted Doctor'),
+        email: docMatch && docMatch[2] ? docMatch[2].trim() : 'Email Dispatched',
+        time: match.timestamp || 'Logged in Database',
+        note: match.details || 'Doctor consultation dispatched and alert marked as resolved.'
+      };
+    }
+    return null;
+  }, [sentEventInfo, alert, effectiveCheckId, patientMrn, drugA]);
+
   // Lock body scroll on open
   useEffect(() => {
     if (!isOpen) return;
@@ -255,25 +295,10 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
       setSentEventInfo({ doctor: cleanDocName, email: cleanDocEmail, time: timeStr });
       setEmailSentSuccess(true);
 
-      // Save audit entry to database VirtualDb
-      try {
-        VirtualDb.addAudit({
-          id: 'aud-' + Date.now(),
-          timestamp: 'Just now',
-          clinicianName: loggedClinician,
-          action: 'Alert Overridden',
-          patientMrn: patientMrn,
-          severity: (alert.severity?.toLowerCase() as any) || 'moderate',
-          details: `Doctor consultation email dispatched to Dr. ${cleanDocName} (${cleanDocEmail}). Directive sent to modify ${drugA} / ${drugB}. Alternative: ${newMedication.trim() || 'Safer Therapeutic Alternative'}. Hazard marked as completed/overridden.`,
-        });
-      } catch (auditErr) {
-        console.error('Audit logging error:', auditErr);
-      }
-
       const changeNote = newMedication.trim()
         ? ` [Proposed Alternative: ${newMedication.trim()}]`
         : '';
-      const fullReason = `DOCTOR NOTIFIED & EMAIL SENT [Dr. ${cleanDocName} (${cleanDocEmail})]${changeNote} - ${aiClinicalDirective.slice(0, 160)}...`;
+      const fullReason = `Doctor consultation email dispatched to Dr. ${cleanDocName} (${cleanDocEmail}). Directive sent to modify ${drugA} / ${drugB}.${changeNote} Hazard marked as completed/overridden.`;
 
       if (newMedication.trim() && onSelectAlternative) {
         onSelectAlternative(newMedication.trim());
@@ -858,8 +883,8 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
                     </div>
                   </div>
 
-                  {/* Event 2: Sent doctor email if triggered */}
-                  {sentEventInfo && (
+                  {/* Event 2: Sent doctor email if triggered or synced from cloud database */}
+                  {historicalRecord && (
                     <div className="relative">
                       <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center ring-4 ring-surface-container-lowest">
                         <span className="material-symbols-outlined text-[12px]">send</span>
@@ -868,10 +893,10 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
                         <div className="flex items-center gap-2 text-xs">
                           <span className="font-bold text-emerald-800">Doctor Consultation Email Dispatched</span>
                           <span className="text-outline">•</span>
-                          <span className="font-mono text-on-surface-variant">{sentEventInfo.time}</span>
+                          <span className="font-mono text-on-surface-variant">{historicalRecord.time}</span>
                         </div>
                         <p className="text-xs text-on-surface-variant mt-0.5">
-                          Alert sent to <strong className="text-on-surface">Dr. {sentEventInfo.doctor}</strong> (<span className="font-mono">{sentEventInfo.email}</span>) requesting regimen change.
+                          Alert sent to <strong className="text-on-surface">Dr. {historicalRecord.doctor}</strong> (<span className="font-mono">{historicalRecord.email}</span>) requesting regimen change. Hazard marked as completed/overridden.
                         </p>
                       </div>
                     </div>

@@ -209,6 +209,7 @@ export interface AuditLogEntry {
   overrideAuthor?: string;
 
   details: string;
+  eventDetails?: string;
 
   severity: AlertSeverity;
 

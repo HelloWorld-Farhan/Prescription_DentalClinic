@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
-import { pullFromCloud } from '../services/cloudSyncService';
+import { pullFromCloud, pushAlertSettingsState } from '../services/cloudSyncService';
 import { DrugInteractionAlert, SafetyCheckRecord } from '../types';
 import AlertDetailDrawer from '../components/AlertDetailDrawer';
 import EmailScheduleAlertModal from '../components/EmailScheduleAlertModal';
@@ -72,11 +72,24 @@ export default function Alerts() {
         return next;
       });
     };
+    const handleAlertSettingsSync = (e: any) => {
+      if (e?.detail) {
+        if (typeof e.detail.masterEmailAlertsEnabled === 'boolean') {
+          setMasterEmailAlertsEnabled(e.detail.masterEmailAlertsEnabled);
+        }
+        if (Array.isArray(e.detail.disabledMedAlertIds)) {
+          setDisabledMedAlertIds(new Set(e.detail.disabledMedAlertIds));
+        }
+      }
+    };
+
     window.addEventListener('smileclinic_checks_updated', handleChecksSync);
+    window.addEventListener('smileclinic_alert_settings_updated', handleAlertSettingsSync);
     window.addEventListener('storage', handleChecksSync);
     return () => {
       isMounted = false;
       window.removeEventListener('smileclinic_checks_updated', handleChecksSync);
+      window.removeEventListener('smileclinic_alert_settings_updated', handleAlertSettingsSync);
       window.removeEventListener('storage', handleChecksSync);
     };
   }, []);
@@ -131,6 +144,7 @@ export default function Alerts() {
     try {
       localStorage.setItem('smileclinic_master_email_alerts_enabled', String(next));
     } catch {}
+    pushAlertSettingsState({ masterEmailAlertsEnabled: next }).catch(() => {});
     showConfirmation(
       next
         ? 'Automated Email Alerts are now ACTIVE for all scheduled prescriptions.'
@@ -150,9 +164,11 @@ export default function Alerts() {
         next.add(medUniqueKey);
         showConfirmation(`Email alerts for ${drugName} turned OFF`, 'info');
       }
+      const arr = Array.from(next);
       try {
-        localStorage.setItem('smileclinic_disabled_med_alert_ids', JSON.stringify(Array.from(next)));
+        localStorage.setItem('smileclinic_disabled_med_alert_ids', JSON.stringify(arr));
       } catch {}
+      pushAlertSettingsState({ disabledMedAlertIds: arr }).catch(() => {});
       return next;
     });
   };
@@ -166,7 +182,7 @@ export default function Alerts() {
     if (!targetCheckId) {
       const allChecks = VirtualDb.getChecks();
       const parent = allChecks.find((c) =>
-        (c.alerts || []).some((a) => a.id === alertId || a.title === alertId)
+        (c.alerts || []).some((a) => a.id === alertId || a.title === alertId || a.title?.toLowerCase() === alertId?.toLowerCase())
       );
       if (parent) targetCheckId = parent.id;
     }

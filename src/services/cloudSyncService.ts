@@ -340,6 +340,28 @@ export async function pullFromCloud(): Promise<boolean> {
         }
       }
 
+      // 8. Reconcile Cross-Device Alert Toggles (Master & Individual Medication Alerts)
+      if (typeof data.masterEmailAlertsEnabled === 'boolean' || Array.isArray(data.disabledMedAlertIds)) {
+        try {
+          if (typeof data.masterEmailAlertsEnabled === 'boolean') {
+            localStorage.setItem('smileclinic_master_email_alerts_enabled', String(data.masterEmailAlertsEnabled));
+          }
+          if (Array.isArray(data.disabledMedAlertIds)) {
+            localStorage.setItem('smileclinic_disabled_med_alert_ids', JSON.stringify(data.disabledMedAlertIds));
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('smileclinic_alert_settings_updated', {
+              detail: {
+                masterEmailAlertsEnabled: typeof data.masterEmailAlertsEnabled === 'boolean' ? data.masterEmailAlertsEnabled : true,
+                disabledMedAlertIds: Array.isArray(data.disabledMedAlertIds) ? data.disabledMedAlertIds : [],
+              }
+            }));
+          }
+        } catch (e) {
+          console.warn('[CloudSync] Failed to reconcile alert settings state', e);
+        }
+      }
+
       return true;
     } catch (err) {
       console.warn('[CloudSync] Pull error (will retry):', err);
@@ -706,5 +728,32 @@ export async function pushKnowledgeSyncState(syncedKnowledge: {
 
   }
 
+}
+
+/**
+ * Pushes Master Email Alert toggle and Individual Medication Alert exclusions to PostgreSQL cloud.
+ */
+export async function pushAlertSettingsState(settings: {
+  masterEmailAlertsEnabled?: boolean;
+  disabledMedAlertIds?: string[];
+}): Promise<boolean> {
+  const email = getClinicianEmail();
+  if (!email || !API_BASE_URL) return false;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/sync/alert-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        masterEmailAlertsEnabled: settings.masterEmailAlertsEnabled,
+        disabledMedAlertIds: settings.disabledMedAlertIds,
+      }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.warn('[CloudSync] Push alert settings failed:', e);
+    return false;
+  }
 }
 

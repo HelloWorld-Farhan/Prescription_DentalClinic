@@ -908,16 +908,21 @@ export class ClinicalDecisionSupport {
     const check = _cachedChecks.find(c => c.id === checkId || c.checkNumber === checkId);
     if (!check) return;
 
-    const alert = (check.alerts || []).find(a => a.id === alertId || a.title === alertId);
+    const alert = (check.alerts || []).find(a => 
+      a.id === alertId || 
+      a.title === alertId || 
+      (a.title && alertId && a.title.toLowerCase() === alertId.toLowerCase())
+    );
     if (alert) {
       alert.overridden = true;
       alert.overrideReason = reason;
       alert.overrideAuthor = author;
     }
 
-    const hasUnresolved = check.alerts.some(a => !a.overridden);
+    const hasUnresolved = (check.alerts || []).some(a => !a.overridden);
     if (!hasUnresolved) {
       check.overallStatus = 'Overridden';
+      check.status = 'overridden';
     }
 
     saveLocalBackup(CHECKS_BACKUP_KEY, _cachedChecks);
@@ -929,6 +934,10 @@ export class ClinicalDecisionSupport {
     const now = Date.now();
     const istTimeStr = formatISTTime(now, true);
     const auditHash = 'SHA256:' + Math.random().toString(36).substring(2, 10).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase();
+
+    const detailMsg = reason.includes('Doctor consultation email dispatched') || reason.startsWith('DOCTOR')
+      ? reason
+      : `Alert "${alert?.title || alertId}" overridden: ${reason}`;
 
     this.addAudit({
       id: 'aud-' + now,
@@ -944,7 +953,8 @@ export class ClinicalDecisionSupport {
       alerts: check.alerts,
       overrideReason: reason,
       overrideAuthor: author,
-      details: `Alert "${alert?.title || alertId}" overridden: ${reason}`,
+      details: detailMsg,
+      eventDetails: detailMsg,
       severity: alert?.severity || 'major',
       hash: auditHash
     });
