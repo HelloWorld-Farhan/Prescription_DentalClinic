@@ -431,8 +431,6 @@ const DEMO_PRESCRIPTION_PROFILES: DemoProfile[] = [
     },
     totalPrescribedCount: 7,
     supportiveTherapies: [
-      'Steam Inhalation with XL Vapo (Three times daily / TDS × 7 days)',
-      'Betadine Mouth Gargle / Water 1:1 (Three times daily / TDS × 5 days)',
       'Rest for 7 days',
     ],
     medicines: [
@@ -475,11 +473,29 @@ const DEMO_PRESCRIPTION_PROFILES: DemoProfile[] = [
       {
         drugName: 'Tab. Emlukast FX',
         genericName: 'Montelukast 10 mg + Fexofenadine 120 mg',
-        dosage: 'Standard',
+        dosage: '10mg / 120mg',
         frequency: '1 tab Once Daily at 7:00 PM (or HS)',
         duration: '10 days',
         route: 'Oral (PO)',
-        indication: 'Allergic rhinitis / Cough',
+        indication: 'Allergic rhinitis and cough associated with post-nasal drip',
+      },
+      {
+        drugName: 'Steam Inhalation with XL Vapo',
+        genericName: 'Aromatic Decongestant Inhalation (Menthol + Camphor + Eucalyptus)',
+        dosage: '1 Inhalation',
+        frequency: 'Three times daily (TDS)',
+        duration: '7 days',
+        route: 'Inhalation',
+        indication: 'Throat congestion & airway soothing',
+      },
+      {
+        drugName: 'Betadine Mouth Gargle / Water (1:1)',
+        genericName: 'Povidone-Iodine 1% w/v Oral Gargle',
+        dosage: '10 ml (1:1 with warm water)',
+        frequency: 'Three times daily (TDS)',
+        duration: '5 days',
+        route: 'Oral Gargle / Topical',
+        indication: 'Antiseptic throat gargle / Oropharyngeal antisepsis',
       },
     ],
     rules: [

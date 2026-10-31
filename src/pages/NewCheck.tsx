@@ -225,16 +225,26 @@ export default function NewCheck() {
     roomOrUnit: 'Dental Operatory'
   };
 
+  const [customPatients, setCustomPatients] = useState<Patient[]>([]);
+
   // Only genuine patient records: strictly filter out any mock/test data
   const rawPatients = VirtualDb.getPatients().filter(p => p && !isMockPatient(p));
-  const patients: Patient[] = [
-    defaultPatient,
-    ...rawPatients.filter(p => p.id !== defaultPatient.id && p.name !== userFullName)
-  ];
+  const patients: Patient[] = useMemo(() => {
+    const list: Patient[] = [...customPatients];
+    if (!list.some(p => p.id === defaultPatient.id || p.name === defaultPatient.name)) {
+      list.push(defaultPatient);
+    }
+    rawPatients.forEach(p => {
+      if (!list.some(item => item.id === p.id || item.name === p.name)) {
+        list.push(p);
+      }
+    });
+    return list;
+  }, [customPatients, rawPatients, defaultPatient]);
 
   // Patient Context Selection
   const [selectedPatientId, setSelectedPatientId] = useState<string>(() => defaultPatient.id);
-  const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || defaultPatient;
+  const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || patients[0] || defaultPatient;
   const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn ? `PT-${selectedPatient.mrn}` : 'PT-NEW-001');
   const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? userWeightNum);
   const [customEgfr, setCustomEgfr] = useState<number>(() => selectedPatient?.egfr ?? 90);
@@ -566,19 +576,42 @@ export default function NewCheck() {
       setExtractedMedicines(extracted);
 
       if (extractedPatient?.name) {
-        setPtKey(`PT-${extractedPatient.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase()}`);
+        const cleanName = extractedPatient.name.trim();
+        const initials = cleanName.replace(/^(mr|ms|mrs|dr)\.?\s+/i, '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'PATIENT';
+        const generatedMrn = `PT-${initials}-001`;
+        const patientRecordId = `pt-${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+
+        const extractedRecord: Patient = {
+          id: patientRecordId,
+          name: cleanName,
+          mrn: generatedMrn,
+          age: Number(extractedPatient.age) || 25,
+          gender: (extractedPatient.gender as any) || 'Male',
+          height: '170 cm',
+          weightKg: 68,
+          egfr: 90,
+          pregnancyStatus: 'No',
+          allergies: [],
+          activeMedications: [],
+          conditions: extractedPatient.diagnosis ? [extractedPatient.diagnosis] : ['Routine Dental Care'],
+          roomOrUnit: 'Dental Operatory'
+        };
+
+        VirtualDb.addPatient(extractedRecord);
+        setCustomPatients(prev => {
+          const filtered = prev.filter(p => p.id !== extractedRecord.id && p.mrn !== extractedRecord.mrn);
+          return [extractedRecord, ...filtered];
+        });
+        setSelectedPatientId(extractedRecord.id);
+        setPtKey(generatedMrn);
+        setCustomWeight(extractedRecord.weightKg);
+        setCustomEgfr(extractedRecord.egfr);
+        setActiveMeds(extractedRecord.activeMedications);
+        setAllergies(extractedRecord.allergies);
       }
 
-      // Automatically stage extracted items without duplicating
-      setPrescriptions((prev) => {
-        const map = new Map(prev.map((p) => [p.drugName.toLowerCase(), p]));
-        extracted.forEach((e) => {
-          if (!map.has(e.drugName.toLowerCase())) {
-            map.set(e.drugName.toLowerCase(), e);
-          }
-        });
-        return Array.from(map.values());
-      });
+      // Automatically stage extracted items into candidate queue
+      setPrescriptions(extracted);
 
       showConfirmation(
         `Extracted ${extracted.length} medications from ${r2Result.filename} and saved to secure vault.`,
@@ -2115,10 +2148,10 @@ export default function NewCheck() {
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                         <span className="text-xs font-bold text-on-surface truncate">
-                          {defaultPatient.name} ({defaultPatient.mrn})
+                          {selectedPatient.name} ({selectedPatient.mrn})
                         </span>
                         <span className="text-[10px] text-outline shrink-0 font-medium">
-                          • {defaultPatient.age}y • eGFR {defaultPatient.egfr}
+                          • {selectedPatient.age}y • eGFR {selectedPatient.egfr ?? customEgfr}
                         </span>
                       </div>
                       <span className="text-[10px] font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 shrink-0">
