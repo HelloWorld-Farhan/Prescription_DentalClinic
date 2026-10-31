@@ -13,6 +13,7 @@ import { uploadToR2, deleteDocumentRecord, saveDocumentRecord } from '../service
 import { extractPrescriptionData, ExtractedPatientMetadata } from '../services/prescriptionExtractor';
 import { showConfirmation } from '../services/confirmation';
 import { executePrescriptionSafetyCheck } from '../services/cloudSyncService';
+import { generatePatientMRN, generatePrescriptionCheckNumber, cleanDocumentPrescriptionTag } from '../utils/patientKeyUtils';
 
 interface AllergyDetailInfo {
   name: string;
@@ -212,7 +213,7 @@ export default function NewCheck() {
   const defaultPatient: Patient = {
     id: 'pt-screening-01',
     name: userFullName,
-    mrn: 'PT-NEW-001',
+    mrn: generatePatientMRN(userFullName || 'Farhan Khalid'),
     age: userAge,
     gender: userGender,
     height: userHeight,
@@ -245,7 +246,7 @@ export default function NewCheck() {
   // Patient Context Selection
   const [selectedPatientId, setSelectedPatientId] = useState<string>(() => defaultPatient.id);
   const selectedPatient = (patients && patients.find(p => p.id === selectedPatientId)) || patients[0] || defaultPatient;
-  const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn ? (selectedPatient.mrn.startsWith('PT-') ? selectedPatient.mrn : `PT-${selectedPatient.mrn}`) : 'PT-NEW-001');
+  const [ptKey, setPtKey] = useState<string>(() => selectedPatient?.mrn || generatePatientMRN(userFullName || 'Farhan Khalid'));
   const [customWeight, setCustomWeight] = useState<number>(() => selectedPatient?.weightKg ?? userWeightNum);
   const [customEgfr, setCustomEgfr] = useState<number>(() => selectedPatient?.egfr ?? 90);
   const [activeMeds, setActiveMeds] = useState<string[]>(() => selectedPatient?.activeMedications ?? []);
@@ -577,8 +578,7 @@ export default function NewCheck() {
 
       if (extractedPatient?.name) {
         const cleanName = extractedPatient.name.trim();
-        const initials = cleanName.replace(/^(mr|ms|mrs|dr)\.?\s+/i, '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'PATIENT';
-        const generatedMrn = `PT-${initials}-001`;
+        const generatedMrn = generatePatientMRN(cleanName, [...customPatients, defaultPatient, ...rawPatients]);
         const patientRecordId = `pt-${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
 
         const extractedRecord: Patient = {
@@ -698,7 +698,14 @@ export default function NewCheck() {
         allergies: parsedAllergies
       };
 
+      const checkIdentifier = generatePrescriptionCheckNumber(
+        updatedPatient.mrn || ptKey,
+        extractedMeta?.filename || uploadedFileName || (inputMethod === 'camera' ? 'Camera_Scan' : 'Prescription_7')
+      );
+
       const dossierPayload = {
+        check_id: checkIdentifier,
+        check_number: checkIdentifier,
         user_email: storedUser?.email || 'clinician-user',
         clinician_name: prescriberDisplayName,
         patient: {
@@ -763,9 +770,11 @@ export default function NewCheck() {
       );
 
       const nowMs = Date.now();
+      const finalCheckNumber = aiResponse.check_id || checkIdentifier;
       const newRecord: SafetyCheckRecord = {
-        id: aiResponse.check_id || ('chk-' + nowMs),
-        checkNumber: aiResponse.check_id || ('CHK-2026-' + Math.floor(1000 + Math.random() * 9000)),
+        id: finalCheckNumber,
+        checkNumber: finalCheckNumber,
+        pdfFilename: `${finalCheckNumber}.pdf`,
         timestamp: 'Just now',
         timestampMs: nowMs,
         createdAt: new Date(nowMs).toISOString(),
@@ -864,9 +873,14 @@ export default function NewCheck() {
       const overallStatus = hasContra ? 'Contraindicated' : hasMajor ? 'Requires Review' : 'Safe to Dispense';
 
       const nowMs = Date.now();
+      const fallbackCheckNumber = generatePrescriptionCheckNumber(
+        updatedPatient.mrn || ptKey,
+        extractedMeta?.filename || uploadedFileName || (inputMethod === 'camera' ? 'Camera_Scan' : 'Prescription_7')
+      );
       const newRecord: SafetyCheckRecord = {
-        id: 'chk-' + nowMs,
-        checkNumber: 'CHK-2026-' + Math.floor(1000 + Math.random() * 9000),
+        id: fallbackCheckNumber,
+        checkNumber: fallbackCheckNumber,
+        pdfFilename: `${fallbackCheckNumber}.pdf`,
         timestamp: 'Just now',
         timestampMs: nowMs,
         createdAt: new Date(nowMs).toISOString(),

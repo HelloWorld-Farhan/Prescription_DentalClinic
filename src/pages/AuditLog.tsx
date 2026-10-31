@@ -399,7 +399,9 @@ export default function AuditLog() {
                   const pdfReportIdentifier = log.checkId || matchedCheck?.checkNumber || matchedCheck?.id || log.id;
                   const pdfFilename =
                     log.pdfFilename ||
-                    `SmileClinic_CDS_Report_${pdfReportIdentifier.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+                    (pdfReportIdentifier.startsWith('PS-') || pdfReportIdentifier.toLowerCase().includes('prescription')
+                      ? `${pdfReportIdentifier}.pdf`
+                      : `SmileClinic_CDS_Report_${pdfReportIdentifier.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`);
 
                   return (
 

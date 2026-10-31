@@ -82,7 +82,8 @@ export default function Report() {
   const reportIdentifier =
     currentCheck?.checkNumber ||
     currentCheck?.id ||
-    'CHK-2026-4372';
+    routeId ||
+    'PS-FK-001-Prescription_7';
 
   const sessionTrackingId = `SES-${reportIdentifier}`;
 
@@ -235,7 +236,7 @@ export default function Report() {
           const blobUrl = window.URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = blobUrl;
-          link.download = `SmileClinic_CDS_Report_${reportIdentifier}.pdf`;
+          link.download = `${reportIdentifier}.pdf`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -353,7 +354,7 @@ export default function Report() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `SmileClinic_Consultation_${reportIdentifier}.doc`;
+    a.download = `${reportIdentifier}.doc`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -421,7 +422,7 @@ export default function Report() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `SmileClinic_Export_${reportIdentifier}.csv`;
+    a.download = `${reportIdentifier}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -487,7 +488,7 @@ export default function Report() {
         download_url: `${API_BASE_URL}/api/v1/sync/report-pdf?id=${encodeURIComponent(
           reportIdentifier
         )}&email=${encodeURIComponent(getClinicianEmail())}`,
-        pdf_filename: `SmileClinic_CDS_Report_${reportIdentifier}.pdf`,
+        pdf_filename: `${reportIdentifier}.pdf`,
         notary_hash: digitalSeal,
       };
 
@@ -1470,7 +1471,7 @@ export default function Report() {
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-1">
                   <div className="flex justify-between">
                     <span>Document:</span>
-                    <strong className="text-slate-800">SmileClinic_CDS_Report_{reportIdentifier}.pdf</strong>
+                    <strong className="text-slate-800">{reportIdentifier}.pdf</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Format:</span>

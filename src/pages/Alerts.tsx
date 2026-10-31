@@ -782,7 +782,7 @@ export default function Alerts() {
             setEmailModalCheck(null);
           }}
           patientName={emailModalCheck?.patientName || checks[0]?.patientName || 'Farhan khalid'}
-          patientMrn={emailModalCheck?.mrn || (checks.length > 1 ? `${checks.length} Prescriptions Combined` : (checks[0]?.mrn || 'PT-NEW-001'))}
+          patientMrn={emailModalCheck?.mrn || (checks.length > 1 ? `${checks.length} Prescriptions Combined` : (checks[0]?.mrn || 'PS-FK-001'))}
           checkNumber={emailModalCheck ? (emailModalCheck.checkNumber || emailModalCheck.id) : (checks.length > 1 ? `Combined (${checks.map(c => c.checkNumber || c.id).join(' + ')})` : (checks[0]?.checkNumber || checks[0]?.id || 'CHK-CURRENT'))}
           medications={emailModalCheck ? allActiveMedications.filter((m) => m.checkId === emailModalCheck.id) : allActiveMedications}
           safetyAlerts={emailModalCheck ? allActiveAlerts.filter((a) => (a as any).checkId === emailModalCheck.id) : allActiveAlerts}
