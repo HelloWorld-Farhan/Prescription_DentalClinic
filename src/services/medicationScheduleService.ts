@@ -329,14 +329,76 @@ const DEFAULT_DOCTORS: SavedDoctorContact[] = [];
 export function getSavedDoctors(userEmail?: string): SavedDoctorContact[] {
   if (typeof window === 'undefined') return DEFAULT_DOCTORS;
   try {
-    const key = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    const map = new Map<string, SavedDoctorContact>();
+
+    // 1. Check user-scoped storage key
+    const scopedKey = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const rawScoped = localStorage.getItem(scopedKey);
+    if (rawScoped) {
+      try {
+        const parsed = JSON.parse(rawScoped);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((d) => {
+            if (d?.email) {
+              const cleanName = (d.name || d.email).replace(/^(?:dr|doctor)\.?\s+/i, '').trim();
+              map.set(d.email.toLowerCase(), { ...d, name: cleanName, email: d.email.toLowerCase() });
+            }
+          });
+        }
+      } catch {}
     }
-  } catch {}
-  return DEFAULT_DOCTORS;
+
+    // 2. Check global and default fallback storage
+    const rawGlobal = localStorage.getItem('smileclinic_doctors_global') || localStorage.getItem('smileclinic_doctors_default');
+    if (rawGlobal) {
+      try {
+        const parsed = JSON.parse(rawGlobal);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((d) => {
+            if (d?.email && !map.has(d.email.toLowerCase())) {
+              const cleanName = (d.name || d.email).replace(/^(?:dr|doctor)\.?\s+/i, '').trim();
+              map.set(d.email.toLowerCase(), { ...d, name: cleanName, email: d.email.toLowerCase() });
+            }
+          });
+        }
+      } catch {}
+    }
+
+    // 3. Automatically aggregate any doctor notified in saved checks across devices
+    try {
+      const checksRaw = localStorage.getItem('smileclinic_checks_v3') || localStorage.getItem('smileclinic_synced_active_checks');
+      if (checksRaw) {
+        const checks = JSON.parse(checksRaw);
+        if (Array.isArray(checks)) {
+          checks.forEach((chk: any) => {
+            (chk.alerts || []).forEach((a: any) => {
+              if (a.overridden || a.overrideReason) {
+                const reason = a.overrideReason || '';
+                const m = reason.match(/Dr\.?\s*([^(\],]+)(?:\s*\(([^)]+)\))?/i);
+                const dName = a.doctorName || (m && m[1] ? m[1].trim() : null);
+                const dEmail = a.doctorEmail || (m && m[2] ? m[2].trim() : null);
+                if (dEmail && !map.has(dEmail.toLowerCase())) {
+                  const cleanName = (dName || dEmail).replace(/^(?:dr|doctor)\.?\s+/i, '').trim();
+                  map.set(dEmail.toLowerCase(), {
+                    id: 'doc-auto-' + dEmail.toLowerCase(),
+                    name: cleanName,
+                    email: dEmail.toLowerCase(),
+                    specialty: 'Consulting Physician',
+                    lastUsed: Date.now(),
+                  });
+                }
+              }
+            });
+          });
+        }
+      }
+    } catch {}
+
+    const result = Array.from(map.values()).sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+    return result.length > 0 ? result : DEFAULT_DOCTORS;
+  } catch {
+    return DEFAULT_DOCTORS;
+  }
 }
 
 export function saveDoctorContact(
@@ -347,26 +409,30 @@ export function saveDoctorContact(
   try {
     const current = getSavedDoctors(userEmail);
     const cleanEmail = doctor.email.trim().toLowerCase();
-    const cleanName = doctor.name.trim();
+    const rawName = doctor.name.trim();
+    const cleanName = rawName.replace(/^(?:dr|doctor)\.?\s+/i, '').trim() || cleanEmail;
     if (!cleanEmail) return current;
 
     const filtered = current.filter((d) => d.email.toLowerCase() !== cleanEmail);
     const updated: SavedDoctorContact[] = [
       {
         id: 'doc-' + Date.now(),
-        name: cleanName || cleanEmail,
+        name: cleanName,
         email: cleanEmail,
         phone: doctor.phone,
         specialty: doctor.specialty || 'Consulting Physician',
         lastUsed: Date.now(),
       },
       ...filtered,
-    ].slice(0, 20);
+    ].slice(0, 30);
 
-    const key = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
-    localStorage.setItem(key, JSON.stringify(updated));
-    // Sync immediately across all devices
-    syncSavedDoctorsToCloud(updated);
+    const scopedKey = 'smileclinic_doctors_' + (userEmail || 'default').toLowerCase().replace(/[^a-z0-9]/g, '_');
+    localStorage.setItem(scopedKey, JSON.stringify(updated));
+    localStorage.setItem('smileclinic_doctors_global', JSON.stringify(updated));
+    localStorage.setItem('smileclinic_doctors_default', JSON.stringify(updated));
+
+    // Sync immediately across all devices with explicit user email
+    syncSavedDoctorsToCloud(updated, userEmail);
     return updated;
   } catch {
     return DEFAULT_DOCTORS;

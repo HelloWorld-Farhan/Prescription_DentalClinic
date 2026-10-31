@@ -160,20 +160,57 @@ export default function Dashboard() {
   const selectedCheckDoc = useMemo(() => {
     if (!selectedCheck) return null;
     if ((selectedCheck as any).doctorName) {
-      return { name: (selectedCheck as any).doctorName, email: (selectedCheck as any).doctorEmail || '' };
+      let name = ((selectedCheck as any).doctorName || '').trim().replace(/^(?:dr|doctor)\.?\s+/i, '').trim();
+      return { name, email: (selectedCheck as any).doctorEmail || '' };
     }
     const withDoc = (selectedCheck.alerts || []).find((a: any) => (a as any).doctorName || a.overrideReason);
     if (withDoc) {
       if ((withDoc as any).doctorName) {
-        return { name: (withDoc as any).doctorName, email: (withDoc as any).doctorEmail || '' };
+        let name = ((withDoc as any).doctorName || '').trim().replace(/^(?:dr|doctor)\.?\s+/i, '').trim();
+        return { name, email: (withDoc as any).doctorEmail || '' };
       }
-      const m = (withDoc.overrideReason || '').match(/Dr\.\s*([^(\]]+)(?:\s*\(([^)]+)\))?/i);
-      if (m) {
-        return { name: m[1].trim(), email: m[2] ? m[2].trim() : '' };
+      const m = (withDoc.overrideReason || '').match(/Dr\.?\s*([^(\],]+)(?:\s*\(([^)]+)\))?/i);
+      if (m && m[1]) {
+        let name = m[1].trim().replace(/^(?:dr|doctor)\.?\s+/i, '').trim();
+        return { name, email: m[2] ? m[2].trim() : '' };
       }
     }
     return null;
   }, [selectedCheck]);
+
+  const selectedCheckNotifiedDoctors = useMemo(() => {
+    if (!selectedCheck || !selectedCheck.alerts) return [];
+    const map = new Map<string, { name: string; email: string }>();
+    (selectedCheck.alerts || []).forEach((a: any) => {
+      if (a.overridden || a.overrideReason) {
+        let name = a.doctorName || '';
+        let email = a.doctorEmail || '';
+        if ((!name || !email) && a.overrideReason) {
+          const m = a.overrideReason.match(/Dr\.?\s*([^(\],]+)(?:\s*\(([^)]+)\))?/i);
+          if (m && m[1]) {
+            if (!name) name = m[1].trim();
+            if (!email && m[2]) email = m[2].trim();
+          }
+          const m2 = a.overrideReason.match(/\[Prescriber:\s*([^(\],]+)(?:\s*\(([^)]+)\))?\]/i);
+          if (m2 && m2[1]) {
+            if (!name) name = m2[1].trim();
+            if (!email && m2[2]) email = m2[2].trim();
+          }
+        }
+        if (name || email) {
+          name = name.replace(/^(?:dr|doctor)\.?\s+/i, '').trim();
+          const key = (email || name).toLowerCase();
+          if (!map.has(key)) {
+            map.set(key, { name: name || email, email });
+          }
+        }
+      }
+    });
+    if (map.size === 0 && selectedCheckDoc) {
+      map.set((selectedCheckDoc.email || selectedCheckDoc.name).toLowerCase(), selectedCheckDoc);
+    }
+    return Array.from(map.values());
+  }, [selectedCheck, selectedCheckDoc]);
 
 
 
@@ -1785,9 +1822,13 @@ export default function Dashboard() {
                     ? (selectedCheck.overallStatus || 'Safe to Dispense')
                     : 'All Clear'}
                 </span>
-                {selectedCheckIsOverridden && selectedCheckDoc && (
-                  <span className="text-[10px] text-emerald-700 font-semibold truncate max-w-[170px]" title={`Dr. ${selectedCheckDoc.name} (${selectedCheckDoc.email})`}>
-                    Dr. {selectedCheckDoc.name}
+                {selectedCheckIsOverridden && selectedCheckNotifiedDoctors.length > 0 && (
+                  <span
+                    className="text-[10px] text-emerald-700 font-semibold truncate max-w-[200px]"
+                    title={selectedCheckNotifiedDoctors.map(d => `Dr. ${d.name} (${d.email})`).join('; ')}
+                  >
+                    Dr. {selectedCheckNotifiedDoctors[0].name}
+                    {selectedCheckNotifiedDoctors.length > 1 && ` +${selectedCheckNotifiedDoctors.length - 1} more`}
                   </span>
                 )}
               </div>
@@ -1896,8 +1937,27 @@ export default function Dashboard() {
                       <div className="space-y-2">
                         {selectedCheck.alerts.map((alert: any, aIdx: number) => {
                           const isAlertOverridden = Boolean(alert.overridden || selectedCheckIsOverridden);
-                          const alertDocName = alert.doctorName || selectedCheckDoc?.name;
-                          const alertDocEmail = alert.doctorEmail || selectedCheckDoc?.email;
+                          
+                          let alertDocName = alert.doctorName || '';
+                          let alertDocEmail = alert.doctorEmail || '';
+
+                          if ((!alertDocName || !alertDocEmail) && alert.overrideReason) {
+                            const m = alert.overrideReason.match(/Dr\.?\s*([^(\],]+)(?:\s*\(([^)]+)\))?/i);
+                            if (m && m[1]) {
+                              if (!alertDocName) alertDocName = m[1].trim();
+                              if (!alertDocEmail && m[2]) alertDocEmail = m[2].trim();
+                            }
+                            const m2 = alert.overrideReason.match(/\[Prescriber:\s*([^(\],]+)(?:\s*\(([^)]+)\))?\]/i);
+                            if (m2 && m2[1]) {
+                              if (!alertDocName) alertDocName = m2[1].trim();
+                              if (!alertDocEmail && m2[2]) alertDocEmail = m2[2].trim();
+                            }
+                          }
+
+                          if (!alertDocName && selectedCheckDoc?.name) alertDocName = selectedCheckDoc.name;
+                          if (!alertDocEmail && selectedCheckDoc?.email) alertDocEmail = selectedCheckDoc.email;
+
+                          alertDocName = alertDocName.replace(/^(?:dr|doctor)\.?\s+/i, '').trim();
                           const alertSeverity = ((alert.severity || 'major') as string).toLowerCase();
                           const isContra = alertSeverity === 'contraindicated' || alertSeverity === 'critical';
                           const isMaj = alertSeverity === 'major' || alertSeverity === 'high';

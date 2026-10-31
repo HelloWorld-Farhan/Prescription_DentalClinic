@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DrugInteractionAlert } from '../types';
 import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
-import { getClinicianEmail, getClinicianPhone } from '../services/cloudSyncService';
+import { getClinicianEmail, getClinicianPhone, pullFromCloud } from '../services/cloudSyncService';
 import { showConfirmation } from '../services/confirmation';
 import {
   dispatchDoctorConsultEmail,
@@ -49,7 +49,9 @@ export default function AlertDetailDrawer({
   const [doctorEmailError, setDoctorEmailError] = useState('');
   
   // UI & suggestion states
-  const [savedDoctors, setSavedDoctors] = useState<SavedDoctorContact[]>([]);
+  const [savedDoctors, setSavedDoctors] = useState<SavedDoctorContact[]>(() => {
+    return getSavedDoctors(getClinicianEmail());
+  });
   const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -138,6 +140,12 @@ export default function AlertDetailDrawer({
       }
     };
     window.addEventListener('smileclinic_saved_doctors_synced', handleSync);
+    
+    // Auto-pull from cloud on open to ensure cross-device doctors appear immediately
+    pullFromCloud().then(() => {
+      setSavedDoctors(getSavedDoctors(loggedEmail));
+    }).catch(() => {});
+
     return () => window.removeEventListener('smileclinic_saved_doctors_synced', handleSync);
   }, [loggedEmail]);
 

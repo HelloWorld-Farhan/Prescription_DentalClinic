@@ -534,6 +534,8 @@ export async function pullFromCloud(): Promise<boolean> {
           data.savedDoctors.forEach((d: any) => { if (d?.email) map.set(d.email.toLowerCase(), d); });
           const merged = Array.from(map.values()).sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
           if (scopedKey) localStorage.setItem(scopedKey, JSON.stringify(merged));
+          localStorage.setItem('smileclinic_doctors_global', JSON.stringify(merged));
+          localStorage.setItem('smileclinic_doctors_default', JSON.stringify(merged));
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('smileclinic_saved_doctors_synced', { detail: merged }));
           }
@@ -616,8 +618,8 @@ export function syncAuditLogToCloud(auditLog: AuditLogEntry) {
   }).catch((err) => console.warn('[CloudSync] Failed to sync audit log:', err));
 }
 
-export function syncSavedDoctorsToCloud(savedDoctors: any[]) {
-  const email = getClinicianEmail();
+export function syncSavedDoctorsToCloud(savedDoctors: any[], emailOverride?: string) {
+  const email = (emailOverride || getClinicianEmail() || '').trim().toLowerCase();
   if (!email || !API_BASE_URL) return;
 
   fetch(`${API_BASE_URL}/api/v1/sync/saved-doctors`, {
