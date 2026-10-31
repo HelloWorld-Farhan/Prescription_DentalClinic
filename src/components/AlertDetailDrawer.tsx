@@ -22,6 +22,8 @@ interface AlertDetailDrawerProps {
   patientMrn?: string;
   checkNumber?: string;
   checkId?: string;
+  sourceDocumentUrl?: string;
+  sourceDocumentName?: string;
 }
 
 export default function AlertDetailDrawer({
@@ -34,6 +36,8 @@ export default function AlertDetailDrawer({
   patientMrn: propPatientMrn,
   checkNumber: propCheckNumber,
   checkId: propCheckId,
+  sourceDocumentUrl: propSourceDocumentUrl,
+  sourceDocumentName: propSourceDocumentName,
 }: AlertDetailDrawerProps) {
   // Doctor consultation input states (strictly no hardcoded default names or emails)
   const [doctorName, setDoctorName] = useState('');
@@ -72,10 +76,14 @@ export default function AlertDetailDrawer({
     );
   }, [alert, propCheckId]);
 
-  const patientName = propPatientName || matchingCheck?.patientName || 'Farhan khalid';
-  const patientMrn = propPatientMrn || matchingCheck?.mrn || 'PT-NEW-001';
-  const checkNumber = propCheckNumber || matchingCheck?.checkNumber || matchingCheck?.id || 'CHK-CURRENT';
-  const effectiveCheckId = propCheckId || matchingCheck?.id || 'CHK-CURRENT';
+  const patientName = propPatientName || matchingCheck?.patientName || 'Farhan Khalid';
+  const rawMrn = propPatientMrn || matchingCheck?.mrn || 'PS-FK-001';
+  const patientMrn = rawMrn.startsWith('PS-') ? rawMrn : `PS-${rawMrn.replace(/^PT-(?:NEW-)?/i, 'FK-')}`;
+  const rawCheckNum = propCheckNumber || matchingCheck?.checkNumber || matchingCheck?.id || 'PS-FK-001-Prescription_7';
+  const checkNumber = rawCheckNum.startsWith('PS-') ? rawCheckNum : `${patientMrn}-${rawCheckNum.replace(/^CHK-2026-?/i, 'Prescription_7')}`;
+  const effectiveCheckId = propCheckId || matchingCheck?.id || checkNumber;
+  const effectiveSourceDocumentUrl = propSourceDocumentUrl || matchingCheck?.sourceDocumentUrl;
+  const effectiveSourceDocumentName = propSourceDocumentName || matchingCheck?.sourceDocumentName || 'prescription_7.pdf';
 
   // Accurately extract the two interacting drug names (Never "Primary drug" or "Secondary drug")
   const { drugA, drugB } = useMemo(() => {
@@ -259,7 +267,7 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
 
     setIsSendingEmail(true);
     const cleanDocEmail = doctorEmail.trim();
-    const cleanDocName = doctorName.trim();
+    const cleanDocName = doctorName.trim().replace(/^(?:dr|doctor)\.?\s+/i, '');
 
     try {
       const minSpinnerPromise = new Promise((resolve) => setTimeout(resolve, 850));
@@ -283,6 +291,8 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
         clinician_name: loggedClinician,
         clinician_email: loggedEmail,
         cc_user_email: undefined,
+        source_document_url: effectiveSourceDocumentUrl,
+        source_document_name: effectiveSourceDocumentName,
       });
       await Promise.all([emailPromise, minSpinnerPromise]);
 
@@ -798,7 +808,7 @@ Please confirm regimen modification or clinical guidance upon receipt of this me
                             <span className="font-mono text-[10px] text-on-surface-variant">Smile Clinic Mailer</span>
                           </div>
                           <div className="space-y-1 text-[11px] text-on-surface-variant leading-relaxed">
-                            <div><strong>Recipient:</strong> Dr. {doctorName.trim() || '[Doctor Name]'} &lt;{doctorEmail.trim() || '[doctor@email.com]'}&gt;</div>
+                            <div><strong>Recipient:</strong> Dr. {doctorName.trim().replace(/^(?:dr|doctor)\.?\s+/i, '') || '[Doctor Name]'} &lt;{doctorEmail.trim() || '[doctor@email.com]'}&gt;</div>
                             <div><strong>Subject:</strong> Smile Clinic CDS Alert: Prescription Interaction Consultation for {patientName} [{alert.severity.toUpperCase()}]</div>
                             <div><strong>Patient:</strong> {patientName} (MRN: {patientMrn}) | Check #{checkNumber}</div>
                             <div><strong>Interacting Drugs:</strong> <span className="text-error font-semibold">{drugA} ↔ {drugB}</span></div>

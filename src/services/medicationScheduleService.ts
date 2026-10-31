@@ -388,10 +388,15 @@ export async function dispatchDoctorConsultEmail(payload: {
   cc_user_email?: string;
   notary_hash?: string;
   portal_url?: string;
+  source_document_url?: string;
+  source_document_name?: string;
 }): Promise<{ status: string; message: string; delivered: boolean }> {
   const cleanDocEmail = payload.to_doctor_email.trim();
-  const cleanDocName = payload.doctor_name.trim();
+  const rawDocName = payload.doctor_name.trim();
+  const cleanDocName = rawDocName.replace(/^(?:dr|doctor)\.?\s+/i, '');
   const userCc = payload.cc_user_email?.trim() || payload.clinician_email?.trim() || '';
+  const cleanMrn = payload.patient_mrn?.startsWith('PS-') ? payload.patient_mrn : (payload.patient_mrn ? `PS-${payload.patient_mrn.replace(/^PT-(?:NEW-)?/i, 'FK-')}` : 'PS-FK-001');
+  const cleanCheckNum = payload.check_number?.startsWith('PS-') ? payload.check_number : (payload.check_number ? `${cleanMrn}-${payload.check_number.replace(/^CHK-2026-?/i, 'Prescription_7')}` : `${cleanMrn}-Prescription_7`);
 
   // 1. Try FastAPI Backend with 7s timeout
   if (API_BASE_URL) {
@@ -432,7 +437,7 @@ export async function dispatchDoctorConsultEmail(payload: {
         </div>
         <p style="margin: 0 0 12px; font-size: 14px;">Dear <strong>Dr. ${cleanDocName}</strong>,</p>
         <p style="margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: #475569;">
-          A clinical safety screening for Patient <strong>${payload.patient_name}</strong> (MRN: ${payload.patient_mrn || 'PT-NEW-001'}) flagged a <strong>${payload.severity.toUpperCase()}</strong> pharmacological interaction requiring your clinical consultation and regimen modification.
+          A clinical safety screening for Patient <strong>${payload.patient_name}</strong> (MRN: ${cleanMrn}) flagged a <strong>${payload.severity.toUpperCase()}</strong> pharmacological interaction requiring your clinical consultation and regimen modification.
         </p>
         <div style="background: #fff7ed; border: 1px solid #fed7aa; padding: 14px 16px; border-radius: 8px; margin-bottom: 16px;">
           <strong style="color: #9a3412; font-size: 13px; text-transform: uppercase;">Flagged Drug Interaction:</strong>

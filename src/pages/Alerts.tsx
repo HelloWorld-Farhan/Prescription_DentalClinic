@@ -768,6 +768,11 @@ export default function Alerts() {
         onClose={() => setActiveDrawerAlert(null)}
         onOverride={handleOverride}
         checkId={activeDrawerCheckId || undefined}
+        patientName={checks.find((c) => c.id === activeDrawerCheckId || c.checkNumber === activeDrawerCheckId)?.patientName}
+        patientMrn={checks.find((c) => c.id === activeDrawerCheckId || c.checkNumber === activeDrawerCheckId)?.mrn}
+        checkNumber={checks.find((c) => c.id === activeDrawerCheckId || c.checkNumber === activeDrawerCheckId)?.checkNumber || activeDrawerCheckId}
+        sourceDocumentUrl={checks.find((c) => c.id === activeDrawerCheckId || c.checkNumber === activeDrawerCheckId)?.sourceDocumentUrl}
+        sourceDocumentName={checks.find((c) => c.id === activeDrawerCheckId || c.checkNumber === activeDrawerCheckId)?.sourceDocumentName}
         onSelectAlternative={(alt) => {
           showConfirmation('Prescribed alternative noted: ' + alt + '. You can review or edit in New Check.', 'info');
         }}
