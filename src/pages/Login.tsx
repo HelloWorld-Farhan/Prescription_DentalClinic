@@ -40,15 +40,13 @@ export default function Login() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [navigate]);
 
-  const [clinicalId, setClinicalId] = useState(() => {
-    return localStorage.getItem('smileclinic_remembered_email') || '';
-  });
+  const [clinicalId, setClinicalId] = useState('');
   const [password, setPassword] = useState('');
   const [clinicalIdTouched, setClinicalIdTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(true);
+  const [rememberDevice, setRememberDevice] = useState(false);
   const [authorizedConfirmation, setAuthorizedConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(() => {
     const revoked = sessionStorage.getItem('smileclinic_session_revoked_flash');
@@ -528,6 +526,7 @@ export default function Login() {
                         <input
                           id="clinical-password"
                           type={showPassword ? 'text' : 'password'}
+                          autoComplete="new-password"
                           value={password}
                           onBlur={() => setPasswordTouched(true)}
                           onChange={(e) => {

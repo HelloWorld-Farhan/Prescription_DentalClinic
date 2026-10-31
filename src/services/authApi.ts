@@ -1304,7 +1304,8 @@ export const authApi = {
       'rxguard_two_factor_enabled',
       'smileclinic_jwt_token',
       'smileclinic_auth_user',
-      'smileclinic_user_email'
+      'smileclinic_user_email',
+      'smileclinic_remembered_email'
     ];
     authKeys.forEach((k) => {
       try {

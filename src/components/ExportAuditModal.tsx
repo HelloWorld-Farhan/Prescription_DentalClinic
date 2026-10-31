@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PrescriptionStorage as VirtualDb } from '../services/prescriptionService';
+import { PrescriptionStorage as VirtualDb, getActiveClinicianName } from '../services/prescriptionService';
 import { GOOGLE_APPS_SCRIPT_URL, API_BASE_URL } from '../config/api';
 import type { AuditLogEntry } from '../types';
 
@@ -58,7 +58,7 @@ export default function ExportAuditModal({
   const [exportSuccess, setExportSuccess] = useState(false);
 
   // Clinician name state
-  const [currentClinician, setCurrentClinician] = useState('Farhan khalid');
+  const [currentClinician, setCurrentClinician] = useState(() => getActiveClinicianName() || 'Authorized Clinician');
 
   // Load default clinician email on open
   useEffect(() => {
@@ -69,10 +69,10 @@ export default function ExportAuditModal({
         sessionStorage.getItem('rxguard_prescriber_email') ||
         localStorage.getItem('rxguard_prescriber_email') ||
         '';
-      setRecipientEmail(u.email || fallback || 'farhankhalid17968@gmail.com');
+      setRecipientEmail(u.email || fallback || '');
       if (u.name) setCurrentClinician(u.name);
     } catch {
-      setRecipientEmail('farhankhalid17968@gmail.com');
+      setRecipientEmail('');
     }
     setEmailError('');
     setEmailSuccess(false);

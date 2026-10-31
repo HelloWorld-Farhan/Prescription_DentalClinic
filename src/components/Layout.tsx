@@ -618,6 +618,10 @@ export default function Layout() {
         await authApi.revokeSession(email, deviceId);
       }
     } catch {}
+    try {
+      localStorage.removeItem('smileclinic_remembered_email');
+      sessionStorage.clear();
+    } catch {}
     authApi.clearSession();
     navigate('/login');
   };
