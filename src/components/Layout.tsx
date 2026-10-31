@@ -10,7 +10,7 @@ import { SafetyCheckRecord } from '../types';
 import { ConfirmationEventDetail, showConfirmation } from '../services/confirmation';
 import { parseMedicationTiming } from '../services/medicationScheduleService';
 
-import { pushNotificationReadState } from '../services/cloudSyncService';
+import { pushNotificationReadState, pullFromCloud } from '../services/cloudSyncService';
 
 interface NotificationItem {
   id: string;
@@ -359,6 +359,12 @@ export default function Layout() {
   }, [navigate]);
 
   const unreadCount = notifications.filter(n => n.unread).length;
+  const [showDailyBanner, setShowDailyBanner] = useState<boolean>(true);
+
+  // Pull latest read states across all devices on mount
+  useEffect(() => {
+    pullFromCloud().catch(() => {});
+  }, []);
 
   const [notificationsReadAt, setNotificationsReadAt] = useState<number>(() => {
     try {
@@ -479,52 +485,70 @@ export default function Layout() {
     };
   }, []);
 
-  // Compute live clinical notifications from recent checks with persistent read tracking
+  // Compute ONE consolidated daily medication & safety alert notification for today
   useEffect(() => {
-    const list: NotificationItem[] = [];
-    (realChecks || []).slice(0, 4).forEach((check) => {
-      const checkCreatedMs = check.timestampMs || (check.createdAt ? new Date(check.createdAt).getTime() : 0);
-      const isPastBulkRead = notificationsReadAt > 0 && (checkCreatedMs === 0 || checkCreatedMs <= notificationsReadAt);
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const dailyNotifId = `daily-med-schedule-${todayStr}`;
 
-      // 1. Safety hazard alerts
-      (check.alerts || []).forEach((al, idx) => {
-        const notifId = `notif-al-${check.id}-${idx}`;
-        const isRead = readNotifIds.has(notifId) || isPastBulkRead;
-        list.push({
-          id: notifId,
-          title: al.title || 'Pharmacological Interaction Alert',
-          desc: `${check.patientName} (${check.mrn}): ${al.mechanism || al.description || 'Clinical hazard detected.'}`,
-          time: check.timestamp || 'Recently',
-          category: 'Safety Alert',
-          icon: 'warning',
-          unread: !al.overridden && !isRead,
-          bgClass: al.severity === 'contraindicated' ? 'bg-rose-500/10' : 'bg-amber-500/10',
-          textClass: al.severity === 'contraindicated' ? 'text-rose-600' : 'text-amber-600',
-        });
+    // Gather unique active prescribed medications across checks
+    const activeMedsMap = new Map<string, { drugName: string; dosage?: string; frequency?: string; instruction?: string }>();
+    const activeAlerts: string[] = [];
+
+    (realChecks || []).forEach((chk) => {
+      (chk.prescriptions || []).forEach((rx) => {
+        const drug = rx.drugName || (rx as any).name;
+        if (drug && !activeMedsMap.has(drug.toLowerCase())) {
+          const timing = parseMedicationTiming(rx.frequency || '', drug);
+          activeMedsMap.set(drug.toLowerCase(), {
+            drugName: drug,
+            dosage: rx.dosage || '',
+            frequency: rx.frequency || '',
+            instruction: timing.foodInstruction || 'As prescribed',
+          });
+        }
       });
 
-      // 2. Medication intake timing reminders
-      (check.prescriptions || []).forEach((rx, idx) => {
-        const drugName = rx.drugName || (rx as any).name || 'Medication';
-        const timing = parseMedicationTiming(rx.frequency || '', drugName);
-        const notifId = `notif-rx-${check.id}-${idx}`;
-        const isRead = readNotifIds.has(notifId) || isPastBulkRead;
-        list.push({
-          id: notifId,
-          title: `${drugName} ${rx.dosage || ''} • Intake Due`,
-          desc: `⏰ ${timing.scheduledTime} (${timing.foodInstruction}) for ${check.patientName}`,
-          time: timing.scheduledTime,
-          category: 'Medication Timing',
-          icon: 'alarm',
-          unread: !isRead,
-          bgClass: 'bg-sky-500/10',
-          textClass: 'text-sky-600',
-        });
+      (chk.alerts || []).forEach((al) => {
+        if (!al.overridden && al.title && !activeAlerts.includes(al.title)) {
+          activeAlerts.push(al.title);
+        }
       });
     });
 
-    setNotifications(list);
-  }, [realChecks, readNotifIds, notificationsReadAt]);
+    const activeMedsList = Array.from(activeMedsMap.values());
+    if (activeMedsList.length === 0 && activeAlerts.length === 0) {
+      setNotifications([]);
+      return;
+    }
+
+    const isRead = readNotifIds.has(dailyNotifId);
+    const medsSummary = activeMedsList.length > 0
+      ? activeMedsList.map((m) => `${m.drugName}${m.dosage ? ` (${m.dosage})` : ''} • ${m.instruction}`).join(' | ')
+      : 'No active intake scheduled today';
+
+    const alertsSummary = activeAlerts.length > 0
+      ? ` • ⚠️ ${activeAlerts.length} Clinical Safety Hazard${activeAlerts.length > 1 ? 's' : ''} flagged for review: ${activeAlerts.slice(0, 2).join(', ')}.`
+      : '';
+
+    const title = activeAlerts.length > 0
+      ? `⚠️ Today's Medication Intake & Clinical Alert`
+      : `💊 Today's Prescribed Medication Regimen • Action Required`;
+
+    const singleDailyNotif: NotificationItem = {
+      id: dailyNotifId,
+      title,
+      desc: `${medsSummary}${alertsSummary}`,
+      time: `Today's Schedule (${todayStr})`,
+      category: 'Daily Medication Regimen',
+      icon: activeAlerts.length > 0 ? 'warning' : 'medication',
+      unread: !isRead,
+      bgClass: activeAlerts.length > 0 ? 'bg-amber-500/10' : 'bg-primary/10',
+      textClass: activeAlerts.length > 0 ? 'text-amber-700' : 'text-primary',
+    };
+
+    setNotifications([singleDailyNotif]);
+  }, [realChecks, readNotifIds]);
 
   const filteredSearchItems: SearchResultItem[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -948,21 +972,74 @@ export default function Layout() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                animate={unreadCount > 0 ? { rotate: [0, -12, 12, -8, 8, -4, 4, 0] } : { rotate: 0 }}
+                transition={unreadCount > 0 ? { repeat: Infinity, repeatDelay: 3.5, duration: 1.2 } : { duration: 0.2 }}
                 onClick={() => {
                   setNotificationsOpen(!notificationsOpen);
                   setProfileOpen(false);
+                  setShowDailyBanner(false);
                 }}
-                className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors duration-150 relative cursor-pointer"
+                className={`p-2 rounded-xl transition-all duration-150 relative cursor-pointer ${
+                  unreadCount > 0
+                    ? 'bg-primary/15 text-primary border border-primary/30 shadow-xs'
+                    : 'bg-surface-container-low hover:bg-surface-container-high text-on-surface'
+                }`}
                 title="Notifications"
                 aria-label="Clinical notifications"
               >
-                <span className="material-symbols-outlined text-[20px] block">notifications</span>
+                <span className="material-symbols-outlined text-[20px] block">
+                  {unreadCount > 0 ? 'notifications_active' : 'notifications'}
+                </span>
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-2xs">
-                    {unreadCount}
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-600 text-white text-[10px] font-bold items-center justify-center shadow-xs">
+                      {unreadCount}
+                    </span>
                   </span>
                 )}
               </motion.button>
+
+              {/* Animated First-Open Daily Medication Reminder Callout */}
+              <AnimatePresence>
+                {showDailyBanner && unreadCount > 0 && !notificationsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                    onClick={() => {
+                      setNotificationsOpen(true);
+                      setShowDailyBanner(false);
+                      const now = new Date();
+                      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                      markNotificationAsRead(`daily-med-schedule-${todayStr}`);
+                    }}
+                    className="hidden sm:flex absolute right-0 top-12 z-50 w-80 bg-surface-container-lowest p-3 rounded-2xl shadow-xl border border-primary/30 items-start gap-2.5 cursor-pointer hover:border-primary/50 transition-colors"
+                  >
+                    <div className="p-1.5 rounded-xl bg-primary/10 text-primary shrink-0 mt-0.5">
+                      <span className="material-symbols-outlined text-[18px]">medication</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wide text-primary">Daily Regimen</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDailyBanner(false);
+                          }}
+                          className="text-outline hover:text-on-surface p-0.5"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                      </div>
+                      <p className="text-xs font-bold text-on-surface leading-tight mt-0.5">Today's Prescribed Medicine Intake</p>
+                      <p className="text-[11px] text-on-surface-variant line-clamp-1 mt-0.5">Tap to review your scheduled medicines & safety alerts for today.</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <AnimatePresence>
                 {notificationsOpen && (
